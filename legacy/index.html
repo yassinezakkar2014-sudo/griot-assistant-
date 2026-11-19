@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080812">
+  <title>GRIOT — Wakandan AI</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+  <header class="topbar">
+    <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+    <div><div class="brand">GRIOT<span class="brand-dot">.</span></div><div class="subtitle">INTERFACE D’INTELLIGENCE • PROTOTYPE</div></div>
+    <div class="status-pill"><i id="statusLight"></i><span id="statusText">SYSTÈME PRÊT</span></div>
+  </header>
+
+  <main class="layout">
+    <section class="hero">
+      <div class="eyebrow"><span class="eyebrow-line"></span> INTERFACE NEURO-ASSISTÉE <span class="eyebrow-line"></span></div>
+      <h1>Bonjour.<br><span>Je suis Griot.</span></h1>
+      <p class="intro">Votre assistante personnelle, prête à écouter, voir et réfléchir avec vous.</p>
+
+      <div class="orb-wrap">
+        <div class="orb-ring ring-one"></div><div class="orb-ring ring-two"></div><div class="orb-ring ring-three"></div>
+        <div class="orb-core"><div class="core-grid"></div><div class="core-eye"></div><div class="core-glint"></div></div>
+        <div class="orb-label" id="orbLabel">EN ATTENTE</div>
+      </div>
+
+      <div class="quick-actions">
+        <button class="action-btn primary" id="micBtn"><span class="btn-icon">◉</span><span id="micLabel">Parler à Griot</span></button>
+        <button class="action-btn" id="cameraBtn"><span class="btn-icon">⌗</span><span id="cameraLabel">Activer la caméra</span></button>
+      </div>
+      <p class="privacy-note"><span class="privacy-dot"></span> Micro et caméra activés uniquement avec votre autorisation.</p>
+    </section>
+
+    <section class="console">
+      <div class="console-head"><div><span class="tiny-label">CANAL DE COMMUNICATION</span><h2>Conversation</h2></div><button class="icon-btn" id="clearBtn" title="Effacer la conversation" aria-label="Effacer la conversation">↻</button></div>
+      <div class="messages" id="messages" aria-live="polite">
+        <div class="message assistant"><div class="avatar">G</div><div class="bubble-wrap"><div class="speaker">GRIOT <span>• ASSISTANTE</span></div><div class="bubble">Bonjour. Je suis prête. Écrivez-moi ou activez le microphone pour commencer. Pour une intelligence conversationnelle complète, configurez une clé API dans le serveur local.</div><div class="time">MAINTENANT</div></div></div>
+      </div>
+      <form id="chatForm" class="composer">
+        <label class="sr-only" for="userInput">Votre message</label>
+        <textarea id="userInput" rows="1" placeholder="Écrivez votre message à Griot…" autocomplete="off"></textarea>
+        <button class="send-btn" type="submit" aria-label="Envoyer">↑</button>
+      </form>
+      <div class="console-foot"><span><i class="tiny-dot"></i> LANGUE : FRANÇAIS</span><span id="connectionLabel">MODE LOCAL</span></div>
+    </section>
+
+    <aside class="side-panel">
+      <div class="panel-title"><span class="tiny-label">CAPTEURS</span><span class="panel-symbol">⌁</span></div>
+      <div class="sensor-card"><div class="sensor-icon">◉</div><div class="sensor-info"><strong>Audio</strong><span id="audioState">Inactif</span></div><span class="sensor-state" id="audioLed"></span></div>
+      <div class="sensor-card"><div class="sensor-icon">▧</div><div class="sensor-info"><strong>Vision</strong><span id="visionState">Désactivée</span></div><span class="sensor-state" id="visionLed"></span></div>
+      <div class="camera-preview" id="cameraPreview"><div class="camera-placeholder"><div class="camera-cross">＋</div><span>APERÇU CAMÉRA</span><small>Activation manuelle requise</small></div><video id="cameraVideo" autoplay playsinline muted hidden></video></div>
+      <button class="text-btn" id="stopCameraBtn" disabled>Arrêter la caméra</button>
+      <div class="divider"></div>
+      <div class="panel-title"><span class="tiny-label">PRÉFÉRENCES</span></div>
+      <label class="setting-row"><span><strong>Réponse vocale</strong><small>Lire les réponses à voix haute</small></span><input type="checkbox" id="voiceToggle" checked><i class="switch"></i></label>
+      <label class="setting-row"><span><strong>Voix</strong><small>Féminine, élégante et futuriste</small></span><select id="voiceSelect" aria-label="Choisir une voix"><option value="female">Féminine</option><option value="default">Par défaut</option></select></label>
+      <div class="disclaimer">Prototype personnel. La caméra reste dans votre navigateur ; une image n’est envoyée au modèle que si vous choisissez de l’analyser avec le serveur configuré.</div>
+    </aside>
+  </main>
+  <footer><span>GRIOT INTERFACE <b>v0.1</b></span><span>CONÇU POUR EXPLORER • PAS UN PRODUIT OFFICIEL MARVEL</span></footer>
+  <script src="app.js"></script>
+</body>
+</html>
