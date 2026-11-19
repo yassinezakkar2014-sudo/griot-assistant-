@@ -29,10 +29,11 @@ export class UI {
   async init() {
     this.bindBus();
     this.bindPanel();
+    this.bindHome();
     this.bindKeys();
     if (G.mobile) this.bindTouch();
     await this.griot.init();
-    if (!this.griot.sampleFn) $("aiState").textContent = this.griot.ai ? "IA CONNECTÉE" : "MODE LOCAL";
+    if (!this.griot.sampleFn) $("aiState").textContent = $("homeAi").textContent = this.griot.ai ? "IA CONNECTÉE" : "MODE LOCAL";
     try {
       this.tracked = localStorage.getItem("griot-track");
     } catch {}
@@ -40,6 +41,41 @@ export class UI {
       if (!document.pointerLockElement && !G.input.expectUnlock && !this.modalOpen && !this.panelOpen && G.mode !== "inspect" && G.mode !== "cinematic" && !$("hud").hidden && !G.mobile) this.menu();
       if (!document.pointerLockElement) G.input.expectUnlock = false;
     });
+  }
+
+  /** Interface d'accueil GRIOT : avatar, raccourcis, fenêtre AISAM. */
+  private bindHome() {
+    const home = $<HTMLCanvasElement>("homeAvatar").getContext("2d")!;
+    const tick = (ms: number) => {
+      if (!document.body.classList.contains("full")) this.drawAvatar(ms / 1000, home);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    $("homeTalk").onclick = () => this.talk();
+    document.querySelectorAll<HTMLElement>("[data-say]").forEach((b) => (b.onclick = () => this.griot.send(b.dataset.say!)));
+    $("vActivate").onclick = () => this.griot.send("active AISAM");
+    $("vOff").onclick = () => this.griot.send("mets AISAM en veille");
+    const setFull = (on: boolean) => {
+      document.body.classList.toggle("full", on);
+      this.togglePanel(false);
+      bus.emit("layout");
+    };
+    $("vFull").onclick = () => setFull(true);
+    $("exitFull").onclick = () => setFull(false);
+    // la fenêtre de jeu suit l'emplacement réservé dans l'interface
+    const slot = $("viewSlot");
+    const place = () => {
+      const r = slot.getBoundingClientRect();
+      const st = document.documentElement.style;
+      st.setProperty("--vx", r.left + "px");
+      st.setProperty("--vy", r.top + "px");
+      st.setProperty("--vw", r.width + "px");
+      st.setProperty("--vh", r.height + "px");
+    };
+    new ResizeObserver(place).observe(slot);
+    addEventListener("resize", place);
+    bus.on("layout", () => requestAnimationFrame(place));
+    place();
   }
 
   private unlockQuiet() {
@@ -56,12 +92,13 @@ export class UI {
     });
     bus.on("voice:state", (s: string) => {
       this.voiceState = s;
-      $("griotState").textContent = { idle: "EN ATTENTE", listening: "JE VOUS ÉCOUTE", thinking: "RÉFLEXION…", speaking: "JE VOUS RÉPONDS" }[s] ?? s;
+      $("griotState").textContent = $("homeState").textContent = { idle: "EN ATTENTE", listening: "JE VOUS ÉCOUTE", thinking: "RÉFLEXION…", speaking: "JE VOUS RÉPONDS" }[s] ?? s;
       document.body.dataset.voice = s;
     });
     bus.on("voice:continuous", (on: boolean) => ($<HTMLInputElement>("contToggle").checked = on));
     bus.on("griot:level", (l: number) => (this.level = l));
-    bus.on("griot:status", (t: string) => ($("aiState").textContent = t));
+    bus.on("griot:status", (t: string) => ($("aiState").textContent = $("homeAi").textContent = t));
+    bus.on("aisam:state", (t: string) => ($("aisamChip").textContent = t));
     bus.on("fade", () => {
       const f = $("fade");
       f.classList.remove("go");
@@ -340,7 +377,12 @@ export class UI {
   private bindKeys() {
     addEventListener("keydown", (e) => {
       if (G.uiFocus && e.key !== "Escape") return;
-      if ($("hud").hidden) return;
+      if ($("hud").hidden) {
+        // interface GRIOT seule : T pour parler, Entrée pour écrire
+        if (e.code === "KeyT") this.talk();
+        if (e.code === "Enter") $("input").focus();
+        return;
+      }
       if (e.key === "Escape") {
         if (this.modalOpen) {
           e.preventDefault();
@@ -982,8 +1024,7 @@ export class UI {
   }
 
   /** Avatar de GRIOT : visage holographique dont la bouche suit l'amplitude de la voix. */
-  private drawAvatar(t: number) {
-    const c = this.avatarCtx;
+  private drawAvatar(t: number, c = this.avatarCtx) {
     const W = 120;
     c.clearRect(0, 0, W, W);
     const lvl = this.voiceState === "speaking" ? this.level : 0;

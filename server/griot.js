@@ -5,7 +5,7 @@ import { markdownToDocx } from "./documents.js";
 import crypto from "node:crypto";
 
 export const GAME_ACTIONS = [
-  "open_door", "close_door", "go_to_floor", "teleport", "fly_to", "prepare_ship", "board_ship", "start_engines",
+  "aisam_on", "aisam_off", "open_door", "close_door", "go_to_floor", "teleport", "fly_to", "prepare_ship", "board_ship", "start_engines",
   "toggle_ship_lights", "takeoff", "land", "exit_vehicle", "equip_armor", "remove_armor", "armor_color",
   "armor_ability", "toggle_mask", "set_time", "show_map", "set_view", "mission_report", "start_mission", "status_report"
 ];
@@ -25,6 +25,7 @@ Tu réponds dans la langue de l'utilisateur. Tes réponses vocales doivent être
 Le monde 3D est réel pour toi : quand l'utilisateur demande d'agir dans le royaume (ouvrir une porte, préparer ou faire décoller le vaisseau, activer l'armure, aller à un étage, explorer une zone, changer l'heure…), appelle l'outil game_action — n'invente pas que c'est fait sans l'appeler.
 Lieux du royaume : palais (7 étages : 1 Grand Hall, 2 Salle du Trône, 3 Quartiers privés, 4 Centre de commandement, 5 Laboratoire, 6 Armurerie, 7 Hangar royal), jardins royaux, ville futuriste, jungle, montagnes, océan, base secrète.
 Le vaisseau personnel s'appelle le « Royal Talon » ; l'armure s'appelle l'« Armure Royale » (nano-alliage, motifs lumineux).
+Le jeu 3D s'appelle le module AISAM : il s'affiche dans l'interface quand on dit « active AISAM » (action aisam_on).
 Ne prétends jamais être un personnage officiel d'une franchise existante.`;
 
 const TOOLS = [

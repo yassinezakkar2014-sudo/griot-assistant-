@@ -12,7 +12,20 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 </head>
-<body>
+<body class="home">
+  <!-- INTERFACE GRIOT : fenêtre du module AISAM (le jeu s'affiche dans #viewSlot) -->
+  <section id="viewport" class="glass">
+    <header class="vbar">
+      <div class="vtitle"><span class="tiny">MODULE IMMERSIF</span><b>AISAM</b><span id="aisamChip" class="chip-state">EN VEILLE</span></div>
+      <div class="vbtns">
+        <button id="vActivate" class="btn small primary">Activer AISAM</button>
+        <button id="vFull" class="btn small" title="Plein écran">⤢ Plein écran</button>
+        <button id="vOff" class="btn small ghost" title="Mettre AISAM en veille">⏻ Veille</button>
+      </div>
+    </header>
+    <div id="viewSlot"></div>
+  </section>
+  <button id="exitFull" class="btn small glass">⤡ Revenir à l'interface GRIOT</button>
   <canvas id="scene"></canvas>
 
   <!-- ÉCRAN DE CHARGEMENT / TITRE -->
@@ -25,9 +38,10 @@
       <p id="loadLabel" class="load-label">Initialisation du royaume…</p>
       <div id="startButtons" class="start-buttons" hidden>
         <button id="btnContinue" class="btn primary" hidden>Continuer</button>
-        <button id="btnStart" class="btn primary">Entrer dans le royaume</button>
+        <button id="btnStart" class="btn primary">Activer AISAM</button>
         <button id="btnNew" class="btn ghost" hidden>Nouvelle partie</button>
       </div>
+      <p class="aisam-hint">Dites ou écrivez à GRIOT : « active AISAM »</p>
       <p class="credits">Univers original · inspiré de l'esthétique afrofuturiste · aucun contenu officiel d'une franchise</p>
     </div>
   </div>
@@ -87,8 +101,24 @@
 
   <!-- PANNEAU GRIOT -->
   <aside id="panel" class="panel glass">
+    <div class="console-hero">
+      <canvas id="homeAvatar" width="120" height="120"></canvas>
+      <div class="hero-text">
+        <span class="tiny">INTELLIGENCE ROYALE · THINK. SPEAK. RULE.</span>
+        <h1>GRIOT</h1>
+        <div class="chips"><span id="homeState" class="chip-state">EN ATTENTE</span><span id="homeAi" class="chip-state">MODE LOCAL</span></div>
+      </div>
+      <button id="homeTalk" class="round big-mic" title="Parler à GRIOT">🎙</button>
+    </div>
+    <div class="quick">
+      <button class="pill" data-say="active AISAM">▶ Active AISAM</button>
+      <button class="pill" data-say="emmène-moi explorer la ville">Explorer la ville</button>
+      <button class="pill" data-say="active mon armure">Mon armure</button>
+      <button class="pill" data-say="rapport sur mes missions">Rapport</button>
+      <button class="pill" data-say="aide">Aide</button>
+    </div>
     <header>
-      <div><span class="tiny">INTELLIGENCE ROYALE</span><h2>GRIOT</h2></div>
+      <div><span class="tiny">CONSOLE</span><h2>GRIOT</h2></div>
       <select id="modeSel" title="Mode"></select>
       <select id="langSel" title="Langue"></select>
       <button id="panelClose" class="icon" title="Fermer">✕</button>

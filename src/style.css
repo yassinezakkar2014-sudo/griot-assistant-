@@ -272,3 +272,78 @@ canvas#scene, #touch, #lookZone, .stick, .tbtns button { touch-action: none; -we
 .touch .ship-left { left: max(16px, env(safe-area-inset-left)); }
 .touch .ship-right { right: max(16px, env(safe-area-inset-right)); }
 .touch .big { font-size: 26px; }
+
+/* =====================================================================
+   INTERFACE GRIOT (accueil) + fenêtre intégrée du module AISAM
+   Disposition : console GRIOT à gauche, fenêtre AISAM à droite ;
+   en portrait : AISAM en haut, console en bas. Plein écran = jeu seul.
+   ===================================================================== */
+:root { --console-w: min(440px, 38vw); --gap: 12px; --vx: 0px; --vy: 0px; --vw: 100vw; --vh: 100vh; }
+body.home { background: radial-gradient(ellipse at 70% 20%, #0c2a55 0%, #050a18 55%, #020308 100%); }
+body.home::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; background: repeating-linear-gradient(0deg, rgba(79, 210, 255, 0.035) 0 1px, transparent 1px 4px); }
+
+#viewport { position: fixed; z-index: 1; top: max(var(--gap), env(safe-area-inset-top)); bottom: max(var(--gap), env(safe-area-inset-bottom)); right: max(var(--gap), env(safe-area-inset-right)); left: calc(var(--console-w) + var(--gap) * 2); display: flex; flex-direction: column; padding: 0; overflow: hidden; background: rgba(4, 10, 24, 0.55); }
+#viewport::before, #viewport::after { content: ""; position: absolute; width: 26px; height: 26px; border: 2px solid var(--cyan); pointer-events: none; z-index: 3; }
+#viewport::before { top: 6px; left: 6px; border-right: none; border-bottom: none; border-radius: 6px 0 0 0; }
+#viewport::after { bottom: 6px; right: 6px; border-left: none; border-top: none; border-radius: 0 0 6px 0; }
+.vbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.vtitle { display: flex; align-items: center; gap: 10px; }
+.vtitle b { font: 900 18px Orbitron, sans-serif; letter-spacing: 0.3em; color: #fff; text-shadow: 0 0 18px rgba(63, 224, 255, 0.6); }
+.vbtns { display: flex; gap: 6px; flex-wrap: wrap; }
+#viewSlot { flex: 1; min-height: 0; }
+.chip-state { font: 500 10px "JetBrains Mono", monospace; letter-spacing: 0.12em; padding: 3px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--cyan); background: rgba(63, 224, 255, 0.08); white-space: nowrap; }
+body.aisam #aisamChip { color: #3fff9a; border-color: rgba(63, 255, 154, 0.5); }
+body.aisam #vActivate { display: none; }
+body:not(.aisam) #vFull, body:not(.aisam) #vOff { display: none; }
+
+/* le jeu, son HUD et ses commandes tactiles occupent exactement la fenêtre AISAM */
+body.home #loader, body.home canvas#scene, body.home #hud, body.home #touch, body.home #fade, body.home #visionOverlay {
+  position: fixed; inset: auto; left: var(--vx); top: var(--vy); width: var(--vw); height: var(--vh); border-radius: 0 0 var(--radius) var(--radius); overflow: hidden;
+}
+body.home #loader { z-index: 2; background: radial-gradient(ellipse at 50% 35%, rgba(12, 42, 85, 0.9), rgba(4, 8, 20, 0.92)); }
+body.home canvas#scene { z-index: 2; }
+body.home #hud { z-index: 3; }
+body.home #touch { z-index: 3; }
+body.home:not(.aisam) canvas#scene, body.home:not(.aisam) #touch { visibility: hidden; }
+body.home .logo-ring { width: 96px; height: 96px; margin-bottom: 12px; }
+body.home .logo-core { width: 58px; height: 58px; font-size: 28px; }
+body.home .title { font-size: clamp(32px, 5vw, 58px); }
+body.home .slogan { margin-bottom: 18px; }
+.aisam-hint { font: 500 13px Manrope, sans-serif; color: var(--gold); margin-top: 16px; }
+body.home .credits { margin-top: 14px; }
+body.home:not(.full) #dock { display: none; }
+
+/* console GRIOT ancrée à gauche */
+.console-hero, .quick { display: none; }
+body.home:not(.full) .panel { transform: none; left: max(var(--gap), env(safe-area-inset-left)); right: auto; top: max(var(--gap), env(safe-area-inset-top)); bottom: max(var(--gap), env(safe-area-inset-bottom)); width: var(--console-w); z-index: 4; }
+body.home:not(.full) #panelClose { display: none; }
+body.home:not(.full) .console-hero { display: flex; align-items: center; gap: 12px; padding: 16px 14px 6px; }
+body.home:not(.full) .quick { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 14px 10px; }
+body.home:not(.full) .panel > header { padding-top: 4px; }
+body.home:not(.full) .panel > header h2 { font-size: 13px; letter-spacing: 0.3em; color: var(--muted); }
+#homeAvatar { width: 84px; height: 84px; flex: none; filter: drop-shadow(0 0 18px rgba(63, 160, 255, 0.5)); }
+.hero-text { flex: 1; min-width: 0; }
+.hero-text h1 { margin: 2px 0 6px; font: 900 30px Orbitron, sans-serif; letter-spacing: 0.24em; background: linear-gradient(180deg, #fff, #8fd0ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.big-mic { width: 56px; height: 56px; font-size: 24px; flex: none; }
+body[data-voice="listening"] #homeTalk { background: rgba(63, 255, 154, 0.3); box-shadow: 0 0 24px rgba(63, 255, 154, 0.6); animation: pulse 1s infinite; }
+.quick .pill { font-size: 12.5px; padding: 7px 12px; }
+.quick .pill:first-child { border-color: rgba(255, 200, 97, 0.7); color: var(--gold); }
+
+/* plein écran : le jeu seul, la console redevient un tiroir */
+body.full #viewport { display: none; }
+body.full #loader, body.full canvas#scene, body.full #hud, body.full #touch, body.full #fade, body.full #visionOverlay { left: 0; top: 0; width: 100vw; height: 100vh; border-radius: 0; }
+#exitFull { display: none; position: fixed; z-index: 15; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); }
+body.full #exitFull { display: block; }
+body.full.aisam #hud .ship-status { top: 56px; }
+
+/* portrait / écrans étroits : AISAM en haut, console en bas */
+@media (max-width: 900px), (orientation: portrait) {
+  #viewport { left: max(var(--gap), env(safe-area-inset-left)); bottom: auto; height: 52vh; }
+  body.home:not(.full) .panel { width: auto; right: max(var(--gap), env(safe-area-inset-right)); top: calc(52vh + var(--gap) * 2); }
+  body.home:not(.full) .console-hero { padding-top: 10px; }
+  #homeAvatar { width: 60px; height: 60px; }
+  .hero-text h1 { font-size: 22px; }
+  body.home .hud-tl { transform: scale(0.85); transform-origin: top left; }
+  body.home .hud-tr { transform: scale(0.75); transform-origin: top right; }
+}

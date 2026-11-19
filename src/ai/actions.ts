@@ -114,6 +114,17 @@ function doorId(target?: string | null): string | null {
 
 /** Exécute une action ; renvoie la phrase de confirmation de GRIOT. */
 export async function runAction(action: string, target?: string | null): Promise<string> {
+  const W = window as any;
+  if (action === "aisam_off") {
+    bus.emit("aisam:off");
+    return "AISAM est en veille. Je reste à votre écoute ici.";
+  }
+  if (!W.__gameReady) {
+    bus.emit("aisam:on");
+    return "AISAM est encore en cours de chargement. Je l'active dès qu'il est prêt, redemandez-moi ensuite.";
+  }
+  if (!W.__aisamActive) await W.__aisamActivate?.();
+  if (action === "aisam_on") return "AISAM activé. Bienvenue dans votre royaume, Majesté.";
   const ship = G.ship;
   const armor = G.armor;
   switch (action) {

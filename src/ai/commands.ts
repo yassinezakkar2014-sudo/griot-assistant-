@@ -21,6 +21,12 @@ function clause(raw: string): Intent | null {
   const t = normalize(raw).replace(/^(griot|grio|hey griot|ok griot|dis griot)[ ,]*/, "");
   if (!t) return null;
 
+  // module de jeu AISAM (variantes fréquentes de la reconnaissance vocale)
+  const AISAM = /\b(aisam|a isam|aissam|aysam|eisam|haisam|isam|issam|aizam|ai sam|a sam|et sam|hey sam)\b/;
+  if (AISAM.test(t)) {
+    if (/\b(desactiv\w*|ferme\w*|quitt\w*|arret\w*|stop|eteins|veille|close|exit|deactivate)\b/.test(t)) return { action: "aisam_off" };
+    return { action: "aisam_on" };
+  }
   if (/\b(tais.toi|silence|chut|stop talking|arrete de parler|calla)\b/.test(t)) return { action: "stop_voice" };
   if (/^(aide|help|ayuda|que peux.tu faire|what can you do|commandes)\b/.test(t)) return { action: "help" };
   if (/\b(sauvegard\w*|save|guardar)\b/.test(t) && !/projet/.test(t)) return { action: "save" };

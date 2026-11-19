@@ -24,6 +24,7 @@ const loadLabel = $("loadLabel");
 const progress = (p: number, label: string) => {
   loadFill.style.width = `${Math.round(p * 100)}%`;
   loadLabel.textContent = label;
+  bus.emit("aisam:state", p >= 1 ? "PRÊT" : `CHARGEMENT ${Math.round(p * 100)} %`);
 };
 
 // réglages graphiques persistants
@@ -42,7 +43,7 @@ async function boot() {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: !G.mobile, powerPreference: "high-performance" });
   const applyPR = () => renderer.setPixelRatio(Math.min(devicePixelRatio, 2) * settings.pixelRatio);
   applyPR();
-  renderer.setSize(innerWidth, innerHeight);
+  renderer.setSize(innerWidth, innerHeight, false);
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 12000);
   Object.assign(G, { renderer, scene, camera, mode: "foot", time: 0, uiFocus: false });
@@ -56,6 +57,16 @@ async function boot() {
   G.missions.init();
   G.player = new Player();
   G.player.init();
+
+  // l'interface GRIOT est utilisable tout de suite ; le module AISAM (le jeu) se charge derrière
+  const ui = new UI();
+  await ui.init();
+  Object.assign(window as any, { __G: G, __ui: ui });
+  // « active AISAM » avant la fin du chargement : on mémorise la demande
+  const early = bus.on("aisam:on", () => {
+    document.body.classList.add("aisam");
+    bus.emit("layout");
+  });
 
   progress(0.03, "Construction du palais royal");
   await new Promise((r) => setTimeout(r, 30));
@@ -72,10 +83,6 @@ async function boot() {
   G.armor.build();
   const companion = buildCompanion();
 
-  const ui = new UI();
-  await ui.init();
-  // poignées de débogage (console du navigateur)
-  Object.assign(window as any, { __G: G, __ui: ui });
 
   // position de départ : devant le palais, porte ouverte
   G.player.position.set(0, 0, -78);
@@ -83,6 +90,16 @@ async function boot() {
   G.palace.doors.get("door-main")!.open(true);
   G.player.snapCamera();
 
+  // le rendu suit la taille de la fenêtre AISAM (intégrée ou plein écran)
+  function fit() {
+    const w = Math.max(1, canvas.clientWidth),
+      h = Math.max(1, canvas.clientHeight);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h, false);
+    G.env.resize(w, h);
+  }
+  new ResizeObserver(fit).observe(canvas);
   const applySettings = () => {
     G.env.bloomEnabled = settings.bloom;
     if (renderer.shadowMap.enabled !== settings.shadows) {
@@ -93,8 +110,7 @@ async function boot() {
       });
     }
     applyPR();
-    renderer.setSize(innerWidth, innerHeight);
-    G.env.resize(innerWidth, innerHeight);
+    fit();
     try {
       localStorage.setItem("griot-gfx", JSON.stringify(settings));
     } catch {}
@@ -102,12 +118,6 @@ async function boot() {
   bus.on("settings", applySettings);
   applySettings();
 
-  addEventListener("resize", () => {
-    camera.aspect = innerWidth / innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(innerWidth, innerHeight);
-    G.env.resize(innerWidth, innerHeight);
-  });
 
   // pré-compilation des shaders pour éviter les saccades au premier affichage
   progress(0.97, "Compilation des shaders");
@@ -123,34 +133,75 @@ async function boot() {
     }
   })();
   $("startButtons").hidden = false;
-  if (hasSave) {
-    $("btnContinue").hidden = false;
-    $("btnNew").hidden = false;
-    $("btnStart").hidden = true;
-  }
-  const enter = async (load: boolean) => {
-    G.audio.unlock();
-    ui.griot.voice.unlock(); // iOS : la voix doit être débloquée pendant le geste
+  $("btnContinue").hidden = true;
+  $("btnNew").hidden = !hasSave;
+  const W = window as any;
+  let active = false;
+  let activating: Promise<void> | null = null;
+  let wantActive = false;
+  let firstEntry = true;
 
-    if (load) await G.missions.load();
-    else if (hasSave) {
-      try {
-        localStorage.removeItem("griot-save");
-      } catch {}
-      await fetch("/api/save", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ save: null }) }).catch(() => {});
-    }
-    $("loader").classList.add("gone");
-    $("hud").hidden = false;
-    document.body.dataset.mode = "foot";
-    if (!G.mobile) canvas.requestPointerLock?.();
-    setTimeout(() => {
-      const hello = load ? "Bon retour dans votre royaume, Majesté." : "Bienvenue dans votre royaume, Majesté. Je suis GRIOT. Le palais vous attend : entrez, explorez, et appelez-moi quand vous voulez avec la touche T.";
-      bus.emit("griot:say", { text: hello });
-    }, 900);
+  /** Active le module AISAM : le jeu prend vie dans la fenêtre de l'interface. */
+  const activate = (fresh = false): Promise<void> => {
+    wantActive = true;
+    document.body.classList.add("aisam");
+    bus.emit("layout");
+    if (active) return Promise.resolve();
+    if (activating) return activating;
+    activating = (async () => {
+      G.audio.unlock();
+      ui.griot.voice.unlock();
+      if (firstEntry) {
+        firstEntry = false;
+        if (hasSave && !fresh) await G.missions.load();
+        else if (hasSave) {
+          try {
+            localStorage.removeItem("griot-save");
+          } catch {}
+          await fetch("/api/save", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ save: null }) }).catch(() => {});
+        }
+      }
+      G.input.keys.clear();
+      G.input.pressed.clear();
+      $("loader").classList.add("gone");
+      $("hud").hidden = false;
+      document.body.dataset.mode = G.mode;
+      active = W.__aisamActive = true;
+      bus.emit("aisam:state", "ACTIF");
+      bus.emit("mode");
+      fit();
+      activating = null;
+    })();
+    return activating;
   };
-  $("btnStart").onclick = () => enter(false);
-  $("btnContinue").onclick = () => enter(true);
-  $("btnNew").onclick = () => enter(false);
+  const deactivate = () => {
+    wantActive = false;
+    if (!active) {
+      document.body.classList.remove("aisam");
+      return;
+    }
+    if (G.mode === "inspect") G.armor.endInspect();
+    ui.closeModal();
+    G.input.unlock();
+    G.missions.saveNow();
+    G.audio.setEngine(null);
+    active = W.__aisamActive = false;
+    $("hud").hidden = true;
+    $("loader").classList.remove("gone");
+    loadLabel.textContent = "AISAM en veille. Votre progression est sauvegardée.";
+    document.body.classList.remove("aisam", "full");
+    bus.emit("aisam:state", "EN VEILLE");
+    bus.emit("layout");
+  };
+  W.__aisamActivate = activate;
+  W.__gameReady = true;
+  early();
+  bus.on("aisam:on", () => activate());
+  bus.on("aisam:off", deactivate);
+  $("btnStart").onclick = () => activate();
+  $("btnNew").onclick = () => activate(true);
+  if (wantActive || document.body.classList.contains("aisam")) activate();
+  bus.emit("aisam:state", "PRÊT");
 
   // ---------------------------------------------------------------- boucle principale
   const clock = new THREE.Clock();
@@ -159,6 +210,7 @@ async function boot() {
   const loop = () => {
     requestAnimationFrame(loop);
     const raw = clock.getDelta();
+    if (!active) return; // AISAM en veille : aucun calcul ni rendu 3D
     (window as any).__fps = Math.round(0.9 * ((window as any).__fps ?? 60) + 0.1 / Math.max(raw, 1e-3));
     const dt = Math.min(raw, 0.05);
     G.time += dt;

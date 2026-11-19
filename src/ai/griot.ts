@@ -106,8 +106,8 @@ export class Griot {
       this.render(
         "assistant",
         this.ai
-          ? "Bienvenue dans votre royaume, Majesté. Je suis **GRIOT**. Parlez-moi (touche **T**) ou écrivez-moi : je peux agir dans le palais, piloter le Royal Talon, déployer votre armure… et bien sûr rechercher, rédiger, coder, traduire ou analyser vos documents."
-          : "Bienvenue dans votre royaume. Je suis **GRIOT**. Mon moteur d'IA n'est pas connecté (ajoutez `OPENAI_API_KEY` dans `.env`), mais toutes les **commandes du royaume** fonctionnent déjà : « ouvre les portes du garage », « prépare le Royal Talon », « active mon armure », « emmène-moi explorer la ville »… Tapez **aide** pour la liste."
+          ? "Bonjour, Majesté. Je suis **GRIOT**. Demandez-moi ce que vous voulez : rédiger, coder, traduire, analyser, organiser vos projets… Et quand vous voulez entrer dans votre royaume, dites **« active AISAM »**."
+          : "Bonjour, Majesté. Je suis **GRIOT**. Dites ou écrivez **« active AISAM »** pour ouvrir votre royaume 3D ici même, puis : « ouvre les portes du garage », « prépare le Royal Talon », « active mon armure », « emmène-moi explorer la ville »… Tapez **aide** pour la liste."
       );
     }
   }
