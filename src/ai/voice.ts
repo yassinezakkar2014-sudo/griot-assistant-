@@ -45,6 +45,8 @@ export class Voice {
   private spokenText = "";
   private synthLevelTimer: any = null;
   onFinal: (text: string) => void = () => {};
+  /** Dictée fournie par Claude quand la page est ouverte dans claude.ai (Chrome, Edge, app de bureau). */
+  dict: any = null;
 
   constructor() {
     try {
@@ -56,6 +58,24 @@ export class Voice {
       speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
     }
     requestAnimationFrame(() => this.levelLoop());
+    const cl = (window as any).claude;
+    cl?.use?.("dictation").then((d: any) => {
+      if (!d) return;
+      this.dict = d;
+      d.onPartial(({ text }: { text: string }) => {
+        if (this.speaking && !this.isEcho(text) && text.split(" ").length >= 2) this.interrupt();
+        bus.emit("voice:interim", text);
+      });
+      d.onFinal(({ text }: { text: string }) => {
+        bus.emit("voice:interim", "");
+        if (!this.isEcho(text)) this.handleFinal(text.trim());
+      });
+      d.onState(({ state, reason }: { state: string; reason?: string }) => {
+        this.listening = state === "listening" || state === "starting";
+        bus.emit("voice:state", this.listening ? "listening" : this.speaking ? "speaking" : "idle");
+        if (reason === "not_granted") bus.emit("toast", { text: "Micro refusé pour cette page.", kind: "warn" });
+      });
+    });
   }
 
   saveSettings() {
@@ -76,6 +96,21 @@ export class Voice {
 
   startListening() {
     this.interrupt();
+    if (this.dict) {
+      // appelé directement depuis le geste de l'utilisateur (aucun await avant)
+      this.dict.start({ language: this.settings.lang }).catch((e: any) => {
+        if (e?.code === "not_granted") bus.emit("toast", { text: "Micro refusé : tapez votre message ou utilisez la dictée du clavier.", kind: "warn" });
+        else if (e?.code !== "stopped") bus.emit("toast", { text: "Micro indisponible pour le moment.", kind: "warn" });
+      });
+      return;
+    }
+    if ((window as any).claude) {
+      bus.emit("toast", {
+        text: "🎙 Ici (Claude sur iPad / Safari), le micro n'est pas donné aux pages. Touchez la zone de texte puis le 🎙 du clavier pour dicter — ou ouvrez GRIOT dans Chrome sur ordinateur.",
+        kind: "warn"
+      });
+      return;
+    }
     const SRC = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SRC) return this.recordFallback();
     const rec: SR = new SRC();
@@ -128,6 +163,12 @@ export class Voice {
   }
 
   stopListening() {
+    if (this.dict && this.listening) {
+      this.dict.stop().catch(() => {});
+      this.listening = false;
+      bus.emit("voice:state", "idle");
+      return;
+    }
     const r = this.rec;
     this.rec = null;
     this.settings.continuous = false;
