@@ -2,6 +2,7 @@
 import { G, bus } from "../core";
 import { parseCommands, type Intent } from "./commands";
 import { runAction, gameSummary } from "./actions";
+import { GAME_ACTIONS, MODE_RULES, PERSONA } from "./persona";
 import { Voice } from "./voice";
 
 export type GriotMode = "personal" | "business" | "research" | "creative" | "coder";
@@ -52,6 +53,9 @@ export class Griot {
   history: Msg[] = [];
   pending: Attachment[] = [];
   busy = false;
+  /** Cerveau Claude fourni par la page hébergée (capacité « sample »), quand il n'y a pas de serveur. */
+  sampleFn: any = null;
+  private sampleTools = false;
   private abort: AbortController | null = null;
   private list = document.getElementById("messages")!;
 
@@ -88,6 +92,16 @@ export class Griot {
     });
     this.refreshProjects();
     bus.emit("griot:status", this.ai ? "IA CONNECTÉE" : "MODE LOCAL");
+    const cl = (window as any).claude;
+    if (!this.ai && cl?.use) {
+      cl.use("sample").then(async (fn: any) => {
+        if (!fn) return;
+        this.sampleFn = fn;
+        const lim = await fn.limits().catch(() => null);
+        this.sampleTools = !!lim?.tools;
+        bus.emit("griot:status", "CLAUDE CONNECTÉ");
+      });
+    }
     if (!this.history.length) {
       this.render(
         "assistant",
@@ -198,6 +212,17 @@ export class Griot {
       }
     }
     // 2) intelligence artificielle
+    if (!this.ai && this.sampleFn) {
+      let content = text || "Analyse ces fichiers.";
+      const images: Blob[] = [];
+      for (const a of atts) {
+        if (a.kind === "image" && a.image) images.push(dataUrlToBlob(a.image));
+        else if (a.text) content += `\n\n[Document joint : ${a.name}]\n"""\n${a.text.slice(0, 40000)}\n"""`;
+      }
+      this.history.push({ role: "user", content });
+      await this.streamSample(images, opts.spoken);
+      return;
+    }
     if (!this.ai) {
       const r = this.offline(text);
       this.render("assistant", r);
@@ -228,14 +253,119 @@ export class Griot {
         G.ship.startEngines(false);
         return "Moteurs coupés.";
       case "project_report":
-        if (this.ai) {
+        if (this.ai || this.sampleFn) {
           this.history.push({ role: "user", content: "Fais-moi un rapport clair et concis sur mes projets (statut, prochaines tâches, priorités)." });
-          this.stream(null, true);
+          if (this.ai) this.stream(null, true);
+          else this.streamSample([], true);
           return "";
         }
         return this.projectReport();
     }
     return runAction(it.action, it.target);
+  }
+
+  /** Conversation via Claude (page hébergée) : streaming + outils qui agissent dans le jeu. */
+  private async streamSample(images: Blob[], spoken = false) {
+    this.busy = true;
+    bus.emit("voice:state", "thinking");
+    const bubble = this.render("assistant", "");
+    bubble.classList.add("typing");
+    const ctl = new AbortController();
+    this.abort = ctl;
+    let facts: string[] = [];
+    let projects: any[] = [];
+    try {
+      facts = ((await (await fetch("/api/memory")).json()).facts ?? []).map((f: any) => f.text);
+      projects = (await (await fetch("/api/projects")).json()).projects ?? [];
+    } catch {}
+    const rules = [
+      PERSONA,
+      MODE_RULES[this.mode],
+      `Réponds dans la langue : ${this.voice.settings.lang}. Pas de recherche Internet ni de lecture de PDF dans cette version : dis-le simplement si on te le demande, et propose de coller le texte.`,
+      facts.length ? "Ce que tu sais de l'utilisateur :\n- " + facts.join("\n- ") : "",
+      projects.length ? "Projets : " + JSON.stringify(projects.map((p) => ({ nom: p.name, statut: p.status, taches: p.tasks }))).slice(0, 4000) : "",
+      "État du jeu : " + JSON.stringify(gameSummary()),
+      this.sampleTools ? "Pour agir dans le royaume, appelle l'outil game_action (jamais prétendre l'avoir fait sans l'appeler)." : "Tu ne peux pas agir directement dans le jeu ici : indique à l'utilisateur la commande à dire (ex. « ouvre les portes du garage »)."
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    const turns = [{ role: "user", content: rules }, ...this.history.slice(-16).map((m) => ({ role: m.role, content: m.content || "…" }))];
+    const tools = this.sampleTools
+      ? [
+          {
+            name: "game_action",
+            description: "Déclenche une action réelle dans l'univers 3D (portes, étages, vaisseau, armure, heure, carte, vues, rapports). Renvoie la confirmation.",
+            inputSchema: { type: "object", properties: { action: { type: "string", enum: GAME_ACTIONS }, target: { type: "string", description: "Étage 1-7, nom de porte, lieu (city, jungle, mountains, ocean, base, night, gardens, palace), heure, couleur, capacité…" } }, required: ["action"] },
+            execute: async (i: any) => {
+              const r = await runAction(String(i.action), i.target != null ? String(i.target) : null);
+              bus.emit("toast", { text: `GRIOT ▸ ${r}` });
+              return r;
+            }
+          },
+          {
+            name: "remember",
+            description: "Mémorise durablement un fait ou une préférence de l'utilisateur.",
+            inputSchema: { type: "object", properties: { fact: { type: "string" } }, required: ["fact"] },
+            execute: async (i: any) => {
+              await fetch("/api/memory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fact: String(i.fact) }) });
+              bus.emit("toast", { text: `🧠 Mémorisé : ${i.fact}` });
+              return "ok";
+            }
+          },
+          {
+            name: "manage_project",
+            description: "Crée ou met à jour un projet (statut, note, tâche à ajouter ou à cocher).",
+            inputSchema: { type: "object", properties: { name: { type: "string" }, status: { type: "string", enum: ["idée", "en cours", "en pause", "terminé"] }, note: { type: "string" }, task: { type: "string" }, complete_task: { type: "string" } }, required: ["name"] },
+            execute: async (i: any) => {
+              await fetch("/api/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(i) });
+              this.refreshProjects();
+              bus.emit("toast", { text: `📁 Projet mis à jour : ${i.name}` });
+              return "ok";
+            }
+          }
+        ]
+      : undefined;
+    let last = "";
+    try {
+      const res = await this.sampleFn(turns, {
+        signal: ctl.signal,
+        modelTier: this.mode === "personal" ? "quick" : "default",
+        ...(tools ? { tools } : { cache: false }),
+        ...(images.length ? { images } : {}),
+        onText: ({ text, delta }: { text: string; delta: string }) => {
+          last = text;
+          bubble.classList.remove("typing");
+          bubble.innerHTML = md(text);
+          this.list.scrollTop = this.list.scrollHeight;
+          this.voice.stream(delta);
+        }
+      });
+      this.voice.flush();
+      this.history.push({ role: "assistant", content: res.text });
+      this.persist();
+      bus.emit("caption", res.text.slice(0, 220));
+    } catch (e: any) {
+      bubble.classList.remove("typing");
+      const msg: Record<string, string> = {
+        not_granted: "Vous n'avez pas autorisé cette page à utiliser Claude. Les commandes du royaume restent disponibles.",
+        sampling_disabled: "Claude n'est pas disponible pour ce compte.",
+        rate_limited: "Trop de demandes pour l'instant. Réessayez dans un moment.",
+        images_unavailable: "Je ne peux pas recevoir d'images dans cette vue.",
+        refused: "Je ne peux pas répondre à cette demande.",
+        cancelled: ""
+      };
+      const keep = e?.text ?? last;
+      bubble.innerHTML = md((keep ? keep + "\n\n" : "") + (msg[e?.code] ?? "Connexion à Claude interrompue. Réessayez."));
+      if (e?.code === "not_granted" || e?.code === "sampling_disabled") {
+        this.sampleFn = null;
+        bus.emit("griot:status", "MODE LOCAL");
+      }
+      this.history.pop();
+    } finally {
+      this.busy = false;
+      this.abort = null;
+      bus.emit("voice:state", this.voice.listening ? "listening" : "idle");
+    }
   }
 
   private async stream(image: string | null, spoken = false) {
@@ -345,6 +475,15 @@ export class Griot {
         .join(" ")
     );
   }
+}
+
+function dataUrlToBlob(url: string) {
+  const [head, b64] = url.split(",");
+  const type = /data:([^;]+)/.exec(head)?.[1] ?? "image/jpeg";
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type });
 }
 
 export const HELP = `**Commandes du royaume** (voix ou texte) :

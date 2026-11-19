@@ -32,7 +32,7 @@ export class UI {
     this.bindKeys();
     if (G.mobile) this.bindTouch();
     await this.griot.init();
-    $("aiState").textContent = this.griot.ai ? "IA CONNECTÉE" : "MODE LOCAL";
+    if (!this.griot.sampleFn) $("aiState").textContent = this.griot.ai ? "IA CONNECTÉE" : "MODE LOCAL";
     try {
       this.tracked = localStorage.getItem("griot-track");
     } catch {}
@@ -61,6 +61,7 @@ export class UI {
     });
     bus.on("voice:continuous", (on: boolean) => ($<HTMLInputElement>("contToggle").checked = on));
     bus.on("griot:level", (l: number) => (this.level = l));
+    bus.on("griot:status", (t: string) => ($("aiState").textContent = t));
     bus.on("fade", () => {
       const f = $("fade");
       f.classList.remove("go");
@@ -331,6 +332,7 @@ export class UI {
 
   talk() {
     G.audio.unlock();
+    this.griot.voice.unlock();
     this.griot.voice.toggleListen();
   }
 
@@ -391,7 +393,7 @@ export class UI {
         <button class="btn" data-a="help">⌨ Commandes</button>
         <button class="btn" data-a="settings">⚙ Réglages</button>
         <button class="btn" data-a="save">💾 Sauvegarder</button>
-        <button class="btn ghost" data-a="reset">⟲ Nouvelle partie</button>
+        <button class="btn ghost" data-a="reset" id="resetBtn">⟲ Nouvelle partie</button>
       </div>
       <p class="hint">Niveau ${G.missions.level()} · ${G.missions.rankName()} · ${G.missions.completedCount()}/${G.missions.defs.length} missions · ${G.missions.state.credits} éclats royaux</p>`
     );
@@ -408,7 +410,14 @@ export class UI {
       else if (a === "save") {
         G.missions.saveNow();
         this.toast("💾 Progression sauvegardée (navigateur + serveur).");
-      } else if (a === "reset" && confirm("Effacer la progression et recommencer ?")) G.missions.reset();
+      } else if (a === "reset") {
+        const b = $("resetBtn");
+        if (b.dataset.armed) G.missions.reset();
+        else {
+          b.dataset.armed = "1";
+          b.textContent = "⚠ Toucher encore pour tout effacer";
+        }
+      }
     };
   }
 
@@ -753,6 +762,17 @@ export class UI {
   // ---------------------------------------------------------------- tactile
   private bindTouch() {
     $("touch").hidden = false;
+    // capacités de l'armure au toucher (et au clic)
+    document.querySelectorAll<HTMLElement>("#armorHud [data-ab]").forEach((el) => {
+      el.addEventListener("click", () => G.armor.ability(el.dataset.ab!));
+    });
+    // toucher la bulle « ◎ … » = interagir
+    $("prompt").addEventListener("click", () => G.input.tap("KeyE"));
+    // pas de zoom / défilement parasite sur iPad
+    document.addEventListener("gesturestart", (e) => e.preventDefault());
+    document.addEventListener("touchmove", (e) => {
+      if (!(e.target as HTMLElement).closest(".panel, .modal-card")) e.preventDefault();
+    }, { passive: false });
     const stick = $("stick");
     const knob = stick.querySelector("i") as HTMLElement;
     let sid: number | null = null;

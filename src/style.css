@@ -250,3 +250,25 @@ body[data-mode="ship"] .tbtns.ship { display: grid; }
   .modal.side { place-items: end center; }
   .modal-card.side { max-height: 55vh; }
 }
+
+/* ---------- iPad / tactile ---------- */
+canvas#scene, #touch, #lookZone, .stick, .tbtns button { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.touch #crosshair { display: none; }
+.touch .prompt { pointer-events: auto; }
+.touch .abilities span { padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.touch .abilities span:active { background: rgba(63, 224, 255, 0.25); }
+.touch #armorHud { bottom: calc(96px + var(--safe-b)); }
+.hud-tl { top: max(16px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); }
+.hud-tr { top: max(16px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); }
+.tbtns { right: max(16px, env(safe-area-inset-right)); }
+.stick { left: max(24px, env(safe-area-inset-left)); }
+@media (min-width: 761px) and (pointer: coarse), (min-width: 761px) and (hover: none) {
+  .tbtns { grid-template-columns: repeat(3, 64px); }
+  .tbtns button { width: 64px; height: 64px; font-size: 24px; }
+  .stick { width: 160px; height: 160px; }
+  .stick i { width: 64px; height: 64px; margin: -32px; }
+}
+.touch .ship-left, .touch .ship-right { bottom: auto; top: calc(230px + env(safe-area-inset-top, 0px)); min-width: 120px; padding: 10px 12px; }
+.touch .ship-left { left: max(16px, env(safe-area-inset-left)); }
+.touch .ship-right { right: max(16px, env(safe-area-inset-right)); }
+.touch .big { font-size: 26px; }

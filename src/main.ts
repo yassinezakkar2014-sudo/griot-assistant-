@@ -15,6 +15,7 @@ import { ArmorSystem } from "./game/armor";
 import { Missions } from "./game/missions";
 import { UI } from "./ui/ui";
 import { mat } from "./world/materials";
+import { installLocalApi } from "./ai/localapi";
 
 const $ = (id: string) => document.getElementById(id)!;
 const canvas = $("scene") as HTMLCanvasElement;
@@ -26,7 +27,9 @@ const progress = (p: number, label: string) => {
 };
 
 // réglages graphiques persistants
-G.mobile = matchMedia("(pointer: coarse)").matches && !matchMedia("(pointer: fine)").matches;
+// iPad (y compris iPadOS qui se présente comme un Mac), téléphones, tablettes
+G.mobile = matchMedia("(pointer: coarse)").matches || (navigator.maxTouchPoints > 1 && /Macintosh|iPad|iPhone|Android/.test(navigator.userAgent));
+if (G.mobile) document.documentElement.classList.add("touch");
 const settings = { bloom: !G.mobile, shadows: !G.mobile, pixelRatio: G.mobile ? 0.6 : 1 };
 try {
   Object.assign(settings, JSON.parse(localStorage.getItem("griot-gfx") || "{}"));
@@ -34,6 +37,8 @@ try {
 (window as any).__griotSettings = settings;
 
 async function boot() {
+  const local = await installLocalApi();
+  if (local) document.documentElement.classList.add("serverless");
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: !G.mobile, powerPreference: "high-performance" });
   const applyPR = () => renderer.setPixelRatio(Math.min(devicePixelRatio, 2) * settings.pixelRatio);
   applyPR();
@@ -125,6 +130,8 @@ async function boot() {
   }
   const enter = async (load: boolean) => {
     G.audio.unlock();
+    ui.griot.voice.unlock(); // iOS : la voix doit être débloquée pendant le geste
+
     if (load) await G.missions.load();
     else if (hasSave) {
       try {

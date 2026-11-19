@@ -214,6 +214,18 @@ export class Voice {
     }
   }
 
+  /** À appeler dans un geste utilisateur (iPad/iPhone) : débloque audio et synthèse vocale. */
+  unlock() {
+    try {
+      this.ensureCtx();
+    } catch {}
+    if ("speechSynthesis" in window) {
+      const u = new SpeechSynthesisUtterance(" ");
+      u.volume = 0;
+      speechSynthesis.speak(u);
+    }
+  }
+
   // ---------------------------------------------------------------- parole
   /** Interrompt immédiatement GRIOT. */
   interrupt() {
