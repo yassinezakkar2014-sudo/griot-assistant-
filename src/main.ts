@@ -38,6 +38,11 @@ try {
 } catch {}
 (window as any).__griotSettings = settings;
 
+// app installable (écran d'accueil) : fonctionne hors ligne après la première visite
+if ("serviceWorker" in navigator && !(window as any).claude && (location.protocol === "https:" || location.hostname === "localhost")) {
+  addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+}
+
 async function boot() {
   const local = await installLocalApi();
   if (local) document.documentElement.classList.add("serverless");
