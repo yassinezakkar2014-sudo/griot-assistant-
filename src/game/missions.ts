@@ -16,7 +16,7 @@ export interface MissionDef {
 export const MISSIONS: MissionDef[] = [
   { id: "tour", title: "Visite royale", desc: "Visitez les 7 étages du palais.", xp: 150, reward: "+150 XP · 100 éclats", hint: "Utilisez l'ascenseur au fond du hall (touches 1-7 dans la cabine)." },
   { id: "armor", title: "L'Armure Royale", desc: "Activez puis revêtez l'Armure Royale à l'armurerie, et utilisez une capacité.", xp: 200, reward: "+200 XP", hint: "Niveau 6 — approchez du socle central et appuyez sur E." },
-  { id: "flight", title: "Baptême de l'air", desc: "Démarrez le Royal Talon, décollez et dépassez 300 m d'altitude.", xp: 200, reward: "+200 XP", hint: "Niveau 7 — « GRIOT, prépare le Royal Talon »." },
+  { id: "flight", title: "Baptême de l'air", desc: "Démarrez le Royal Talon, décollez et dépassez 300 m d'altitude.", xp: 200, reward: "+200 XP", hint: "Plateforme royale derrière le palais — « GRIOT, monte dans le vaisseau »." },
   { id: "rings", title: "Tester un véhicule", desc: "Traversez les 8 anneaux dorés autour du palais en Royal Talon.", xp: 300, reward: "Armure Solaire", hint: "Suivez l'anneau doré le plus lumineux." },
   { id: "tech", title: "Découvrir une nouvelle technologie", desc: "Analysez les 3 prototypes du laboratoire puis récupérez le Cœur d'énergie dans le coffre.", xp: 300, reward: "Armure Aurora + améliorations", hint: "Niveau 5 — laboratoire technologique." },
   { id: "explorer", title: "Explorer le royaume", desc: "Visitez la ville, la jungle, les montagnes, l'océan, la vallée nocturne et la base secrète.", xp: 400, reward: "Armure Ivoire", hint: "Demandez : « GRIOT, emmène-moi explorer la ville »." },
@@ -244,7 +244,7 @@ export class Missions {
       v: 2,
       missions: this.state,
       player: { pos: pl.position.toArray(), yaw: pl.yaw, view: pl.view, outfit: pl.body.outfit.color.getHex() },
-      ship: { pos: G.ship.root.position.toArray(), yaw: G.ship.yaw, ready: G.ship.ready },
+      ship: { pos: G.ships[0].root.position.toArray(), yaw: G.ships[0].yaw, ready: G.ships[0].ready },
       armor: { style: G.armor.style, worn: G.armor.worn },
       world: { hour: G.env.hour },
       inShip: G.mode === "ship",
@@ -287,11 +287,14 @@ export class Missions {
     pl.yaw = snap.player.yaw;
     pl.view = snap.player.view;
     pl.setOutfit(snap.player.outfit);
-    G.ship.root.position.fromArray(snap.ship.pos);
-    G.ship.yaw = snap.ship.yaw;
-    G.ship.root.quaternion.setFromEuler(new THREE.Euler(0, G.ship.yaw, 0));
-    G.ship.ready = snap.ship.ready;
-    if (snap.ship.ready) G.ship.setLights(true);
+    const royal = G.ships[0];
+    royal.root.position.fromArray(snap.ship.pos);
+    royal.yaw = snap.ship.yaw;
+    royal.root.quaternion.setFromEuler(new THREE.Euler(0, royal.yaw, 0));
+    royal.ready = snap.ship.ready;
+    // anciennes sauvegardes : le vaisseau (devenu géant) ne tient plus dans le hangar
+    if (G.palace.inside(royal.root.position)) royal.park();
+    if (snap.ship.ready) royal.setLights(true);
     G.armor.setStyle(snap.armor.style);
     if (snap.armor.worn) {
       G.armor.worn = true;

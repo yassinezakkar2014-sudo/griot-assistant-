@@ -71,6 +71,8 @@ export const PLACES: Place[] = [
   { id: "palace", name: "le palais", pos: () => G.palace.spots.floor0.pos.clone(), outdoor: false },
   { id: "terrace", name: "la terrasse", pos: () => G.palace.spots.terrace.pos.clone(), outdoor: false },
   { id: "platform", name: "la plate-forme de lancement", pos: () => G.palace.spots.platform.pos.clone(), outdoor: false },
+  { id: "pad", name: "la plateforme du Royal Talon", pos: () => G.palace.shipSpawn.clone().add(new THREE.Vector3(-30, 0.3, -42)), outdoor: false },
+  { id: "zuria", name: "le pays de Zuria", pos: () => G.palace.spots.zuria.pos.clone(), outdoor: true },
   { id: "garage", name: "le garage royal", pos: () => G.palace.spots.garage.pos.clone(), outdoor: false },
   { id: "gallery", name: "la galerie royale", pos: () => G.palace.spots.gallery.pos.clone(), outdoor: false }
 ];
@@ -87,7 +89,9 @@ export function placeFromText(t: string): Place | null {
     [/jardin|garden|fontaine|parc/, "gardens"],
     [/terrasse|terrace/, "terrace"],
     [/plate.?forme|platform|piste/, "platform"],
+    [/zuria|autre pays|pays voisin|autre royaume|etranger|voisin/, "zuria"],
     [/garage|voitures?|autos?/, "garage"],
+    [/plateforme royale|plateforme du vaisseau|aire d atterrissage/, "pad"],
     [/galerie|gallery|musee/, "gallery"],
     [/palais|palace|maison|home|chez moi/, "palace"]
   ];
@@ -131,6 +135,10 @@ export async function runAction(action: string, target?: string | null): Promise
   }
   if (!W.__aisamActive) await W.__aisamActivate?.();
   if (action === "aisam_on") return "AISAM activé. Bienvenue dans votre royaume, Majesté.";
+  // à pied : on utilise le vaisseau le plus proche (Royal Talon ou Faucon de Zuria)
+  if (G.mode !== "ship" && G.ships && /ship|engines|takeoff|fly_to|stealth/.test(action)) {
+    G.ship = [...G.ships].sort((a, b) => a.root.position.distanceTo(G.player.position) - b.root.position.distanceTo(G.player.position))[0];
+  }
   const ship = G.ship;
   const armor = G.armor;
   switch (action) {
@@ -197,7 +205,7 @@ export async function runAction(action: string, target?: string | null): Promise
     }
     case "prepare_ship":
       ship.prepare();
-      return "Le Royal Talon est prêt : diagnostics nominaux, lumières allumées et portes du hangar ouvertes.";
+      return "Le Royal Talon est prêt sur la plateforme royale : diagnostics nominaux, lumières allumées.";
     case "board_ship":
       if (G.mode === "ship") return "Vous êtes déjà aux commandes.";
       if (!ship.ready) ship.prepare();
@@ -210,6 +218,12 @@ export async function runAction(action: string, target?: string | null): Promise
       }
       ship.startEngines(true);
       return "Moteurs démarrés. Puissance stable.";
+    case "toggle_stealth": {
+      const n = normalize(String(target ?? ""));
+      const on = /desactiv|coupe|arrete|off|visible/.test(n) ? false : !/^(on|active)$/.test(n) && ship.stealth ? false : true;
+      ship.setStealth(on);
+      return ship.stealth ? "Mode furtif activé. Le Royal Talon est invisible." : "Mode furtif désactivé.";
+    }
     case "toggle_ship_lights":
       ship.setLights(!ship.lights);
       return ship.lights ? "Systèmes lumineux activés." : "Lumières coupées.";
