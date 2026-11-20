@@ -17,6 +17,7 @@ interface Attachment {
   kind: string;
   text?: string;
   image?: string;
+  pdf?: string;
   truncated?: boolean;
 }
 
@@ -110,6 +111,17 @@ export class Griot {
           : "Bonjour, Majesté. Je suis **GRIOT**. Dites ou écrivez **« active AISAM »** pour ouvrir votre royaume 3D ici même, puis : « ouvre les portes du garage », « prépare le Royal Talon », « active mon armure », « emmène-moi explorer la ville »… Tapez **aide** pour la liste."
       );
     }
+  }
+
+  /** Relit l'état du moteur d'IA (après avoir enregistré ou retiré une clé OpenAI). */
+  async refreshAI() {
+    try {
+      const h = await (await fetch("/api/health")).json();
+      this.ai = h.ai;
+      this.voice.serverTTS = h.tts;
+      this.voice.serverSTT = h.ai;
+    } catch {}
+    bus.emit("griot:status", this.ai ? "IA OPENAI" : this.sampleFn ? "CLAUDE CONNECTÉ" : "MODE LOCAL");
   }
 
   setMode(m: GriotMode) {
@@ -231,12 +243,17 @@ export class Griot {
     }
     let content = text || "Analyse ces fichiers.";
     let image: string | null = null;
+    let pdf: { data: string; name: string } | null = null;
     for (const a of atts) {
       if (a.kind === "image" && a.image) image = a.image;
+      else if (a.pdf) {
+        pdf = { data: a.pdf, name: a.name };
+        content += `\n\n[PDF joint : ${a.name}]`;
+      }
       else if (a.text) content += `\n\n[Document joint : ${a.name} (${a.kind})${a.truncated ? " — tronqué" : ""}]\n"""\n${a.text}\n"""`;
     }
     this.history.push({ role: "user", content });
-    await this.stream(image, opts.spoken);
+    await this.stream(image, opts.spoken, pdf);
   }
 
   private async local(it: Intent): Promise<string> {
@@ -374,7 +391,7 @@ export class Griot {
     }
   }
 
-  private async stream(image: string | null, spoken = false) {
+  private async stream(image: string | null, spoken = false, pdf: { data: string; name: string } | null = null) {
     this.busy = true;
     bus.emit("voice:state", "thinking");
     const bubble = this.render("assistant", "");
@@ -386,7 +403,7 @@ export class Griot {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: this.history.slice(-20), mode: this.mode, lang: this.voice.settings.lang.slice(0, 2), game: gameSummary(), image }),
+        body: JSON.stringify({ messages: this.history.slice(-20), mode: this.mode, lang: this.voice.settings.lang.slice(0, 2), game: gameSummary(), image, pdf: pdf?.data, pdfName: pdf?.name }),
         signal: this.abort.signal
       });
       if (!res.ok || !res.body) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);

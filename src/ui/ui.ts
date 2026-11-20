@@ -8,6 +8,7 @@ import { runAction, PLACES } from "../ai/actions";
 import { Griot, MODE_LABELS, type GriotMode, md, HELP } from "../ai/griot";
 import { LANGS } from "../ai/voice";
 import { WORLD } from "../world/terrain";
+import { getOpenAIKey, setOpenAIKey } from "../ai/localapi";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -52,6 +53,8 @@ export class UI {
     };
     requestAnimationFrame(tick);
     $("homeTalk").onclick = () => this.talk();
+    $("keyBtn").onclick = () => this.keyPanel();
+    if ((window as any).claude) document.documentElement.classList.add("in-claude");
     document.querySelectorAll<HTMLElement>("[data-say]").forEach((b) => (b.onclick = () => this.griot.send(b.dataset.say!)));
     $("vActivate").onclick = () => this.griot.send("active AISAM");
     $("vOff").onclick = () => this.griot.send("mets AISAM en veille");
@@ -651,6 +654,51 @@ export class UI {
       };
     }
     card.querySelectorAll<HTMLElement>("[data-mt]").forEach((b) => (b.onclick = () => this.map(b.dataset.mt as any)));
+  }
+
+  // ---------------------------------------------------------------- clé OpenAI (site web)
+  keyPanel() {
+    const has = !!getOpenAIKey();
+    const model = (() => {
+      try {
+        return localStorage.getItem("griot-openai-model") || "gpt-4o-mini";
+      } catch {
+        return "gpt-4o-mini";
+      }
+    })();
+    const card = this.openModal(
+      "key",
+      `<h2 class="mt">Clé OpenAI</h2>
+      <p class="hint">Collez votre clé (elle commence par <code>sk-</code>). Elle reste uniquement dans ce navigateur, sur cet appareil : GRIOT l'utilise pour discuter, lire vos PDF et images, et parler avec une voix naturelle. Les appels sont facturés sur votre compte OpenAI.</p>
+      <div class="form">
+        <label>Clé <input id="oaKey" type="password" autocomplete="off" placeholder="${has ? "•••••••• (enregistrée)" : "sk-…"}"></label>
+        <label>Modèle <select id="oaModel"><option value="gpt-4o-mini">gpt-4o-mini (rapide, économique)</option><option value="gpt-4o">gpt-4o (plus intelligent)</option></select></label>
+      </div>
+      <div class="row wrap">
+        <button class="btn primary" data-k="save">Enregistrer</button>
+        ${has ? `<button class="btn ghost" data-k="del">Retirer la clé</button>` : ""}
+        <span class="chip-state">${has ? "CLÉ ACTIVE" : "AUCUNE CLÉ"}</span>
+      </div>
+      <p class="hint">Créer une clé : <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com/api-keys</a> (compte OpenAI avec crédit).</p>`
+    );
+    (card.querySelector("#oaModel") as HTMLSelectElement).value = model;
+    card.onclick = async (e) => {
+      const k = (e.target as HTMLElement).dataset.k;
+      if (!k) return;
+      const m = (card.querySelector("#oaModel") as HTMLSelectElement).value;
+      try {
+        localStorage.setItem("griot-openai-model", m);
+      } catch {}
+      if (k === "save") {
+        const v = (card.querySelector("#oaKey") as HTMLInputElement).value.trim();
+        if (v && !/^sk-[\w-]{10,}$/.test(v)) return this.toast("Cette clé ne ressemble pas à une clé OpenAI (sk-…).", "warn");
+        if (v) setOpenAIKey(v);
+      }
+      if (k === "del") setOpenAIKey("");
+      await this.griot.refreshAI();
+      this.closeModal();
+      this.toast(getOpenAIKey() ? "🔑 Clé OpenAI enregistrée : GRIOT est connecté." : "Clé retirée.");
+    };
   }
 
   // ---------------------------------------------------------------- multijoueur

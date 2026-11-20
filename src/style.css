@@ -352,3 +352,7 @@ body.full.aisam #hud .ship-status { top: 56px; }
 /* horizon artificiel : en bas au centre, pour garder le vaisseau visible */
 #attitude { top: auto; bottom: 18px; transform: translateX(-50%); width: 150px; height: 150px; opacity: 0.8; }
 .touch #attitude { bottom: 120px; }
+
+.in-claude .key-pill { display: none; }
+.key-pill { border-color: rgba(63, 255, 154, 0.5); }
+html:not(.serverless) .key-pill { display: none; }
