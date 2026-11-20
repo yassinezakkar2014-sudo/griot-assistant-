@@ -57,9 +57,12 @@ function clause(raw: string): Intent | null {
   if (/\b(surcharge|boost|turbo)\b/.test(t)) return { action: "armor_ability", target: "boost" };
   if (/\bvision (tactique|nocturne)|night vision|tactical vision\b/.test(t)) return { action: "armor_ability", target: "vision" };
 
+  // --- barrières : « active » = la lever (fermer le passage), « coupe » = l'abaisser
+  if (/\bbarrieres?\b/.test(t) && /\b(active|activer|leve|lever|monte|allume|dresse|securise)\w*\b/.test(t)) return { action: "close_door", target: t };
+  if (/\bbarrieres?\b/.test(t) && /\b(coupe|couper|baisse|baisser|desactive|eteins|abaisse)\w*\b/.test(t)) return { action: "open_door", target: t };
   // --- portes ---
-  if (V.open.test(t) && /\b(porte|portes|door|doors|puerta|garage|hangar|terrasse|chambre|cinema|archives?|coffre|dressing|spa|ascenseur|elevator)\b/.test(t)) return { action: "open_door", target: t };
-  if (V.close.test(t) && /\b(porte|portes|door|doors|puerta|garage|hangar|terrasse|chambre|cinema|archives?|coffre|dressing|spa)\b/.test(t)) return { action: "close_door", target: t };
+  if (V.open.test(t) && /\b(porte|portes|door|doors|puerta|garage|hangar|terrasse|chambre|cinema|archives?|coffre|dressing|spa|ascenseur|elevator|barrieres?|remparts?|portails?|muraille|enceinte)\b/.test(t)) return { action: "open_door", target: t };
+  if (V.close.test(t) && /\b(porte|portes|door|doors|puerta|garage|hangar|terrasse|chambre|cinema|archives?|coffre|dressing|spa|barrieres?|remparts?|portails?|muraille|enceinte)\b/.test(t)) return { action: "close_door", target: t };
   if (/\b(appelle|call)\b.*\b(ascenseur|elevator)/.test(t)) return { action: "open_door", target: "ascenseur" };
 
   // --- temps ---
