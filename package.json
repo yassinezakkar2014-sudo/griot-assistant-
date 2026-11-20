@@ -1,14 +1,31 @@
 {
-  "name": "griot-wakandan-assistant",
-  "version": "0.1.0",
+  "name": "griot-royal-universe",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
+  "description": "GRIOT 2.0 — assistant IA personnel intégré dans un univers royal 3D explorable.",
   "scripts": {
-    "start": "node server.js"
+    "dev": "node server/index.js --dev",
+    "build": "tsc --noEmit && vite build",
+    "start": "node server/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test server/tests/*.test.js"
   },
   "dependencies": {
+    "docx": "^9.1.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "openai": "^4.77.0"
+    "mammoth": "^1.8.0",
+    "mqtt": "^5.10.1",
+    "multer": "^1.4.5-lts.1",
+    "openai": "^4.77.0",
+    "pdf-parse": "^1.1.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/three": "^0.170.0",
+    "three": "^0.170.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7"
   }
 }

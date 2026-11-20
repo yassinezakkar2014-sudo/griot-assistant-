@@ -1,66 +1,197 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#080812">
-  <title>GRIOT — Wakandan AI</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#04060d" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="GRIOT" />
+  <title>GRIOT — Royal Intelligence Universe</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 </head>
-<body>
-  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
-  <header class="topbar">
-    <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
-    <div><div class="brand">GRIOT<span class="brand-dot">.</span></div><div class="subtitle">INTERFACE D’INTELLIGENCE • PROTOTYPE</div></div>
-    <div class="status-pill"><i id="statusLight"></i><span id="statusText">SYSTÈME PRÊT</span></div>
-  </header>
-
-  <main class="layout">
-    <section class="hero">
-      <div class="eyebrow"><span class="eyebrow-line"></span> INTERFACE NEURO-ASSISTÉE <span class="eyebrow-line"></span></div>
-      <h1>Bonjour.<br><span>Je suis Griot.</span></h1>
-      <p class="intro">Votre assistante personnelle, prête à écouter, voir et réfléchir avec vous.</p>
-
-      <div class="orb-wrap">
-        <div class="orb-ring ring-one"></div><div class="orb-ring ring-two"></div><div class="orb-ring ring-three"></div>
-        <div class="orb-core"><div class="core-grid"></div><div class="core-eye"></div><div class="core-glint"></div></div>
-        <div class="orb-label" id="orbLabel">EN ATTENTE</div>
+<body class="home">
+  <!-- INTERFACE GRIOT : fenêtre du module AISAM (le jeu s'affiche dans #viewSlot) -->
+  <section id="viewport" class="glass">
+    <header class="vbar">
+      <div class="vtitle"><span class="tiny">MODULE IMMERSIF</span><b>AISAM</b><span id="aisamChip" class="chip-state">EN VEILLE</span></div>
+      <div class="vbtns">
+        <button id="vActivate" class="btn small primary">Activer AISAM</button>
+        <button id="vFull" class="btn small" title="Plein écran">⤢ Plein écran</button>
+        <button id="vOff" class="btn small ghost" title="Mettre AISAM en veille">⏻ Veille</button>
       </div>
+    </header>
+    <div id="viewSlot"></div>
+  </section>
+  <button id="exitFull" class="btn small glass">⤡ Revenir à l'interface GRIOT</button>
+  <canvas id="scene"></canvas>
 
-      <div class="quick-actions">
-        <button class="action-btn primary" id="micBtn"><span class="btn-icon">◉</span><span id="micLabel">Parler à Griot</span></button>
-        <button class="action-btn" id="cameraBtn"><span class="btn-icon">⌗</span><span id="cameraLabel">Activer la caméra</span></button>
+  <!-- ÉCRAN DE CHARGEMENT / TITRE -->
+  <div id="loader">
+    <div class="loader-inner">
+      <div class="logo-ring"><div class="logo-core">G</div></div>
+      <h1 class="title">GRIOT</h1>
+      <p class="slogan">THINK. SPEAK. RULE.</p>
+      <div class="load-bar"><i id="loadFill"></i></div>
+      <p id="loadLabel" class="load-label">Initialisation du royaume…</p>
+      <div id="startButtons" class="start-buttons" hidden>
+        <button id="btnContinue" class="btn primary" hidden>Continuer</button>
+        <button id="btnStart" class="btn primary">Activer AISAM</button>
+        <button id="btnNew" class="btn ghost" hidden>Nouvelle partie</button>
       </div>
-      <p class="privacy-note"><span class="privacy-dot"></span> Micro et caméra activés uniquement avec votre autorisation.</p>
-    </section>
+      <p class="aisam-hint">Dites ou écrivez à GRIOT : « active AISAM »</p>
+      <p class="credits">Univers original · inspiré de l'esthétique afrofuturiste · aucun contenu officiel d'une franchise</p>
+    </div>
+  </div>
 
-    <section class="console">
-      <div class="console-head"><div><span class="tiny-label">CANAL DE COMMUNICATION</span><h2>Conversation</h2></div><button class="icon-btn" id="clearBtn" title="Effacer la conversation" aria-label="Effacer la conversation">↻</button></div>
-      <div class="messages" id="messages" aria-live="polite">
-        <div class="message assistant"><div class="avatar">G</div><div class="bubble-wrap"><div class="speaker">GRIOT <span>• ASSISTANTE</span></div><div class="bubble">Bonjour. Je suis prête. Écrivez-moi ou activez le microphone pour commencer. Pour une intelligence conversationnelle complète, configurez une clé API dans le serveur local.</div><div class="time">MAINTENANT</div></div></div>
+  <!-- HUD -->
+  <div id="hud" hidden>
+    <div class="hud-tl glass">
+      <div id="zone" class="zone">Palais — Niveau 1</div>
+      <div id="mpChip" class="mp-chip" hidden></div>
+      <div class="sub"><span id="clock">17:00</span> · <span id="rank">Héritier</span> · Niv. <span id="level">1</span></div>
+      <div id="objective" class="objective"></div>
+    </div>
+    <div class="hud-tr">
+      <canvas id="minimap" width="180" height="180"></canvas>
+      <div id="compass" class="compass">N</div>
+    </div>
+    <div id="crosshair"></div>
+    <div id="prompt" class="prompt glass"></div>
+    <div id="caption" class="caption"></div>
+    <div id="interim" class="interim"></div>
+    <div id="toasts"></div>
+    <div id="progress" class="progress glass" hidden><span id="progressLabel"></span><i><b id="progressFill"></b></i></div>
+
+    <div id="shipHud" hidden>
+      <div class="ship-left glass">
+        <div class="big" id="spd">0</div><div class="unit">km/h</div>
+        <div class="bar"><i id="thr"></i></div><div class="unit">POUSSÉE</div>
       </div>
-      <form id="chatForm" class="composer">
-        <label class="sr-only" for="userInput">Votre message</label>
-        <textarea id="userInput" rows="1" placeholder="Écrivez votre message à Griot…" autocomplete="off"></textarea>
-        <button class="send-btn" type="submit" aria-label="Envoyer">↑</button>
+      <canvas id="attitude" width="220" height="220"></canvas>
+      <div class="ship-right glass">
+        <div class="big" id="alt">0</div><div class="unit">m ALTITUDE</div>
+        <div class="unit" id="agl">sol +0 m</div>
+        <div class="unit" id="hdg">CAP 000°</div>
+      </div>
+      <div class="ship-status glass" id="shipStatus"></div>
+    </div>
+
+    <div id="armorHud" class="armor-hud glass" hidden>
+      <div class="unit">ARMURE ROYALE</div>
+      <div class="bar"><i id="armorEnergy"></i></div>
+      <div class="abilities">
+        <span data-ab="pulse">1 Impulsion</span><span data-ab="shield">2 Bouclier</span><span data-ab="boost">3 Surcharge</span><span data-ab="vision">4 Vision</span><span>X Masque</span>
+      </div>
+    </div>
+
+    <!-- dock GRIOT : avatar à synchronisation labiale -->
+    <div id="dock" class="dock glass">
+      <canvas id="avatar" width="120" height="120"></canvas>
+      <div class="dock-info">
+        <strong>GRIOT</strong>
+        <span id="griotState">EN ATTENTE</span>
+        <span id="aiState" class="tiny">MODE LOCAL</span>
+      </div>
+      <button id="talkBtn" class="round" title="Parler (T)">🎙</button>
+      <button id="chatBtn" class="round" title="Écrire (Entrée)">💬</button>
+    </div>
+  </div>
+
+  <!-- PANNEAU GRIOT -->
+  <aside id="panel" class="panel glass">
+    <div class="console-hero">
+      <canvas id="homeAvatar" width="120" height="120"></canvas>
+      <div class="hero-text">
+        <span class="tiny">INTELLIGENCE ROYALE · THINK. SPEAK. RULE.</span>
+        <h1>GRIOT</h1>
+        <div class="chips"><span id="homeState" class="chip-state">EN ATTENTE</span><span id="homeAi" class="chip-state">MODE LOCAL</span></div>
+      </div>
+      <button id="homeTalk" class="round big-mic" title="Parler à GRIOT">🎙</button>
+    </div>
+    <div class="quick">
+      <button class="pill" data-say="active AISAM">▶ Active AISAM</button>
+      <button class="pill" data-say="emmène-moi explorer la ville">Explorer la ville</button>
+      <button class="pill" data-say="active mon armure">Mon armure</button>
+      <button class="pill" data-say="multijoueur">👥 Multijoueur</button>
+      <button class="pill" data-say="rapport sur mes missions">Rapport</button>
+      <button class="pill" data-say="aide">Aide</button>
+      <button class="pill key-pill" id="keyBtn">🔑 Clé OpenAI</button>
+    </div>
+    <header>
+      <div><span class="tiny">CONSOLE</span><h2>GRIOT</h2></div>
+      <select id="modeSel" title="Mode"></select>
+      <select id="langSel" title="Langue"></select>
+      <button id="panelClose" class="icon" title="Fermer">✕</button>
+    </header>
+    <nav class="tabs">
+      <button data-tab="chat" class="on">Conversation</button>
+      <button data-tab="memory">Mémoire</button>
+      <button data-tab="projects">Projets</button>
+    </nav>
+    <section data-pane="chat" class="pane on">
+      <div id="messages" class="messages"></div>
+      <div id="attachments" class="attachments"></div>
+      <form id="composer" class="composer">
+        <label class="icon" title="Joindre PDF, Word, Excel, image…">📎<input id="fileInput" type="file" hidden multiple accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json,image/*" /></label>
+        <button type="button" id="camBtn" class="icon" title="Capturer la caméra">📷</button>
+        <textarea id="input" rows="1" placeholder="Parlez au royaume… (Entrée pour envoyer)"></textarea>
+        <button type="button" id="micBtn" class="icon" title="Micro">🎙</button>
+        <button type="submit" class="send" title="Envoyer">➤</button>
       </form>
-      <div class="console-foot"><span><i class="tiny-dot"></i> LANGUE : FRANÇAIS</span><span id="connectionLabel">MODE LOCAL</span></div>
+      <div class="chat-foot">
+        <label><input type="checkbox" id="speakToggle" /> Réponses vocales</label>
+        <label><input type="checkbox" id="contToggle" /> Conversation continue</label>
+        <label><input type="checkbox" id="wakeToggle" /> Mot d'éveil « GRIOT »</label>
+        <button id="stopBtn" class="link">⏹ Interrompre</button>
+        <button id="clearBtn" class="link">Effacer</button>
+      </div>
+      <video id="camVideo" autoplay playsinline muted hidden></video>
     </section>
+    <section data-pane="memory" class="pane">
+      <p class="hint">Ce que GRIOT retient de vous (préférences, objectifs…). Il peut aussi mémoriser de lui-même pendant la conversation.</p>
+      <form id="memForm" class="row"><input id="memInput" placeholder="Ex. : Je préfère des réponses courtes le matin." /><button class="btn small">Ajouter</button></form>
+      <ul id="memList" class="list"></ul>
+    </section>
+    <section data-pane="projects" class="pane">
+      <form id="projForm" class="row"><input id="projInput" placeholder="Nouveau projet…" /><button class="btn small">Créer</button></form>
+      <div id="projList"></div>
+    </section>
+  </aside>
 
-    <aside class="side-panel">
-      <div class="panel-title"><span class="tiny-label">CAPTEURS</span><span class="panel-symbol">⌁</span></div>
-      <div class="sensor-card"><div class="sensor-icon">◉</div><div class="sensor-info"><strong>Audio</strong><span id="audioState">Inactif</span></div><span class="sensor-state" id="audioLed"></span></div>
-      <div class="sensor-card"><div class="sensor-icon">▧</div><div class="sensor-info"><strong>Vision</strong><span id="visionState">Désactivée</span></div><span class="sensor-state" id="visionLed"></span></div>
-      <div class="camera-preview" id="cameraPreview"><div class="camera-placeholder"><div class="camera-cross">＋</div><span>APERÇU CAMÉRA</span><small>Activation manuelle requise</small></div><video id="cameraVideo" autoplay playsinline muted hidden></video></div>
-      <button class="text-btn" id="stopCameraBtn" disabled>Arrêter la caméra</button>
-      <div class="divider"></div>
-      <div class="panel-title"><span class="tiny-label">PRÉFÉRENCES</span></div>
-      <label class="setting-row"><span><strong>Réponse vocale</strong><small>Lire les réponses à voix haute</small></span><input type="checkbox" id="voiceToggle" checked><i class="switch"></i></label>
-      <label class="setting-row"><span><strong>Voix</strong><small>Féminine, élégante et futuriste</small></span><select id="voiceSelect" aria-label="Choisir une voix"><option value="female">Féminine</option><option value="default">Par défaut</option></select></label>
-      <div class="disclaimer">Prototype personnel. La caméra reste dans votre navigateur ; une image n’est envoyée au modèle que si vous choisissez de l’analyser avec le serveur configuré.</div>
-    </aside>
-  </main>
-  <footer><span>GRIOT INTERFACE <b>v0.1</b></span><span>CONÇU POUR EXPLORER • PAS UN PRODUIT OFFICIEL MARVEL</span></footer>
-  <script src="app.js"></script>
+  <!-- MODALES -->
+  <div id="modal" class="modal" hidden><div class="modal-card glass" id="modalCard"></div></div>
+  <div id="fade"></div>
+  <div id="visionOverlay"></div>
+
+  <!-- CONTRÔLES TACTILES -->
+  <div id="touch" hidden>
+    <div id="stick" class="stick"><i></i></div>
+    <div id="lookZone"></div>
+    <div class="tbtns">
+      <button data-t="TouchJump">⤒</button>
+      <button data-t="KeyE">◎</button>
+      <button data-t="TouchRun">»</button>
+      <button data-t="KeyV">👁</button>
+      <button data-t="KeyM">🗺</button>
+      <button data-t="Escape">☰</button>
+    </div>
+    <div class="tbtns ship">
+      <button data-t="TouchThrottleUp">＋</button>
+      <button data-t="TouchThrottleDown">－</button>
+      <button data-t="TouchUp">▲</button>
+      <button data-t="TouchDown">▼</button>
+      <button data-t="KeyR">⏻</button>
+      <button data-t="KeyH">🛬</button>
+      <button data-t="KeyF">⇲</button>
+      <button data-t="KeyV">👁</button>
+      <button data-t="KeyL">💡</button>
+      <button data-t="Escape">☰</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
