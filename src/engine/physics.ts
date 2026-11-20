@@ -25,6 +25,8 @@ export class Physics {
   dynamic: Body[] = [];
   terrain: HeightFn = () => 0;
   waterLevel = -1e9;
+  /** surfaces praticables hors boîtes (routes en viaduc) : hauteur ou -Infinity */
+  surfaces: ((x: number, z: number) => number)[] = [];
 
   addBox(min: THREE.Vector3Like, max: THREE.Vector3Like, tag?: string): Body {
     const b: Body = { box: new THREE.Box3(new THREE.Vector3().copy(min), new THREE.Vector3().copy(max)), enabled: true, tag, dx: 0, dy: 0, dz: 0 };
@@ -65,6 +67,10 @@ export class Physics {
     let y = this.terrain(x, z);
     if (y < this.waterLevel - 1.1) y = this.waterLevel - 1.1;
     let body: Body | null = null;
+    for (const f of this.surfaces) {
+      const h = f(x, z);
+      if (h <= feetY + step && h > y) y = h;
+    }
     for (const b of this.bodies) {
       if (!b.enabled) continue;
       const bx = b.box;

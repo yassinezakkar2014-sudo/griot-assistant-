@@ -230,6 +230,22 @@ export async function runAction(action: string, target?: string | null): Promise
       ship.setSupersonic(!off);
       return ship.supersonic ? "Mode supersonique engagé. Mach 1 dans quelques secondes." : "Mode supersonique désactivé.";
     }
+    case "ride": {
+      const n = normalize(String(target ?? "")).replace(/\b(en|comme|le|la|de|du|avec|passager|dans|son|sa|vaisseau|voiture)\b/g, " ").trim();
+      const peers = [...G.net.peers.values()];
+      const p = peers.find((x) => n && normalize(x.state?.n ?? "").includes(n)) ?? peers.find((x) => x.state && (x.state.m === "ship" || x.state.m === "car"));
+      if (!p || !p.state) return "Personne avec qui monter : aucun joueur connecté n'est aux commandes d'un véhicule.";
+      if (G.mode !== "foot") return "Descendez d'abord de votre véhicule.";
+      if (p.state.m === "car" && p.car) {
+        G.passenger.board("car", p.id);
+        return `Vous montez en passager dans la voiture de ${p.state.n}.`;
+      }
+      if (p.state.m === "ship") {
+        G.passenger.board("ship", p.id);
+        return `Vous montez à bord avec ${p.state.n}.`;
+      }
+      return `${p.state.n} n'est dans aucun véhicule pour l'instant.`;
+    }
     case "antiair": {
       const aa = G.antiair;
       const n = String(target ?? "on");

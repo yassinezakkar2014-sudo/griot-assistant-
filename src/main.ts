@@ -17,10 +17,12 @@ import { UI } from "./ui/ui";
 import { mat } from "./world/materials";
 import { installLocalApi } from "./ai/localapi";
 import { Multiplayer } from "./net/multiplayer";
+import { Passenger } from "./net/passenger";
 import { buildWings } from "./world/wings";
 import { buildWalls } from "./world/walls";
 import { buildZuria } from "./world/zuria";
 import { AntiAir } from "./world/antiair";
+import { buildHighway, buildRoyalTowers } from "./world/expansion";
 import { CarSystem } from "./game/car";
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -69,6 +71,7 @@ async function boot() {
   G.player = new Player();
   G.player.init();
   G.net = new Multiplayer();
+  G.passenger = new Passenger();
 
   // l'interface GRIOT est utilisable tout de suite ; le module AISAM (le jeu) se charge derrière
   const ui = new UI();
@@ -92,6 +95,9 @@ async function boot() {
   progress(0.95, "Garage royal & galerie");
   const wings = buildWings(G.palace);
   buildWalls(G.palace);
+  progress(0.955, "Autoroute royale & Tours royales");
+  (G.world as any).highway = buildHighway();
+  buildRoyalTowers();
   G.antiair = new AntiAir();
   G.antiair.build();
   progress(0.96, "Pays de Zuria");
@@ -257,6 +263,7 @@ async function boot() {
       for (const s of G.ships) s.update(dt, t);
       G.antiair.update(dt, t);
       G.cars.update(dt, t);
+      G.passenger.update(dt);
     } else {
       if (G.mode !== "inspect") G.input.consumeMouse();
       if (G.mode === "foot") G.player.update(0);

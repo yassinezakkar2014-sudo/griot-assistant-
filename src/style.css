@@ -404,3 +404,7 @@ body[data-mode="car"] #crosshair { display: none; }
 body:has(#visor:not([hidden])) #crosshair { display: none; }
 .touch .v-modes { bottom: 210px; }
 @media (max-width: 760px) { .v-panel { width: 170px; top: 70px; } .v-top { gap: 8px; font-size: 9px; } }
+
+body[data-mode="passenger"] #crosshair { display: none; }
+body[data-mode="passenger"] .tbtns:not(.car) { display: none; }
+body[data-mode="passenger"] .tbtns.car { display: grid; }

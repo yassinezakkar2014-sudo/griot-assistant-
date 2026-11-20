@@ -4,7 +4,8 @@
 import * as THREE from "three";
 import { G, bus } from "../core";
 import { Humanoid } from "../game/humanoid";
-import { buildShipModel, cloakMaterial } from "../game/shipmodel";
+import { buildShipModel, buildSmallShipModel, cloakMaterial } from "../game/shipmodel";
+import { ArmorSet, type ArmorStyle } from "../game/armor";
 import { SHIP_SCALE } from "../game/ship";
 
 export interface NetState {
@@ -17,7 +18,18 @@ export interface NetState {
   s: number[] | 0; // vaisseau : x y z qx qy qz qw poussée
   z: string; // zone
   say?: { text: string; at: number };
+  /** armure complète : [alliage, lueur, motif, masque] */
+  ar?: [string, string, string, number];
+  /** voiture conduite : [id, x, y, z, cap, vitesse, moteur] */
+  c?: [string, number, number, number, number, number, number];
+  /** passager de (id du joueur) */
+  r?: string;
+  /** portes et barrières partagées : id → [ouverte, horodatage] */
+  d?: Record<string, [number, number]>;
 }
+
+/** Portes synchronisées entre joueurs (barrières, portails, grandes portes). */
+const SHARED_DOOR = /^(gate-|door-main$|door-hangar$|door-cargarage$|door-zuria$|door-terrace$)/;
 
 const BROKERS = ["wss://broker.emqx.io:8084/mqtt", "wss://broker.hivemq.com:8884/mqtt", "wss://test.mosquitto.org:8081"];
 const TOPIC = "griot-royaume/v2";
@@ -35,6 +47,10 @@ class Remote {
   last = performance.now();
   state: NetState | null = null;
   private cloaked = false;
+  armor: ArmorSet | null = null;
+  shipKind = -1;
+  car: string | null = null;
+  interactAdded = false;
   private prev = new THREE.Vector3();
   private lightMat = new THREE.MeshStandardMaterial({ color: 0x050810, emissive: 0x3fc8ff, emissiveIntensity: 2 });
   private glowMat = new THREE.MeshStandardMaterial({ color: 0, emissive: 0x2a9dff, emissiveIntensity: 3 });
@@ -75,27 +91,39 @@ class Remote {
     this.last = performance.now();
     this.target.fromArray(st.p);
     this.yaw = st.y;
-    if (st.a) {
-      this.body.outfit.color.setHex(0x0b0b12);
-      this.body.outfit.emissive.set(st.a).multiplyScalar(0.5);
-    } else {
-      this.body.outfit.color.setHex(st.o);
-      this.body.outfit.emissive.setHex(0);
-    }
+    this.body.outfit.color.setHex(st.o);
+    this.body.outfit.emissive.setHex(0);
+    // armure complète, avec ses couleurs, son motif et le masque
+    if (st.ar) {
+      const style: ArmorStyle = { primary: st.ar[0], glow: st.ar[1], pattern: (st.ar[2] as ArmorStyle["pattern"]) || "lines", intensity: 1.6, effect: "pulse" };
+      if (!this.armor) {
+        this.armor = new ArmorSet(this.body, style);
+        this.armor.setWindow(0, 1e4);
+      }
+      this.armor.setVisible(true);
+      this.armor.applyStyle(style);
+      this.armor.plate.emissiveIntensity = 1;
+      this.armor.helmet.visible = st.ar[3] === 1;
+    } else if (this.armor) this.armor.setVisible(false);
     if (st.s) {
-      if (!this.ship) {
-        this.ship = buildShipModel(this.lightMat, this.glowMat);
-        this.ship.group.position.y = -0.3 * SHIP_SCALE;
-        this.ship.group.scale.setScalar(SHIP_SCALE);
+      const kind = (st.s as number[])[9] === 1 ? 1 : 0;
+      if (this.shipKind !== kind) {
+        if (this.ship) this.shipGroup.remove(this.ship.group);
+        this.shipKind = kind;
+        const sc = kind ? 1 : SHIP_SCALE;
+        this.ship = (kind ? buildSmallShipModel : buildShipModel)(this.lightMat, this.glowMat);
+        this.ship.group.position.y = -0.3 * sc;
+        this.ship.group.scale.setScalar(sc);
         this.shipGroup.add(this.ship.group);
         this.shipGroup.position.fromArray(st.s);
+        this.cloaked = false;
       }
       this.shipTarget.set(st.s[0], st.s[1], st.s[2]);
       this.shipQ.set(st.s[3], st.s[4], st.s[5], st.s[6]);
       const cloaked = (st.s as number[])[8] === 1;
       if (cloaked !== this.cloaked) {
         this.cloaked = cloaked;
-        this.ship.group.traverse((o) => {
+        this.ship!.group.traverse((o) => {
           const me = o as THREE.Mesh;
           if (!me.isMesh) return;
           if (cloaked) {
@@ -104,7 +132,7 @@ class Remote {
           } else if (me.userData.mat) me.material = me.userData.mat;
         });
       }
-      this.ship.exhaust.forEach((e) => {
+      this.ship!.exhaust.forEach((e) => {
         e.visible = (st.s as number[])[7] > 0;
         e.scale.y = 0.4 + (st.s as number[])[7];
       });
@@ -114,7 +142,7 @@ class Remote {
   update(dt: number) {
     const st = this.state;
     if (!st) return;
-    const inShip = st.m === "ship" && st.s;
+    const inShip = (st.m === "ship" && st.s) || st.m === "car" || st.m === "passenger";
     this.body.root.visible = !inShip;
     this.shipGroup.visible = !!st.s;
     this.prev.copy(this.body.root.position);
@@ -132,8 +160,14 @@ class Remote {
     }
   }
 
+  /** échelle du vaisseau de ce joueur */
+  get shipScale() {
+    return this.shipKind === 1 ? 1 : SHIP_SCALE;
+  }
+
   dispose() {
     G.scene.remove(this.body.root, this.shipGroup);
+    G.interact.remove("peer-ship-" + this.id);
   }
 }
 
@@ -288,7 +322,42 @@ export class Multiplayer {
       bus.emit("toast", { text: `👥 ${String(st.n || "Un joueur")} a rejoint le royaume.` });
       bus.emit("mp:peers");
     }
+    const wasRiding = r.state?.r === this.id;
     r.apply({ ...st, n: String(st.n || "Joueur").slice(0, 16) });
+    if (st.r === this.id && !wasRiding) bus.emit("toast", { text: `🧑‍🚀 ${r.state!.n} est monté à bord avec vous.` });
+    if (st.r !== this.id && wasRiding) bus.emit("toast", { text: `${r.state!.n} est descendu.` });
+    // portes et barrières : le changement le plus récent gagne
+    if (st.d && typeof st.d === "object")
+      for (const [did, v] of Object.entries(st.d)) {
+        const door = G.palace?.doors.get(did);
+        if (!door || !SHARED_DOOR.test(did) || !Array.isArray(v)) continue;
+        const [open, at] = v;
+        if (at > door.changedAt) {
+          door.changedAt = at;
+          door.locked = false;
+          if (open) door.open(true);
+          else door.close(true);
+        }
+      }
+    // voiture conduite par ce joueur
+    const carId = Array.isArray(st.c) ? String(st.c[0]) : null;
+    if (r.car && r.car !== carId) G.cars?.releaseRemote(r.car);
+    r.car = carId;
+    if (carId && st.c) G.cars?.applyRemote(carId, id, st.c);
+    if (!r.interactAdded) {
+      r.interactAdded = true;
+      G.interact.add({
+        id: "peer-ship-" + id,
+        pos: () => {
+          const sc = r!.shipScale;
+          return r!.shipGroup.position.clone().add(new THREE.Vector3(-5.8 * sc, -1.35 * sc + 1, -2.5 * sc).applyQuaternion(r!.shipGroup.quaternion));
+        },
+        radius: 9,
+        enabled: () => G.mode === "foot" && !!r!.state?.s && r!.state.m === "ship" && r!.shipGroup.position.y - G.physics.terrain(r!.shipGroup.position.x, r!.shipGroup.position.z) < 12 * r!.shipScale,
+        label: () => `Monter en passager avec ${r!.state?.n ?? "ce joueur"}`,
+        action: () => G.passenger.board("ship", id)
+      });
+    }
     if (st.say && st.say.text) {
       const key = id + st.say.at;
       if (!this.seenSay.has(key) && Date.now() - st.say.at < 60_000) {
@@ -301,6 +370,7 @@ export class Multiplayer {
   private drop(id: string, silent = false) {
     const r = this.peers.get(id);
     if (!r) return;
+    if (r.car) G.cars?.releaseRemote(r.car);
     r.dispose();
     this.peers.delete(id);
     if (!silent) bus.emit("toast", { text: `👋 ${r.state?.n ?? "Un joueur"} a quitté le royaume.` });
@@ -318,10 +388,22 @@ export class Multiplayer {
       y: r2(pl.body.root.rotation.y),
       o: pl.body.outfit.color.getHex(),
       a: G.armor.worn ? G.armor.style.glow : 0,
-      s: shipOut ? [r2(sh.root.position.x), r2(sh.root.position.y), r2(sh.root.position.z), r2(sh.root.quaternion.x), r2(sh.root.quaternion.y), r2(sh.root.quaternion.z), r2(sh.root.quaternion.w), sh.engines ? r2(sh.throttle) : 0, sh.stealth ? 1 : 0] : 0,
+      ...(G.armor.worn ? { ar: [G.armor.style.primary, G.armor.style.glow, G.armor.style.pattern, G.armor.maskUp ? 1 : 0] as [string, string, string, number] } : {}),
+      ...((G.mode as string) === "car" && G.cars.active
+        ? { c: [G.cars.active.def.id, r2(G.cars.active.pos.x), r2(G.cars.active.pos.y), r2(G.cars.active.pos.z), r2(G.cars.active.yaw), r2(G.cars.active.speed), 1] as [string, number, number, number, number, number, number] }
+        : {}),
+      ...(G.passenger?.ride ? { r: G.passenger.ride.owner } : {}),
+      d: this.sharedDoors(),
+      s: shipOut ? [r2(sh.root.position.x), r2(sh.root.position.y), r2(sh.root.position.z), r2(sh.root.quaternion.x), r2(sh.root.quaternion.y), r2(sh.root.quaternion.z), r2(sh.root.quaternion.w), sh.engines ? r2(sh.throttle) : 0, sh.stealth ? 1 : 0, sh.opts.small ? 1 : 0] : 0,
       z: G.world.zoneName(G.mode === "ship" ? sh.root.position : pl.position),
       ...(this.lastSay ? { say: this.lastSay } : {})
     };
+  }
+
+  private sharedDoors() {
+    const out: Record<string, [number, number]> = {};
+    for (const [id, d] of G.palace.doors) if (d.changedAt && SHARED_DOOR.test(id)) out[id] = [d.target, d.changedAt];
+    return out;
   }
 
   update(dt: number) {
@@ -342,6 +424,6 @@ export class Multiplayer {
   }
 
   list() {
-    return [...this.peers.values()].map((r) => ({ id: r.id, name: r.state?.n ?? "?", zone: r.state?.z ?? "", pos: r.target.clone(), mode: r.state?.m }));
+    return [...this.peers.values()].map((r) => ({ id: r.id, name: r.state?.n ?? "?", zone: r.state?.z ?? "", pos: r.target.clone(), mode: r.state?.m, car: r.car }));
   }
 }

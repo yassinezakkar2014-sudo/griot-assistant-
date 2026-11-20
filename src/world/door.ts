@@ -17,6 +17,8 @@ export class Door {
   speed = 1.4;
   autoCloseAfter = 0; // secondes (0 = jamais)
   private openTimer = 0;
+  /** horodatage du dernier changement voulu par un joueur (synchronisation multijoueur) */
+  changedAt = 0;
 
   constructor(public id: string, public label: string, public center: THREE.Vector3) {}
 
@@ -34,7 +36,10 @@ export class Door {
       bus.emit("toast", { text: `🔒 ${this.label} : ${this.lockedReason}`, kind: "warn" });
       return false;
     }
-    if (this.target !== 1 && !silent) G.audio.door();
+    if (this.target !== 1 && !silent) {
+      G.audio.door();
+      this.changedAt = Date.now();
+    }
     this.target = 1;
     this.openTimer = 0;
     bus.emit("door", { id: this.id, open: true });
@@ -42,7 +47,10 @@ export class Door {
   }
 
   close(silent = false) {
-    if (this.target !== 0 && !silent) G.audio.door();
+    if (this.target !== 0 && !silent) {
+      G.audio.door();
+      this.changedAt = Date.now();
+    }
     this.target = 0;
     bus.emit("door", { id: this.id, open: false });
   }
