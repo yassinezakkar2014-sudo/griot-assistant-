@@ -243,6 +243,12 @@ export class Griot {
     switch (it.action) {
       case "help":
         return HELP;
+      case "multiplayer": {
+        bus.emit("ui:multi");
+        const list = G.net?.list() ?? [];
+        if (G.net?.status !== "on") return "Voici le multijoueur : choisissez votre nom et une salle, puis donnez le nom de la salle à vos amis.";
+        return list.length ? `Connectés avec vous : ${list.map((p) => `${p.name} (${p.zone})`).join(", ")}.` : "Vous êtes seul dans la salle pour l'instant.";
+      }
       case "save":
         G.missions.saveNow();
         return "Progression sauvegardée.";

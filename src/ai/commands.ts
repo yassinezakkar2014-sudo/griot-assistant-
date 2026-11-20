@@ -27,6 +27,7 @@ function clause(raw: string): Intent | null {
     if (/\b(desactiv\w*|ferme\w*|quitt\w*|arret\w*|stop|eteins|veille|close|exit|deactivate)\b/.test(t)) return { action: "aisam_off" };
     return { action: "aisam_on" };
   }
+  if (/\b(multi ?joueurs?|multiplayer|joueurs connectes|qui est (la|connecte)|mes amis|jouer avec)\b/.test(t)) return { action: "multiplayer" };
   if (/\b(tais.toi|silence|chut|stop talking|arrete de parler|calla)\b/.test(t)) return { action: "stop_voice" };
   if (/^(aide|help|ayuda|que peux.tu faire|what can you do|commandes)\b/.test(t)) return { action: "help" };
   if (/\b(sauvegard\w*|save|guardar)\b/.test(t) && !/projet/.test(t)) return { action: "save" };

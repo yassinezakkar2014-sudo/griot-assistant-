@@ -2,6 +2,7 @@
 import * as THREE from "three";
 import { G, bus, clamp, damp, lerp } from "../core";
 import { mat, HoloScreen } from "../world/materials";
+import { buildShipModel } from "./shipmodel";
 
 export type ShipView = "cockpit" | "chase" | "cinematic";
 
@@ -12,6 +13,8 @@ export class Ship {
   model = new THREE.Group();
   cockpit = new THREE.Group();
   canopy!: THREE.Mesh;
+  energyTex!: THREE.Texture;
+  nozzleZ = 6.4;
   gear: THREE.Object3D[] = [];
   exhaust: THREE.Mesh[] = [];
   engineGlow: THREE.MeshStandardMaterial;
@@ -47,84 +50,15 @@ export class Ship {
   }
 
   build() {
-    const shipMat = new THREE.MeshStandardMaterial({ color: 0x0a0b10, metalness: 0.92, roughness: 0.28 });
     const trimMat = new THREE.MeshStandardMaterial({ color: 0x23262f, metalness: 0.95, roughness: 0.2 });
     const m = this.model;
-    // fuselage (vue de dessus, extrudé)
-    const hull = new THREE.Shape();
-    const hp: [number, number][] = [[0, -7.4], [0.9, -4.5], [1.7, -1.2], [2.1, 2.6], [1.4, 6.4], [0, 5.6]];
-    hull.moveTo(hp[0][0], hp[0][1]);
-    hp.slice(1).forEach(([x, z]) => hull.lineTo(x, z));
-    [...hp].reverse().slice(1).forEach(([x, z]) => hull.lineTo(-x, z));
-    const hullGeo = new THREE.ExtrudeGeometry(hull, { depth: 1.1, bevelEnabled: true, bevelThickness: 0.35, bevelSize: 0.35, bevelSegments: 3 });
-    hullGeo.rotateX(Math.PI / 2);
-    hullGeo.translate(0, 1.0, 0);
-    const hullMesh = new THREE.Mesh(hullGeo, shipMat);
-    hullMesh.castShadow = true;
-    m.add(hullMesh);
-    // dorsale
-    const spine = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.9, 8, 6), trimMat);
-    spine.rotation.x = Math.PI / 2;
-    spine.position.set(0, 1.15, 1.8);
-    spine.scale.set(1, 1, 0.5);
-    m.add(spine);
-    // ailes en serre (pointes recourbées vers l'avant)
-    for (const s of [-1, 1]) {
-      const w = new THREE.Shape();
-      const wp: [number, number][] = [[1.6, -1.4], [4.2, 0.2], [7.0, 1.2], [7.9, -2.6], [7.3, -1.9], [6.6, 1.6], [6.1, 3.0], [2.0, 4.0]];
-      w.moveTo(s * wp[0][0], wp[0][1]);
-      wp.slice(1).forEach(([x, z]) => w.lineTo(s * x, z));
-      const wg = new THREE.ExtrudeGeometry(w, { depth: 0.22, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.06, bevelSegments: 1 });
-      wg.rotateX(Math.PI / 2);
-      wg.translate(0, 0.55, 0);
-      const wing = new THREE.Mesh(wg, shipMat);
-      wing.castShadow = true;
-      wing.rotation.z = s * -0.06;
-      m.add(wing);
-      // liseré lumineux sur le bord d'attaque
-      const edge = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 3.4), this.lightMat);
-      edge.position.set(s * 5.6, 0.5, -0.4);
-      edge.rotation.y = s * -1.1;
-      m.add(edge);
-      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.12, 1.4, 6), this.lightMat);
-      tip.rotation.x = -Math.PI / 2;
-      tip.position.set(s * 7.75, 0.45, -2.6);
-      m.add(tip);
-      // réacteurs
-      const eng = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.75, 3.2, 20), trimMat);
-      eng.rotation.x = Math.PI / 2;
-      eng.position.set(s * 1.35, 0.75, 5.4);
-      m.add(eng);
-      const nozzle = new THREE.Mesh(new THREE.CircleGeometry(0.55, 24), this.engineGlow);
-      nozzle.position.set(s * 1.35, 0.75, 7.02);
-      m.add(nozzle);
-      const plume = new THREE.Mesh(
-        new THREE.ConeGeometry(0.5, 4, 16, 1, true),
-        new THREE.MeshBasicMaterial({ color: 0x5fc8ff, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })
-      );
-      plume.rotation.x = -Math.PI / 2;
-      plume.position.set(s * 1.35, 0.75, 9);
-      plume.visible = false;
-      m.add(plume);
-      this.exhaust.push(plume);
-      // lignes lumineuses latérales
-      const side = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 6), this.lightMat);
-      side.position.set(s * 1.9, 1.0, 0.8);
-      side.rotation.y = s * 0.08;
-      m.add(side);
-    }
-    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 4), this.lightMat);
-    nose.position.set(0, 1.55, -4.6);
-    nose.rotation.x = 0.18;
-    m.add(nose);
-    // verrière
-    this.canopy = new THREE.Mesh(
-      new THREE.SphereGeometry(1, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2),
-      new THREE.MeshPhysicalMaterial({ color: 0x3fa8ff, metalness: 0.2, roughness: 0.05, transparent: true, opacity: 0.38, side: THREE.FrontSide, depthWrite: false })
-    );
-    this.canopy.scale.set(0.95, 0.75, 2.3);
-    this.canopy.position.set(0, 1.55, -2.4);
-    m.add(this.canopy);
+    // coque du Royal Talon (modèle partagé avec les vaisseaux des autres joueurs)
+    const built = buildShipModel(this.lightMat, this.engineGlow);
+    m.add(built.group);
+    this.canopy = built.canopy;
+    this.exhaust = built.exhaust;
+    this.energyTex = built.energy;
+    this.nozzleZ = built.nozzleZ;
     // cockpit intérieur
     const seat = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.9, 0.2), new THREE.MeshStandardMaterial({ color: 0x1a1d2a, roughness: 0.8 }));
     seat.position.set(0, 1.8, -1.2);
@@ -158,7 +92,7 @@ export class Ship {
     m.position.y = -0.3;
     this.root.add(m);
     // volume de collision du vaisseau (le joueur ne le traverse pas)
-    const hullBox = new THREE.Mesh(new THREE.BoxGeometry(5, 2.2, 13), new THREE.MeshBasicMaterial({ visible: false }));
+    const hullBox = new THREE.Mesh(new THREE.BoxGeometry(7.6, 2.2, 13), new THREE.MeshBasicMaterial({ visible: false }));
     hullBox.position.set(0, 0.6, -0.5);
     this.root.add(hullBox);
     G.scene.add(this.root);
@@ -167,7 +101,7 @@ export class Ship {
 
     G.interact.add({
       id: "ship",
-      pos: () => this.root.position.clone().add(new THREE.Vector3(-2.6, -1, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw)),
+      pos: () => this.root.position.clone().add(new THREE.Vector3(-5, -1, -2.5).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw)),
       radius: 6,
       enabled: () => G.mode === "foot",
       label: () => "Entrer dans le cockpit du Royal Talon",
@@ -217,7 +151,7 @@ export class Ship {
       if (G.mode === "ship") return resolve();
       // si le joueur est loin, il est d'abord conduit au vaisseau
       if (G.player.position.distanceTo(this.root.position) > 12) {
-        const side = this.root.position.clone().add(new THREE.Vector3(-4, -GEAR, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw));
+        const side = this.root.position.clone().add(new THREE.Vector3(-5.2, -GEAR, -2.5).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw));
         G.player.teleport(side, this.yaw - Math.PI / 2);
       }
       G.mode = "cinematic";
@@ -314,7 +248,7 @@ export class Ship {
       bus.emit("toast", { text: "Atterrissez d'abord (H : atterrissage automatique).", kind: "warn" });
       return;
     }
-    const side = this.root.position.clone().add(new THREE.Vector3(-4.2, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw));
+    const side = this.root.position.clone().add(new THREE.Vector3(-5.2, 0, -2.5).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw));
     side.y = G.physics.ground(side.x, this.root.position.y, side.z, 2).y;
     G.mode = "foot";
     G.armor.onVehicle(false);
@@ -330,7 +264,8 @@ export class Ship {
     this.gearT = damp(this.gearT, this.landed || this.root.position.y - G.physics.ground(this.root.position.x, this.root.position.y - GEAR, this.root.position.z, 0.5).y < 12 ? 1 : 0, 3, dt);
     this.gear.forEach((g) => (g.scale.y = Math.max(0.05, this.gearT)));
     this.canopyT = damp(this.canopyT, this.canopyTarget, 4, dt);
-    this.canopy.position.y = 1.55 + this.canopyT * 0.8;
+    this.canopy.position.y = 1.95 + this.canopyT * 0.7;
+    this.energyTex.offset.y = (t * 0.6) % 1;
     this.canopy.rotation.x = -this.canopyT * 0.5;
     this.lightMat.emissiveIntensity = this.lights ? 2.2 + Math.sin(t * 2) * 0.3 : 0.05;
     const thrVis = this.engines ? 0.35 + this.throttle * 0.65 : 0;
@@ -338,7 +273,7 @@ export class Ship {
     this.exhaust.forEach((e) => {
       e.visible = this.engines;
       e.scale.set(1, thrVis * (1 + Math.random() * 0.1) * (G.input.down("ShiftLeft") && this.canBoost() ? 1.8 : 1), 1);
-      e.position.z = 7 + 2 * e.scale.y;
+      e.position.z = this.nozzleZ + 2 * e.scale.y;
     });
 
     if (G.mode !== "ship") {
@@ -497,7 +432,7 @@ export class Ship {
     }
   }
 
-  private samples = [new THREE.Vector3(0, 0.6, -7.2), new THREE.Vector3(0, 0.6, 6.4), new THREE.Vector3(-7.6, 0.4, -1.5), new THREE.Vector3(7.6, 0.4, -1.5), new THREE.Vector3(0, 2.1, -1.5), new THREE.Vector3(-4, 0.5, 2), new THREE.Vector3(4, 0.5, 2)];
+  private samples = [new THREE.Vector3(0, 0.6, -6.3), new THREE.Vector3(0, 0.6, 6.6), new THREE.Vector3(-6.4, 0.6, 2), new THREE.Vector3(6.4, 0.6, 2), new THREE.Vector3(0, 2.3, -1.5), new THREE.Vector3(-3.9, 0.4, -3.5), new THREE.Vector3(3.9, 0.4, -3.5), new THREE.Vector3(-3.5, 0.6, 5), new THREE.Vector3(3.5, 0.6, 5)];
   private collides() {
     this.root.updateMatrixWorld();
     for (const s of this.samples) {

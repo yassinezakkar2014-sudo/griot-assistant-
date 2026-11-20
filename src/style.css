@@ -347,3 +347,8 @@ body.full.aisam #hud .ship-status { top: 56px; }
   body.home .hud-tl { transform: scale(0.85); transform-origin: top left; }
   body.home .hud-tr { transform: scale(0.75); transform-origin: top right; }
 }
+
+.mp-chip { margin-top: 6px; font: 500 11px "JetBrains Mono", monospace; color: #3fff9a; letter-spacing: 0.06em; }
+/* horizon artificiel : en bas au centre, pour garder le vaisseau visible */
+#attitude { top: auto; bottom: 18px; transform: translateX(-50%); width: 150px; height: 150px; opacity: 0.8; }
+.touch #attitude { bottom: 120px; }

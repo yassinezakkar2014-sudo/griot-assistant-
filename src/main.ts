@@ -16,6 +16,7 @@ import { Missions } from "./game/missions";
 import { UI } from "./ui/ui";
 import { mat } from "./world/materials";
 import { installLocalApi } from "./ai/localapi";
+import { Multiplayer } from "./net/multiplayer";
 
 const $ = (id: string) => document.getElementById(id)!;
 const canvas = $("scene") as HTMLCanvasElement;
@@ -57,6 +58,7 @@ async function boot() {
   G.missions.init();
   G.player = new Player();
   G.player.init();
+  G.net = new Multiplayer();
 
   // l'interface GRIOT est utilisable tout de suite ; le module AISAM (le jeu) se charge derrière
   const ui = new UI();
@@ -229,6 +231,7 @@ async function boot() {
     G.interact.update();
     G.world.update(dt, t);
     updateCompanion(companion, dt, t);
+    G.net.update(dt);
     zoneTimer += dt;
     if (zoneTimer > 1) {
       zoneTimer = 0;

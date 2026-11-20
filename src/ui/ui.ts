@@ -122,6 +122,23 @@ export class UI {
     bus.on("ui:command", () => this.command());
     bus.on("ui:elevator", () => this.elevator());
     bus.on("ui:map", () => this.map());
+    bus.on("ui:multi", () => this.multi());
+    bus.on("mp:chat", (d: { name: string; text: string }) => {
+      this.toast(`💬 <b>${esc(d.name)}</b> : ${esc(d.text)}`, "", 7000);
+      if (this.modalOpen === "multi") this.multi();
+    });
+    const mpRefresh = () => {
+      const n = G.net.peers.size;
+      const chip = $("mpChip");
+      chip.hidden = G.net.status !== "on";
+      chip.textContent = `👥 Salle « ${G.net.room} » · ${n + 1} joueur${n ? "s" : ""}`;
+      if (this.modalOpen === "multi") this.multi();
+    };
+    bus.on("mp:peers", mpRefresh);
+    bus.on("mp:status", (d: { status: string; msg?: string }) => {
+      mpRefresh();
+      if (d.status === "error") this.toast(`Multijoueur : ${d.msg ?? "connexion impossible"}`, "warn");
+    });
     bus.on("ui:armor", (open: boolean) => (open ? this.armorPanel() : this.closeModal()));
     bus.on("track", (id: string) => {
       this.tracked = id;
@@ -634,6 +651,52 @@ export class UI {
       };
     }
     card.querySelectorAll<HTMLElement>("[data-mt]").forEach((b) => (b.onclick = () => this.map(b.dataset.mt as any)));
+  }
+
+  // ---------------------------------------------------------------- multijoueur
+  multi() {
+    const net = G.net;
+    const on = net.status === "on";
+    const list = net.list();
+    const card = this.openModal(
+      "multi",
+      `<h2 class="mt">Multijoueur</h2>
+      <p class="hint">Même nom de salle = même royaume. Envoyez le lien du site et le nom de la salle à vos amis : vous vous verrez à pied, en armure et en Royal Talon.</p>
+      <div class="form">
+        <label>Votre nom <input id="mpName" maxlength="16" value="${esc(net.name)}"></label>
+        <label>Salle <input id="mpRoom" maxlength="32" value="${esc(net.room)}"></label>
+      </div>
+      <div class="row wrap">
+        ${on ? `<button class="btn" data-mp="off">Se déconnecter</button>` : `<button class="btn primary" data-mp="on">${net.status === "connecting" ? "Connexion…" : "Rejoindre la salle"}</button>`}
+        <span class="chip-state">${on ? `CONNECTÉ · ${esc(net.via)}` : net.status === "connecting" ? "CONNEXION…" : net.status === "error" ? "ÉCHEC" : "HORS LIGNE"}</span>
+      </div>
+      ${on ? `<h3>Joueurs (${list.length + 1})</h3>
+      <ul class="list"><li><span>♛ ${esc(net.name)} (vous)</span></li>${list.map((p) => `<li><span>👤 ${esc(p.name)} <small class="hint">${esc(p.zone)}</small></span>${G.mode === "foot" ? `<button class="link" data-go="${esc(p.id)}">Rejoindre</button>` : ""}</li>`).join("")}</ul>
+      <form id="mpSay" class="row"><input id="mpText" maxlength="200" placeholder="Message à tous les joueurs…"><button class="btn small">Envoyer</button></form>` : ""}`
+    );
+    card.onclick = (e) => {
+      const el = e.target as HTMLElement;
+      if (el.dataset.mp === "on") {
+        net.connect(($("mpName") as HTMLInputElement).value, ($("mpRoom") as HTMLInputElement).value);
+        setTimeout(() => this.modalOpen === "multi" && this.multi(), 50);
+      }
+      if (el.dataset.mp === "off") {
+        net.disconnect();
+        this.multi();
+      }
+      if (el.dataset.go) {
+        const p = net.list().find((x) => x.id === el.dataset.go);
+        if (p) {
+          this.closeModal();
+          G.player.teleport(p.pos.clone().add(new THREE.Vector3(1.5, 0.2, 1.5)));
+        }
+      }
+    };
+    card.querySelector("#mpSay")?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const inp = $("mpText") as HTMLInputElement;
+      if (net.say(inp.value)) inp.value = "";
+    });
   }
 
   // ---------------------------------------------------------------- royaume (salle du trône)
