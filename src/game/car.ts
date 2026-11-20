@@ -104,6 +104,10 @@ export class Car {
   yaw = 0;
   spin = 0; // plateau tournant
   phys: Body | null = null;
+  /** conduite par un autre joueur (id) */
+  remoteBy: string | null = null;
+  netTarget = new THREE.Vector3();
+  netYaw = 0;
   driverHead: THREE.Vector3;
   driverSide: THREE.Vector3;
 
@@ -327,8 +331,9 @@ export class CarSystem {
         pos: () => car.root.localToWorld(car.driverSide.clone().setY(1)),
         radius: 3.2,
         enabled: () => G.mode === "foot",
-        label: () => (car.doorTarget < 1 ? `Ouvrir la ${def.name}` : `Monter à bord de la ${def.name}`),
+        label: () => (car.remoteBy ? `Monter en passager dans la ${def.name}` : car.doorTarget < 1 ? `Ouvrir la ${def.name}` : `Monter à bord de la ${def.name}`),
         action: () => {
+          if (car.remoteBy) return G.passenger.board("car", car.remoteBy);
           if (car.doorTarget < 1) {
             car.doorTarget = 1;
             car.spin = 0;
@@ -340,7 +345,7 @@ export class CarSystem {
   }
 
   /** Volume de collision du véhicule à l'arrêt (le joueur ne le traverse pas). */
-  private park(car: Car) {
+  park(car: Car) {
     const s = car.spec;
     const c = Math.cos(car.yaw),
       sn = Math.sin(car.yaw);
@@ -390,13 +395,39 @@ export class CarSystem {
     bus.emit("mode");
   }
 
+  /** Un autre joueur conduit cette voiture : on la déplace avec lui. */
+  applyRemote(id: string, peer: string, c: [string, number, number, number, number, number, number]) {
+    const car = this.cars.find((x) => x.def.id === id);
+    if (!car || car === this.active) return;
+    if (car.remoteBy !== peer) {
+      car.remoteBy = peer;
+      car.spin = 0;
+      if (car.phys) car.phys.enabled = false;
+      car.root.position.set(c[1], c[2], c[3]);
+      car.yaw = c[4];
+      car.setEngine(true);
+    }
+    car.netTarget.set(c[1], c[2], c[3]);
+    car.netYaw = c[4];
+    car.speed = c[5];
+  }
+
+  releaseRemote(id: string) {
+    const car = this.cars.find((x) => x.def.id === id);
+    if (!car || !car.remoteBy) return;
+    car.remoteBy = null;
+    car.speed = 0;
+    car.setEngine(false);
+    this.park(car);
+  }
+
   nearest(from: THREE.Vector3, text = "") {
     const n = text.toLowerCase();
     const norm = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const nn = norm(n);
     let best: Car | null = null,
       bestScore = 0;
-    for (const c of this.cars) {
+    for (const c of this.cars.filter((x) => !x.remoteBy)) {
       const words = norm(c.def.name).split(/[ ·]+/).filter((w) => w.length > 1 && w !== "adamas");
       const score = words.filter((w) => new RegExp(`\\b${w}\\b`).test(nn)).length;
       if (score > bestScore) {
@@ -405,11 +436,20 @@ export class CarSystem {
       }
     }
     if (best) return best;
-    return [...this.cars].sort((a, b) => a.pos.distanceTo(from) - b.pos.distanceTo(from))[0];
+    return [...this.cars.filter((x) => !x.remoteBy)].sort((a, b) => a.pos.distanceTo(from) - b.pos.distanceTo(from))[0];
   }
 
   update(dt: number, t: number) {
-    for (const c of this.cars) c.update(dt, t);
+    for (const c of this.cars) {
+      if (c.remoteBy) {
+        c.root.position.lerp(c.netTarget, 1 - Math.exp(-dt * 10));
+        if (c.root.position.distanceTo(c.netTarget) > 40) c.root.position.copy(c.netTarget);
+        let d = c.netYaw - c.yaw;
+        d = Math.atan2(Math.sin(d), Math.cos(d));
+        c.yaw += d * Math.min(1, dt * 10);
+      }
+      c.update(dt, t);
+    }
     const car = this.active;
     if (!car || (G.mode as string) !== "car") return;
     const inp = G.input;

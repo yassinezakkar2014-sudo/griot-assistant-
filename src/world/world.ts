@@ -234,6 +234,7 @@ export class World {
     const lots: { x: number; z: number; w: number; d: number; h: number; cls: number }[] = [];
     for (let x = c.x1 + 45; x < c.x2 - 40; x += 90)
       for (let z = c.z1 + 45; z < c.z2 - 40; z += 90) {
+        if (Math.hypot(x - 1625, z) < 55) continue; // tour centrale
         const distC = Math.hypot(x - 1625, z) / 900;
         for (let k = 0; k < 2; k++) {
           if (Math.random() < 0.15) continue;
@@ -591,6 +592,8 @@ export class World {
       return dz < 45 ? "Palais de Zuria" : dz < 420 ? "Ville de Zuria" : "Pays de Zuria";
     }
     if (p.x > 60 && p.x < 184 && p.z > -34 && p.z < 62) return "Garage royal";
+    if (Math.abs(p.x) > 80 && Math.abs(p.x) < 140 && p.z > 90 && p.z < 130) return p.y > 200 ? "Passerelle des Tours royales" : "Tours royales";
+    if ((this as any).highway?.onRoad(p.x, p.z)) return "Autoroute royale";
     if (p.x > -150 && p.x < -60 && p.z > -40 && p.z < 20) return "Galerie royale";
     if (Math.abs(p.z + 20) < 4 && Math.abs(p.x) > 32 && Math.abs(p.x) < 61) return "Galerie vitrée du palais";
     if (Math.hypot(p.x - ZONES.base.x, p.z - ZONES.base.z) < ZONES.base.r * 1.5) return "Base secrète";

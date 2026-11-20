@@ -28,7 +28,7 @@ function pat(p: Pattern) {
 }
 
 /** Pièces d'armure posées sur un Humanoid. */
-class ArmorSet {
+export class ArmorSet {
   plate: THREE.MeshStandardMaterial;
   under: THREE.MeshStandardMaterial;
   eyes: THREE.MeshStandardMaterial;

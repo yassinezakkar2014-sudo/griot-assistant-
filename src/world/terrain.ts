@@ -55,7 +55,7 @@ const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 
 export const ZONES = {
   palace: { x: 0, z: 0, r: 300 },
-  city: { x1: 950, x2: 2300, z1: -850, z2: 850 },
+  city: { x1: 950, x2: 2500, z1: -1050, z2: 1050 },
   base: { x: 650, z: 1900, r: 160, h: 140 },
   night: { x: -650, z: -1300, r: 260 },
   /** le pays voisin, de l'autre côté de l'océan */
