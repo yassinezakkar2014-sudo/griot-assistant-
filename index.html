@@ -8,6 +8,9 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="GRIOT" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
   <title>GRIOT — Royal Intelligence Universe</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -65,6 +68,7 @@
     <div id="toasts"></div>
     <div id="progress" class="progress glass" hidden><span id="progressLabel"></span><i><b id="progressFill"></b></i></div>
 
+    <div id="carHud" class="car-hud glass" hidden><div class="big" id="carSpd">0</div><div class="unit">km/h · <span id="carName"></span></div><div class="unit">W/S · A/D · Maj boost · V vue · L phares · F sortir</div></div>
     <div id="shipHud" hidden>
       <div class="ship-left glass">
         <div class="big" id="spd">0</div><div class="unit">km/h</div>
@@ -188,6 +192,14 @@
       <button data-t="KeyF">⇲</button>
       <button data-t="KeyV">👁</button>
       <button data-t="KeyL">💡</button>
+      <button data-t="Escape">☰</button>
+    </div>
+    <div class="tbtns car">
+      <button data-t="KeyV">👁</button>
+      <button data-t="KeyL">💡</button>
+      <button data-t="KeyH">📯</button>
+      <button data-t="ShiftLeft">»</button>
+      <button data-t="KeyF">⇲</button>
       <button data-t="Escape">☰</button>
     </div>
   </div>

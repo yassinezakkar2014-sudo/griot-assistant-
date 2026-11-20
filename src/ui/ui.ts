@@ -514,7 +514,7 @@ export class UI {
 
   settings() {
     const v = this.griot.voice.settings;
-    const s = (window as any).__griotSettings as { bloom: boolean; shadows: boolean; pixelRatio: number };
+    const s = (window as any).__griotSettings as { bloom: boolean; shadows: boolean; pixelRatio: number; ao: boolean };
     const card = this.openModal(
       "settings",
       `<h2 class="mt">Réglages</h2>
@@ -524,6 +524,8 @@ export class UI {
         <label>Volume des effets <input type="range" min="0" max="1" step="0.05" value="${G.audio.volume}" data-s="vol"></label>
         <label><input type="checkbox" ${s.bloom ? "checked" : ""} data-s="bloom"> Halo lumineux (bloom)</label>
         <label><input type="checkbox" ${s.shadows ? "checked" : ""} data-s="shadows"> Ombres</label>
+        <label><input type="checkbox" ${s.ao ? "checked" : ""} data-s="ao"> Qualité Ultra (ombres de contact, ombres 4K)</label>
+        <button class="btn small" data-s="ultra">✨ Tout en Ultra</button>
         <label>Résolution <select data-s="pr"><option value="0.6">Performance</option><option value="1">Standard</option><option value="2">Haute</option></select></label>
         <hr>
         <label><input type="checkbox" ${v.neural ? "checked" : ""} data-s="neural"> Voix neuronale premium (serveur)</label>
@@ -542,6 +544,7 @@ export class UI {
       if (k === "vol") G.audio.setVolume(+el.value);
       if (k === "bloom") s.bloom = el.checked;
       if (k === "shadows") s.shadows = el.checked;
+      if (k === "ao") s.ao = el.checked;
       if (k === "pr") s.pixelRatio = +el.value;
       if (k === "neural") v.neural = el.checked;
       if (k === "nv") v.neuralVoice = el.value;
@@ -554,6 +557,13 @@ export class UI {
       bus.emit("settings");
     };
     card.onclick = (e) => {
+      if ((e.target as HTMLElement).dataset.s === "ultra") {
+        Object.assign(s, { bloom: true, shadows: true, ao: true, pixelRatio: 1 });
+        bus.emit("settings");
+        this.settings();
+        this.toast("✨ Qualité Ultra activée (plus gourmand en batterie).");
+        return;
+      }
       if ((e.target as HTMLElement).dataset.s === "test") this.griot.voice.say(v.lang.startsWith("fr") ? "Bonjour Majesté. Je suis GRIOT. Votre royaume vous attend." : "Hello, Your Majesty. I am GRIOT. Your kingdom awaits.");
     };
   }
@@ -1019,6 +1029,11 @@ export class UI {
         ].join("");
       }
       $("armorHud").hidden = !G.armor.worn || G.mode !== "foot";
+    }
+    $("carHud").hidden = (G.mode as string) !== "car";
+    if ((G.mode as string) === "car" && G.cars.active) {
+      $("carSpd").textContent = String(Math.round(Math.abs(G.cars.active.speed) * 3.6));
+      $("carName").textContent = G.cars.active.def.name;
     }
     if (G.mode === "ship") {
       $("thr").style.width = `${G.ship.throttle * 100}%`;

@@ -1,6 +1,7 @@
 // Modèle du Royal Talon (v2) : coque blindée gris acier, plumes métalliques en éventail,
 // cellules d'énergie bleues sur les flancs. Avant = -Z. Réutilisé pour les vaisseaux des autres joueurs.
 import * as THREE from "three";
+import { applyPBR, panelPBR } from "../world/pbr";
 
 export interface ShipModel {
   group: THREE.Group;
@@ -48,8 +49,8 @@ function energyTexture() {
 
 export function buildShipModel(lightMat: THREE.Material, engineGlow: THREE.Material): ShipModel {
   const g = new THREE.Group();
-  const hull = new THREE.MeshStandardMaterial({ color: 0x41454e, metalness: 0.88, roughness: 0.34 });
-  const plate = new THREE.MeshStandardMaterial({ color: 0x5c616c, metalness: 0.9, roughness: 0.3 });
+  const hull = applyPBR(new THREE.MeshPhysicalMaterial({ color: 0x41454e, metalness: 0.88, clearcoat: 0.5, clearcoatRoughness: 0.2 }), panelPBR(), 0.55, 3) as THREE.MeshPhysicalMaterial;
+  const plate = applyPBR(new THREE.MeshPhysicalMaterial({ color: 0x5c616c, metalness: 0.9, clearcoat: 0.6, clearcoatRoughness: 0.15 }), panelPBR(), 0.45, 2) as THREE.MeshPhysicalMaterial;
   const dark = new THREE.MeshStandardMaterial({ color: 0x15171c, metalness: 0.8, roughness: 0.45 });
   const rib = new THREE.MeshStandardMaterial({ color: 0x9aa0aa, metalness: 1, roughness: 0.25 });
   const tex = energyTexture();
@@ -80,13 +81,23 @@ export function buildShipModel(lightMat: THREE.Material, engineGlow: THREE.Mater
   }
   add(new THREE.BoxGeometry(1.4, 0.3, 1.6), dark, 0, 0.55, -5.3, 0.25, 0, 0);
   // poste de pilotage : verrière teintée (invisible de l'intérieur)
+  // verrière bulle panoramique (invisible de l'intérieur) + cuve de la cabine
   const canopy = new THREE.Mesh(
-    new THREE.BoxGeometry(1.7, 0.75, 2.3),
-    new THREE.MeshPhysicalMaterial({ color: 0x0c1824, metalness: 0.6, roughness: 0.08, transparent: true, opacity: 0.72, side: THREE.FrontSide, depthWrite: false })
+    new THREE.SphereGeometry(1, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshPhysicalMaterial({ color: 0x0c1824, metalness: 0.5, roughness: 0.04, transparent: true, opacity: 0.62, side: THREE.FrontSide, depthWrite: false, clearcoat: 1 })
   );
-  canopy.position.set(0, 1.95, -2);
+  canopy.scale.set(1.15, 0.85, 2.05);
+  canopy.position.set(0, 1.55, -2.0);
   g.add(canopy);
-  add(new THREE.BoxGeometry(1.85, 0.12, 2.45), rib, 0, 1.55, -2);
+  const tub = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 20, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x14171d, metalness: 0.7, roughness: 0.45, side: THREE.BackSide }));
+  tub.scale.set(1.12, 0.55, 2.0);
+  tub.position.set(0, 1.56, -2.0);
+  g.add(tub);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(1, 0.035, 8, 64), rib);
+  rim.rotation.x = Math.PI / 2;
+  rim.scale.set(1.16, 2.06, 1);
+  rim.position.set(0, 1.56, -2.0);
+  g.add(rim);
 
   // cellules d'énergie latérales (les panneaux bleus électriques)
   for (const s of [-1, 1]) {

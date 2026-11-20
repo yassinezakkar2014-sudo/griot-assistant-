@@ -17,6 +17,8 @@ import { UI } from "./ui/ui";
 import { mat } from "./world/materials";
 import { installLocalApi } from "./ai/localapi";
 import { Multiplayer } from "./net/multiplayer";
+import { buildWings } from "./world/wings";
+import { CarSystem } from "./game/car";
 
 const $ = (id: string) => document.getElementById(id)!;
 const canvas = $("scene") as HTMLCanvasElement;
@@ -32,11 +34,16 @@ const progress = (p: number, label: string) => {
 // iPad (y compris iPadOS qui se présente comme un Mac), téléphones, tablettes
 G.mobile = matchMedia("(pointer: coarse)").matches || (navigator.maxTouchPoints > 1 && /Macintosh|iPad|iPhone|Android/.test(navigator.userAgent));
 if (G.mobile) document.documentElement.classList.add("touch");
-const settings = { bloom: !G.mobile, shadows: !G.mobile, pixelRatio: G.mobile ? 0.6 : 1 };
+const settings = { bloom: !G.mobile, shadows: !G.mobile, pixelRatio: G.mobile ? 0.6 : 1, ao: false };
 try {
   Object.assign(settings, JSON.parse(localStorage.getItem("griot-gfx") || "{}"));
 } catch {}
 (window as any).__griotSettings = settings;
+
+// app installable (écran d'accueil) : fonctionne hors ligne après la première visite
+if ("serviceWorker" in navigator && !(window as any).claude && (location.protocol === "https:" || location.hostname === "localhost")) {
+  addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+}
 
 async function boot() {
   const local = await installLocalApi();
@@ -79,6 +86,12 @@ async function boot() {
   await G.world.build((p, l) => progress(0.08 + p * 0.85, l));
   progress(0.93, "Royal Talon & armurerie");
   await new Promise((r) => setTimeout(r, 0));
+  progress(0.95, "Garage royal & galerie");
+  const wings = buildWings(G.palace);
+  G.palace.spots.garage = { pos: wings.garageSpot, yaw: -Math.PI / 2, label: "garage" };
+  G.palace.spots.gallery = { pos: wings.gallerySpot, yaw: Math.PI / 2, label: "gallery" };
+  G.cars = new CarSystem();
+  G.cars.build(wings.carSlots);
   G.ship = new Ship();
   G.ship.build();
   G.armor = new ArmorSystem();
@@ -104,6 +117,13 @@ async function boot() {
   new ResizeObserver(fit).observe(canvas);
   const applySettings = () => {
     G.env.bloomEnabled = settings.bloom;
+    G.env.ao.enabled = settings.ao;
+    const res = settings.ao ? 4096 : 2048;
+    if (G.env.sun.shadow.mapSize.x !== res) {
+      G.env.sun.shadow.mapSize.set(res, res);
+      G.env.sun.shadow.map?.dispose();
+      (G.env.sun.shadow as any).map = null;
+    }
     if (renderer.shadowMap.enabled !== settings.shadows) {
       renderer.shadowMap.enabled = settings.shadows;
       scene.traverse((o) => {
@@ -223,6 +243,7 @@ async function boot() {
     if (!$("hud").hidden && !ui.modalOpen) {
       G.player.update(dt);
       G.ship.update(dt, t);
+      G.cars.update(dt, t);
     } else {
       if (G.mode !== "inspect") G.input.consumeMouse();
       if (G.mode === "foot") G.player.update(0);

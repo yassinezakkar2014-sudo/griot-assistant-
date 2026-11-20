@@ -13,8 +13,9 @@ import type { Environment } from "./engine/environment";
 import type { Missions } from "./game/missions";
 import type { World } from "./world/world";
 import type { Multiplayer } from "./net/multiplayer";
+import type { CarSystem } from "./game/car";
 
-export type Mode = "foot" | "ship" | "inspect" | "cinematic";
+export type Mode = "foot" | "ship" | "inspect" | "cinematic" | "car";
 
 export interface GameContext {
   scene: THREE.Scene;
@@ -32,6 +33,7 @@ export interface GameContext {
   missions: Missions;
   world: World;
   net: Multiplayer;
+  cars: CarSystem;
   mode: Mode;
   time: number; // secondes écoulées
   uiFocus: boolean; // vrai quand un champ texte / menu a le focus

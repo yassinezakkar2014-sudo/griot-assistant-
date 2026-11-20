@@ -14,6 +14,11 @@ export class Ship {
   cockpit = new THREE.Group();
   canopy!: THREE.Mesh;
   energyTex!: THREE.Texture;
+  sand!: THREE.Points;
+  sandN = 44;
+  sideScreens: HoloScreen[] = [];
+  orbs: THREE.Mesh[] = [];
+  private sandTimer = 0;
   nozzleZ = 6.4;
   gear: THREE.Object3D[] = [];
   exhaust: THREE.Mesh[] = [];
@@ -59,23 +64,77 @@ export class Ship {
     this.exhaust = built.exhaust;
     this.energyTex = built.energy;
     this.nozzleZ = built.nozzleZ;
-    // cockpit intérieur
-    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.9, 0.2), new THREE.MeshStandardMaterial({ color: 0x1a1d2a, roughness: 0.8 }));
-    seat.position.set(0, 1.8, -1.2);
-    this.cockpit.add(seat);
+    // cockpit intérieur : siège sculpté, console en arc, table holographique de « sable » qui
+    // reproduit le relief autour du vaisseau, écrans latéraux, sphères de pilotage lumineuses
+    const leather = new THREE.MeshStandardMaterial({ color: 0x15161b, roughness: 0.55, metalness: 0.1 });
+    const seatBase = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.16, 0.62), leather);
+    seatBase.position.set(0, 1.5, -1.2);
+    const seatBack = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 0.55, 6, 16), leather);
+    seatBack.scale.set(1, 1, 0.45);
+    seatBack.position.set(0, 2.0, -0.92);
+    seatBack.rotation.x = -0.25;
+    const piping = new THREE.Mesh(new THREE.TorusGeometry(0.31, 0.012, 6, 40), this.lightMat);
+    piping.scale.set(1, 1.9, 1);
+    piping.position.copy(seatBack.position).add(new THREE.Vector3(0, 0, -0.14));
+    piping.rotation.x = -0.25;
+    this.cockpit.add(seatBase, seatBack, piping);
+    const arc = new THREE.Mesh(new THREE.TorusGeometry(0.88, 0.1, 14, 64, Math.PI), trimMat);
+    arc.rotation.x = -Math.PI / 2;
+    arc.position.set(0, 1.74, -1.62);
+    const arcGlow = new THREE.Mesh(new THREE.TorusGeometry(0.88, 0.012, 6, 64, Math.PI), this.lightMat);
+    arcGlow.rotation.x = -Math.PI / 2;
+    arcGlow.position.set(0, 1.85, -1.62);
+    this.cockpit.add(arc, arcGlow);
+    // table de sable holographique
+    const N = 44;
+    const sandGeo = new THREE.BufferGeometry();
+    sandGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(N * N * 3), 3));
+    sandGeo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(N * N * 3), 3));
+    this.sand = new THREE.Points(sandGeo, new THREE.PointsMaterial({ size: 0.009, vertexColors: true, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }));
+    this.sand.position.set(0, 1.9, -2.3);
+    this.sandN = N;
+    const plateM = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.56, 0.05, 48), trimMat);
+    plateM.position.set(0, 1.86, -2.3);
+    const plateRing = new THREE.Mesh(new THREE.TorusGeometry(0.53, 0.01, 6, 64), this.lightMat);
+    plateRing.rotation.x = Math.PI / 2;
+    plateRing.position.set(0, 1.89, -2.3);
+    const marker = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.07, 6), mat.glowGold);
+    marker.rotation.x = -Math.PI / 2;
+    marker.position.set(0, 2.02, -2.3);
+    // table posée plus bas et plus petite, pour garder la vue dégagée
+    const table = new THREE.Group();
+    table.add(this.sand, plateM, plateRing, marker);
+    table.position.set(0, -0.12, -0.6);
+    table.scale.setScalar(0.72);
+    table.position.z = -2.3 * (1 - 0.72) - 0.15;
+    table.position.y = 1.9 * (1 - 0.72) - 0.12;
+    this.cockpit.add(table);
+    // écran principal + écrans latéraux
     this.dash = new HoloScreen(512, 200, (c, w, h) => this.drawDash(c, w, h));
-    const dash = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.58), this.dash.material);
-    dash.position.set(0, 1.55, -3.35);
-    dash.rotation.x = -0.6;
+    const dash = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.39), this.dash.material);
+    dash.scale.setScalar(0.8);
+    dash.position.set(0, 1.98, -2.9);
+    dash.rotation.x = -0.3;
     this.cockpit.add(dash);
-    const dashBody = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.25, 0.6), trimMat);
-    dashBody.position.set(0, 1.38, -3.4);
-    this.cockpit.add(dashBody);
-    const yoke = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.025, 8, 24, Math.PI), mat.silver);
-    yoke.position.set(0, 1.55, -2.9);
-    yoke.rotation.z = Math.PI;
-    this.cockpit.add(yoke);
-    this.cockpit.visible = false;
+    this.sideScreens = [-1, 1].map((sx) => {
+      const scr = new HoloScreen(320, 220, (c, w, h) => this.drawSide(c, w, h, sx));
+      const me = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.34), scr.material);
+      me.position.set(sx * 0.8, 2.05, -1.95);
+      me.rotation.y = -sx * 0.75;
+      this.cockpit.add(me);
+      return scr;
+    });
+    // sphères de pilotage (réagissent aux commandes)
+    this.orbs = [-1, 1].map((sx) => {
+      const glass = new THREE.Mesh(new THREE.SphereGeometry(0.085, 24, 16), new THREE.MeshPhysicalMaterial({ color: 0x9fdcff, transparent: true, opacity: 0.25, roughness: 0, metalness: 0.2 }));
+      glass.position.set(sx * 0.46, 1.9, -1.52);
+      const core = new THREE.Mesh(new THREE.SphereGeometry(0.045, 16, 12), this.lightMat);
+      core.position.copy(glass.position);
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.03, 0.12, 10), trimMat);
+      stem.position.copy(glass.position).add(new THREE.Vector3(0, -0.1, 0));
+      this.cockpit.add(glass, core, stem);
+      return core;
+    });
     m.add(this.cockpit);
     // train d'atterrissage
     for (const [x, z] of [[0, -4.5], [-1.6, 3], [1.6, 3]]) {
@@ -163,7 +222,7 @@ export class Ship {
       const step = () => {
         const t = Math.min(1, (performance.now() - start) / 1800);
         const e = t * t * (3 - 2 * t);
-        const seatPos = this.root.localToWorld(new THREE.Vector3(0, 2.05, -1.6));
+        const seatPos = this.root.localToWorld(new THREE.Vector3(0, 1.95, -1.5));
         const lookAt = this.root.localToWorld(new THREE.Vector3(0, 1.7, -12));
         const mid = this.root.localToWorld(new THREE.Vector3(-5, 5, 2));
         const p1 = from.clone().lerp(mid, e);
@@ -252,7 +311,6 @@ export class Ship {
     side.y = G.physics.ground(side.x, this.root.position.y, side.z, 2).y;
     G.mode = "foot";
     G.armor.onVehicle(false);
-    this.cockpit.visible = false;
     this.throttle = 0;
     G.player.teleport(side, this.yaw);
     bus.emit("mode");
@@ -264,7 +322,7 @@ export class Ship {
     this.gearT = damp(this.gearT, this.landed || this.root.position.y - G.physics.ground(this.root.position.x, this.root.position.y - GEAR, this.root.position.z, 0.5).y < 12 ? 1 : 0, 3, dt);
     this.gear.forEach((g) => (g.scale.y = Math.max(0.05, this.gearT)));
     this.canopyT = damp(this.canopyT, this.canopyTarget, 4, dt);
-    this.canopy.position.y = 1.95 + this.canopyT * 0.7;
+    this.canopy.position.y = 1.55 + this.canopyT * 0.7;
     this.energyTex.offset.y = (t * 0.6) % 1;
     this.canopy.rotation.x = -this.canopyT * 0.5;
     this.lightMat.emissiveIntensity = this.lights ? 2.2 + Math.sin(t * 2) * 0.3 : 0.05;
@@ -415,7 +473,17 @@ export class Ship {
     this.checkRings();
     if (!this.landed && p.y > 300) bus.emit("mission", { type: "altitude", y: p.y });
     this.updateCamera(dt);
-    if (this.view === "cockpit" && Math.floor(t * 10) !== Math.floor((t - dt) * 10)) this.dash.refresh(t);
+    if (this.view === "cockpit" && Math.floor(t * 10) !== Math.floor((t - dt) * 10)) {
+      this.dash.refresh(t);
+      this.sideScreens.forEach((sc) => sc.refresh(t));
+    }
+    this.orbs[0].scale.setScalar(1 + this.throttle * 0.8);
+    this.orbs[1].scale.setScalar(1 + Math.min(1, Math.abs(this.roll) * 2));
+    this.sandTimer -= dt;
+    if (this.view === "cockpit" && this.sandTimer <= 0) {
+      this.sandTimer = 0.15;
+      this.updateSand();
+    }
   }
 
   canBoost() {
@@ -467,9 +535,8 @@ export class Ship {
 
   private updateCamera(dt: number) {
     const cam = G.camera;
-    this.cockpit.visible = this.view === "cockpit";
     if (this.view === "cockpit") {
-      cam.position.copy(this.root.localToWorld(new THREE.Vector3(0, 2.05, -1.6)));
+      cam.position.copy(this.root.localToWorld(new THREE.Vector3(0, 1.95, -1.5)));
       cam.quaternion.copy(this.root.quaternion);
       cam.rotateX(-0.08);
       return;
@@ -492,6 +559,74 @@ export class Ship {
     this.camPos.lerp(want, 1 - Math.exp(-dt * 3));
     cam.position.copy(this.camPos);
     cam.lookAt(this.root.position);
+  }
+
+  /** Relief autour du vaisseau (800 m) reproduit en particules : la carte « de sable ». */
+  private updateSand() {
+    const N = this.sandN;
+    const pos = this.sand.geometry.attributes.position as THREE.BufferAttribute;
+    const col = this.sand.geometry.attributes.color as THREE.BufferAttribute;
+    const p = this.root.position;
+    const c = Math.cos(this.yaw),
+      sn = Math.sin(this.yaw);
+    const span = 900;
+    let k = 0;
+    for (let j = 0; j < N; j++)
+      for (let i = 0; i < N; i++) {
+        const u = i / (N - 1) - 0.5,
+          v = j / (N - 1) - 0.5;
+        const lx = u * span,
+          lz = v * span;
+        const wx = p.x + lx * c + lz * sn,
+          wz = p.z - lx * sn + lz * c;
+        const h = G.physics.terrain(wx, wz);
+        const y = Math.max(-0.02, Math.min(0.22, (h + 10) / 900));
+        pos.setXYZ(k, u * 0.95, y, v * 0.95);
+        if (h < -2) col.setXYZ(k, 0.1, 0.45, 1);
+        else if (h > 420) col.setXYZ(k, 0.95, 0.97, 1);
+        else col.setXYZ(k, 0.95, 0.72 + y, 0.32);
+        k++;
+      }
+    pos.needsUpdate = col.needsUpdate = true;
+  }
+
+  private drawSide(c: CanvasRenderingContext2D, w: number, h: number, side: number) {
+    c.clearRect(0, 0, w, h);
+    c.fillStyle = "rgba(0,18,36,.82)";
+    c.fillRect(0, 0, w, h);
+    c.strokeStyle = "#3fc8ff";
+    c.lineWidth = 2;
+    c.strokeRect(2, 2, w - 4, h - 4);
+    c.fillStyle = "#bff0ff";
+    c.font = "bold 20px Orbitron, Arial";
+    if (side < 0) {
+      c.fillText("SYSTÈMES", 14, 32);
+      const rows: [string, number][] = [["Énergie", this.energy], ["Poussée", this.throttle], ["Boucliers", 1], ["Train", this.landed ? 1 : 0]];
+      c.font = "16px Arial";
+      rows.forEach(([k, v], i) => {
+        const y = 66 + i * 38;
+        c.fillStyle = "#8fc8e8";
+        c.fillText(k, 14, y);
+        c.fillStyle = "rgba(63,200,255,.2)";
+        c.fillRect(120, y - 14, 180, 14);
+        c.fillStyle = "#3fc8ff";
+        c.fillRect(120, y - 14, 180 * Math.max(0, Math.min(1, v)), 14);
+      });
+    } else {
+      c.fillText("NAVIGATION", 14, 32);
+      if (G.world?.mapCanvas) {
+        const pp = this.root.position;
+        const [mx, my] = G.world.toMap(pp.x, pp.z, 512);
+        c.drawImage(G.world.mapCanvas, mx - 40, my - 30, 80, 60, 14, 44, w - 28, h - 58);
+        c.fillStyle = "#ffd27a";
+        c.beginPath();
+        c.arc(w / 2, 44 + (h - 58) / 2, 6, 0, Math.PI * 2);
+        c.fill();
+      }
+      c.fillStyle = "#bff0ff";
+      c.font = "14px Arial";
+      c.fillText(G.world ? G.world.zoneName(this.root.position) : "", 14, h - 10);
+    }
   }
 
   private drawDash(c: CanvasRenderingContext2D, w: number, h: number) {

@@ -48,6 +48,8 @@ export class Palace {
   armorPedestal = new THREE.Vector3(0, BASE[5] + 0.6, -4);
   armorCases: { pos: THREE.Vector3; yaw: number }[] = [];
   tint: number | null = null;
+  /** zones éclairées hors du palais (garage royal, galerie) */
+  zones: { contains: (p: THREE.Vector3) => boolean; lights: { pos: THREE.Vector3; color: number; intensity: number; distance?: number }[] }[] = [];
   outdoorLights: { pos: THREE.Vector3; color: number; intensity: number; distance?: number }[] = [];
 
   elevator = {
@@ -108,8 +110,10 @@ export class Palace {
         glassWall(s, "z", -HALF, -HALF, HALF, y0, h);
         glassWall(s, "z", HALF, -HALF, HALF, y0, h);
       } else {
-        wallZ(s, -HALF, -HALF, HALF, y0, h, mat.marble);
-        wallZ(s, HALF, -HALF, HALF, y0, h, mat.marble);
+        // au Grand Hall : arches vers l'aile ouest (galerie) et l'aile est (garage royal)
+        const arch = i === 0 ? [{ c: -20, w: 6, h: 7 }] : [];
+        wallZ(s, -HALF, -HALF, HALF, y0, h, mat.marble, arch);
+        wallZ(s, HALF, -HALF, HALF, y0, h, mat.marble, arch);
       }
       // gaine d'ascenseur
       wallZ(s, -SHAFT.x - 0.15, SHAFT.z1, HALF, y0, h, mat.silver, [], 0.3);
@@ -436,6 +440,7 @@ export class Palace {
       this.interiors[i].visible = f >= 0 ? Math.abs(i - f) <= 1 : near;
     }
     if (f >= 0) G.env.setPointLights(this.tint === null ? this.floorLights[f] : this.floorLights[f].map((l) => ({ ...l, color: this.tint! })));
+    else if (this.zones.some((z) => z.contains(p))) G.env.setPointLights(this.zones.find((z) => z.contains(p))!.lights);
     else if (near) G.env.setPointLights(this.outdoorLights.concat(G.world?.gardenLights ?? []).slice(0, 6));
     else G.env.setPointLights([]);
 
