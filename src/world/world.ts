@@ -540,6 +540,7 @@ export class World {
       const normal = next.clone().sub(prev).normalize();
       const m = new THREE.Mesh(new THREE.TorusGeometry(14, 0.8, 10, 48), new THREE.MeshStandardMaterial({ color: 0, emissive: 0xffc861, emissiveIntensity: 2.5 }));
       m.position.copy(pos);
+      m.scale.setScalar(2.6); // anneaux à la taille du vaisseau géant
       m.lookAt(pos.clone().add(normal));
       this.root.add(m);
       this.rings.push({ mesh: m, pos, normal });
@@ -585,6 +586,7 @@ export class World {
       const f = G.palace.floorAt(p);
       return `Palais — Niveau ${f + 1}`;
     }
+    if (Math.hypot(p.x - ZONES.zuria.x, p.z - ZONES.zuria.z) < ZONES.zuria.r) return Math.hypot(p.x - ZONES.zuria.x, p.z - ZONES.zuria.z) < 60 ? "Palais de Zuria" : "Pays de Zuria";
     if (p.x > 60 && p.x < 184 && p.z > -34 && p.z < 62) return "Garage royal";
     if (p.x > -150 && p.x < -60 && p.z > -40 && p.z < 20) return "Galerie royale";
     if (Math.abs(p.z + 20) < 4 && Math.abs(p.x) > 32 && Math.abs(p.x) < 61) return "Galerie vitrée du palais";

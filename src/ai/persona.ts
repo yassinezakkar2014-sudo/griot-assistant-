@@ -1,7 +1,7 @@
 // Personnalité de GRIOT côté client (utilisée quand Claude est le cerveau, sans serveur).
 export const GAME_ACTIONS = [
   "aisam_on", "aisam_off", "open_door", "close_door", "go_to_floor", "teleport", "fly_to", "prepare_ship", "board_ship", "start_engines",
-  "toggle_ship_lights", "board_car", "takeoff", "land", "exit_vehicle", "equip_armor", "remove_armor", "armor_color",
+  "toggle_ship_lights", "toggle_stealth", "board_car", "takeoff", "land", "exit_vehicle", "equip_armor", "remove_armor", "armor_color",
   "armor_ability", "toggle_mask", "set_time", "show_map", "set_view", "mission_report", "start_mission", "status_report"
 ];
 

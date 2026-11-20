@@ -57,7 +57,9 @@ export const ZONES = {
   palace: { x: 0, z: 0, r: 300 },
   city: { x1: 950, x2: 2300, z1: -850, z2: 850 },
   base: { x: 650, z: 1900, r: 160, h: 140 },
-  night: { x: -650, z: -1300, r: 260 }
+  night: { x: -650, z: -1300, r: 260 },
+  /** le pays voisin, de l'autre côté de l'océan */
+  zuria: { x: -2900, z: 300, r: 850 }
 };
 
 /** Hauteur analytique (utilisée pour générer la grille). */
@@ -84,6 +86,12 @@ export function rawHeight(x: number, z: number) {
   const n = ZONES.night;
   const dn = Math.hypot(x - n.x, z - n.z);
   h = mix(h, 6 + fbm(x * 0.01, z * 0.01) * 6, 1 - smooth(n.r * 0.6, n.r * 1.4, dn));
+  // pays de Zuria : grande île de savane au milieu de l'océan, plateau pour son palais
+  const zu = ZONES.zuria;
+  const dz = Math.hypot(x - zu.x, z - zu.z);
+  const island = 1 - smooth(zu.r * 0.65, zu.r, dz);
+  if (island > 0) h = mix(h, 5 + fbm(x * 0.004 + 40, z * 0.004 - 7) * 40, island);
+  h = mix(h, 4, 1 - smooth(170, 280, dz));
   // plateau du palais
   const dp = Math.hypot(x, z);
   h = mix(h, -0.12, 1 - smooth(ZONES.palace.r, ZONES.palace.r + 260, dp));
@@ -167,6 +175,7 @@ export class Terrain {
     const c = ZONES.city;
     const inCity = x > c.x1 - 60 && x < c.x2 + 60 && z > c.z1 - 60 && z < c.z2 + 60;
     if (h < SEA + 1.5) out.setRGB(0.76, 0.7, 0.52); // sable
+    else if (Math.hypot(x - ZONES.zuria.x, z - ZONES.zuria.z) < ZONES.zuria.r) out.setRGB(0.42 + fbm(x * 0.01, z * 0.01) * 0.12, 0.36 + fbm(x * 0.013, z * 0.01) * 0.14, 0.16); // savane ocre et herbe sèche
     else if (inCity) out.setRGB(0.12, 0.13, 0.16);
     else if (h > 520) out.setRGB(0.95, 0.96, 1); // neige
     else if (h > 260) out.setRGB(0.42, 0.42, 0.44); // roche

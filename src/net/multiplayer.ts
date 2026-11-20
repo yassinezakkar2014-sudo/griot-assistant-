@@ -4,7 +4,8 @@
 import * as THREE from "three";
 import { G, bus } from "../core";
 import { Humanoid } from "../game/humanoid";
-import { buildShipModel } from "../game/shipmodel";
+import { buildShipModel, cloakMaterial } from "../game/shipmodel";
+import { SHIP_SCALE } from "../game/ship";
 
 export interface NetState {
   n: string; // nom
@@ -33,6 +34,7 @@ class Remote {
   yaw = 0;
   last = performance.now();
   state: NetState | null = null;
+  private cloaked = false;
   private prev = new THREE.Vector3();
   private lightMat = new THREE.MeshStandardMaterial({ color: 0x050810, emissive: 0x3fc8ff, emissiveIntensity: 2 });
   private glowMat = new THREE.MeshStandardMaterial({ color: 0, emissive: 0x2a9dff, emissiveIntensity: 3 });
@@ -83,12 +85,25 @@ class Remote {
     if (st.s) {
       if (!this.ship) {
         this.ship = buildShipModel(this.lightMat, this.glowMat);
-        this.ship.group.position.y = -0.3;
+        this.ship.group.position.y = -0.3 * SHIP_SCALE;
+        this.ship.group.scale.setScalar(SHIP_SCALE);
         this.shipGroup.add(this.ship.group);
         this.shipGroup.position.fromArray(st.s);
       }
       this.shipTarget.set(st.s[0], st.s[1], st.s[2]);
       this.shipQ.set(st.s[3], st.s[4], st.s[5], st.s[6]);
+      const cloaked = (st.s as number[])[8] === 1;
+      if (cloaked !== this.cloaked) {
+        this.cloaked = cloaked;
+        this.ship.group.traverse((o) => {
+          const me = o as THREE.Mesh;
+          if (!me.isMesh) return;
+          if (cloaked) {
+            me.userData.mat = me.material;
+            me.material = cloakMaterial();
+          } else if (me.userData.mat) me.material = me.userData.mat;
+        });
+      }
       this.ship.exhaust.forEach((e) => {
         e.visible = (st.s as number[])[7] > 0;
         e.scale.y = 0.4 + (st.s as number[])[7];
@@ -295,7 +310,7 @@ export class Multiplayer {
   private myState(): NetState {
     const pl = G.player;
     const sh = G.ship;
-    const shipOut = G.mode === "ship" || sh.engines || !sh.isInHangar();
+    const shipOut = true;
     return {
       n: this.name,
       m: pl.sitting ? "sit" : G.mode,
@@ -303,7 +318,7 @@ export class Multiplayer {
       y: r2(pl.body.root.rotation.y),
       o: pl.body.outfit.color.getHex(),
       a: G.armor.worn ? G.armor.style.glow : 0,
-      s: shipOut ? [r2(sh.root.position.x), r2(sh.root.position.y), r2(sh.root.position.z), r2(sh.root.quaternion.x), r2(sh.root.quaternion.y), r2(sh.root.quaternion.z), r2(sh.root.quaternion.w), sh.engines ? r2(sh.throttle) : 0] : 0,
+      s: shipOut ? [r2(sh.root.position.x), r2(sh.root.position.y), r2(sh.root.position.z), r2(sh.root.quaternion.x), r2(sh.root.quaternion.y), r2(sh.root.quaternion.z), r2(sh.root.quaternion.w), sh.engines ? r2(sh.throttle) : 0, sh.stealth ? 1 : 0] : 0,
       z: G.world.zoneName(G.mode === "ship" ? sh.root.position : pl.position),
       ...(this.lastSay ? { say: this.lastSay } : {})
     };

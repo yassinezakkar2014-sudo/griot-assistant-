@@ -2,11 +2,29 @@
 import * as THREE from "three";
 import { G, bus, clamp, damp, lerp } from "../core";
 import { mat, HoloScreen } from "../world/materials";
-import { buildShipModel } from "./shipmodel";
+import { buildShipModel, buildSmallShipModel, cloakMaterial, cloakTime } from "./shipmodel";
+import { cyl, glowLine } from "../world/build";
 
 export type ShipView = "cockpit" | "chase" | "cinematic";
 
-const GEAR = 1.35; // hauteur du centre au-dessus du sol (train sorti)
+/** Échelle du Royal Talon : vaisseau géant (~52 m de long, ~58 m d'envergure). */
+export const SHIP_SCALE = 4;
+
+export interface ShipOptions {
+  name: string;
+  scale: number;
+  /** emplacement de stationnement (au sol) */
+  spawn: THREE.Vector3;
+  yaw?: number;
+  /** petit vaisseau de Zuria (autre modèle, couleurs bronze) */
+  small?: boolean;
+  /** construit la plateforme royale géante */
+  pad?: boolean;
+  accent?: number;
+}
+
+/** Plateforme d'atterrissage géante, dans la cour nord du palais. */
+export const PAD = { x: 0, z: 150 };
 
 export class Ship {
   root = new THREE.Group();
@@ -49,16 +67,30 @@ export class Ship {
   private ringIndex = 0;
   private bumpCooldown = 0;
 
-  constructor() {
-    this.engineGlow = new THREE.MeshStandardMaterial({ color: 0, emissive: 0x2a9dff, emissiveIntensity: 0 });
-    this.lightMat = new THREE.MeshStandardMaterial({ color: 0x050810, emissive: 0x3fc8ff, emissiveIntensity: 0.05 });
+  S: number;
+  GEAR: number;
+  name: string;
+  private samples: THREE.Vector3[];
+
+  constructor(public opts: ShipOptions = { name: "Royal Talon", scale: SHIP_SCALE, spawn: new THREE.Vector3(PAD.x, 0.15, PAD.z), pad: true }) {
+    this.S = opts.scale;
+    this.GEAR = 1.35 * this.S; // hauteur du centre au-dessus du sol (train sorti)
+    this.name = opts.name;
+    const accent = opts.accent ?? 0x3fc8ff;
+    this.engineGlow = new THREE.MeshStandardMaterial({ color: 0, emissive: opts.small ? 0xff8a2a : 0x2a9dff, emissiveIntensity: 0 });
+    this.lightMat = new THREE.MeshStandardMaterial({ color: 0x050810, emissive: accent, emissiveIntensity: 0.05 });
+    this.samples = [this.V(0, 0.6, -6.3), this.V(0, 0.6, 6.6), this.V(-6.4, 0.6, 2), this.V(6.4, 0.6, 2), this.V(0, 2.3, -1.5), this.V(-3.9, 0.4, -3.5), this.V(3.9, 0.4, -3.5), this.V(-3.5, 0.6, 5), this.V(3.5, 0.6, 5)];
+  }
+
+  V(x: number, y: number, z: number) {
+    return new THREE.Vector3(x * this.S, y * this.S, z * this.S);
   }
 
   build() {
     const trimMat = new THREE.MeshStandardMaterial({ color: 0x23262f, metalness: 0.95, roughness: 0.2 });
     const m = this.model;
     // coque du Royal Talon (modèle partagé avec les vaisseaux des autres joueurs)
-    const built = buildShipModel(this.lightMat, this.engineGlow);
+    const built = (this.opts.small ? buildSmallShipModel : buildShipModel)(this.lightMat, this.engineGlow);
     m.add(built.group);
     this.canopy = built.canopy;
     this.exhaust = built.exhaust;
@@ -148,30 +180,86 @@ export class Ship {
       m.add(strut);
       this.gear.push(strut);
     }
-    m.position.y = -0.3;
+    m.position.y = -0.3 * this.S;
+    m.scale.setScalar(this.S);
     this.root.add(m);
     // volume de collision du vaisseau (le joueur ne le traverse pas)
     const hullBox = new THREE.Mesh(new THREE.BoxGeometry(7.6, 2.2, 13), new THREE.MeshBasicMaterial({ visible: false }));
-    hullBox.position.set(0, 0.6, -0.5);
+    hullBox.position.set(0, 0.6 * this.S, -0.5 * this.S);
+    hullBox.scale.setScalar(this.S);
     this.root.add(hullBox);
     G.scene.add(this.root);
+    if (this.opts.pad) this.buildPad();
     this.park();
     G.physics.addDynamic(hullBox, "ship");
 
     G.interact.add({
-      id: "ship",
-      pos: () => this.root.position.clone().add(new THREE.Vector3(-5, -1, -2.5).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw)),
-      radius: 6,
+      id: this.opts.small ? "ship-small" : "ship",
+      pos: () => this.root.position.clone().add(new THREE.Vector3(-5.6 * this.S, -this.GEAR + 1, -2.5 * this.S).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw)),
+      radius: 9,
       enabled: () => G.mode === "foot",
-      label: () => "Entrer dans le cockpit du Royal Talon",
+      label: () => `Monter à bord : ${this.name}`,
       action: () => this.board()
     });
   }
 
+  // ---------------------------------------------------------------- plateforme royale
+  padLights = false;
+  private padGlow = new THREE.MeshStandardMaterial({ color: 0, emissive: 0x3fc8ff, emissiveIntensity: 1 });
+  private buildPad() {
+    const g = new THREE.Group();
+    G.scene.add(g);
+    const c = PAD;
+    cyl(g, 46, 0.35, mat.darkFloor, c.x, -0.2, c.z, { seg: 72 });
+    for (const [r, w] of [[44, 0.4], [30, 0.25], [14, 0.2]] as [number, number][]) {
+      const ring = new THREE.Mesh(new THREE.RingGeometry(r - w, r, 96), this.padGlow);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(c.x, 0.17, c.z);
+      g.add(ring);
+    }
+    for (let k = 0; k < 12; k++) {
+      const a = (k / 12) * Math.PI * 2;
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 3, 10), mat.black);
+      post.position.set(c.x + Math.cos(a) * 46, 1.5, c.z + Math.sin(a) * 46);
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 8), this.padGlow);
+      lamp.position.set(post.position.x, 3.2, post.position.z);
+      g.add(post, lamp);
+    }
+    for (let k = -3; k <= 3; k++) glowLine(g, c.x - 1, 0.18, c.z - 46 + 3 + (k + 3) * 6, c.x + 1, 0.19, c.z - 46 + 6 + (k + 3) * 6, mat.glowGold, 0.01);
+
+  }
+
+  // ---------------------------------------------------------------- mode furtif
+  stealth = false;
+  private originals = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
+  setStealth(on: boolean) {
+    if (on === this.stealth) return;
+    if (on && this.energy < 0.1) return bus.emit("toast", { text: "Énergie insuffisante pour le mode furtif.", kind: "warn" });
+    this.stealth = on;
+    const cloak = cloakMaterial();
+    this.model.traverse((o) => {
+      const me = o as THREE.Mesh;
+      if (!me.isMesh || this.isCockpitPart(me)) return;
+      if (on) {
+        this.originals.set(me, me.material);
+        me.material = cloak;
+      } else if (this.originals.has(me)) me.material = this.originals.get(me)!;
+    });
+    if (!on) this.originals.clear();
+    G.audio.whoosh(1.4, on ? 2400 : 200, on ? 120 : 2400, 0.25);
+    bus.emit("shake", 0.25);
+    bus.emit("toast", { text: on ? "👁‍🗨 Mode furtif activé : le Royal Talon est invisible." : "Mode furtif désactivé." });
+    bus.emit("mission", { type: "stealth" });
+  }
+  private isCockpitPart(o: THREE.Object3D) {
+    for (let p: THREE.Object3D | null = o; p; p = p.parent) if (p === this.cockpit) return true;
+    return false;
+  }
+
   /** Remet le vaisseau à son emplacement de hangar. */
   park() {
-    this.root.position.copy(G.palace.shipSpawn).add(new THREE.Vector3(0, GEAR, 0));
-    this.yaw = 0;
+    this.root.position.copy(this.opts.spawn).add(new THREE.Vector3(0, this.GEAR, 0));
+    this.yaw = this.opts.yaw ?? 0;
     this.pitch = this.roll = 0;
     this.speed = this.vy = this.throttle = 0;
     this.landed = true;
@@ -195,8 +283,8 @@ export class Ship {
   prepare() {
     this.ready = true;
     this.setLights(true);
-    G.palace.doors.get("door-hangar")?.open();
-    bus.emit("toast", { text: "🛩 Royal Talon : diagnostics OK, plein d'énergie, portes du hangar ouvertes." });
+    this.padLights = true;
+    bus.emit("toast", { text: "🛩 Royal Talon : diagnostics OK, plein d'énergie, plateforme royale éclairée." });
     bus.emit("mission", { type: "ship-ready" });
   }
 
@@ -208,9 +296,10 @@ export class Ship {
   board(): Promise<void> {
     return new Promise((resolve) => {
       if (G.mode === "ship") return resolve();
+      G.ship = this; // ce vaisseau devient le vaisseau actif
       // si le joueur est loin, il est d'abord conduit au vaisseau
       if (G.player.position.distanceTo(this.root.position) > 12) {
-        const side = this.root.position.clone().add(new THREE.Vector3(-5.2, -GEAR, -2.5).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw));
+        const side = this.root.position.clone().add(new THREE.Vector3(-5.8 * this.S, -this.GEAR, -2.5 * this.S).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw));
         G.player.teleport(side, this.yaw - Math.PI / 2);
       }
       G.mode = "cinematic";
@@ -222,9 +311,9 @@ export class Ship {
       const step = () => {
         const t = Math.min(1, (performance.now() - start) / 1800);
         const e = t * t * (3 - 2 * t);
-        const seatPos = this.root.localToWorld(new THREE.Vector3(0, 1.95, -1.5));
-        const lookAt = this.root.localToWorld(new THREE.Vector3(0, 1.7, -12));
-        const mid = this.root.localToWorld(new THREE.Vector3(-5, 5, 2));
+        const seatPos = this.root.localToWorld(this.V(0, 1.95, -1.5));
+        const lookAt = this.root.localToWorld(this.V(0, 1.7, -12));
+        const mid = this.root.localToWorld(this.V(-6, 5, 2));
         const p1 = from.clone().lerp(mid, e);
         G.camera.position.copy(p1.lerp(seatPos, e));
         const m4 = new THREE.Matrix4().lookAt(G.camera.position, lookAt, new THREE.Vector3(0, 1, 0));
@@ -235,7 +324,7 @@ export class Ship {
           G.mode = "ship";
           this.view = "cockpit";
           this.camPos.copy(G.camera.position);
-          bus.emit("toast", { text: "Aux commandes. R : moteurs · Espace : monter · W/S : poussée · V : vue · F : sortir" });
+          bus.emit("toast", { text: "Aux commandes. R : moteurs · Espace : monter · W/this.S : poussée · V : vue · F : sortir" });
           bus.emit("mode");
           resolve();
         }
@@ -273,7 +362,7 @@ export class Ship {
       };
     } else {
       const g = G.physics.ground(p.x, p.y, p.z).y;
-      this.autopilot = { label: "Décollage", points: [new THREE.Vector3(p.x, g + 40, p.z)] };
+      this.autopilot = { label: "Décollage", points: [new THREE.Vector3(p.x, g + 70, p.z)] };
     }
     this.landed = false;
   }
@@ -285,7 +374,7 @@ export class Ship {
     if (this.isInHangar()) {
       G.palace.doors.get("door-hangar")?.open();
       pts.push(new THREE.Vector3(p.x, 59.5, p.z), new THREE.Vector3(0, 60, -40), new THREE.Vector3(0, 110, -160));
-    } else if (this.landed) pts.push(new THREE.Vector3(p.x, p.y + 40, p.z));
+    } else if (this.landed) pts.push(new THREE.Vector3(p.x, p.y + 70, p.z));
     const cruise = Math.max(dest.y + 120, 180);
     pts.push(new THREE.Vector3(dest.x, cruise, dest.z));
     this.autopilot = { points: pts, label };
@@ -295,19 +384,19 @@ export class Ship {
 
   land() {
     const p = this.root.position;
-    const g = G.physics.ground(p.x, p.y - GEAR, p.z, 0.5).y;
-    this.autopilot = { label: "Atterrissage", points: [new THREE.Vector3(p.x, g + GEAR, p.z)], land: true };
+    const g = G.physics.ground(p.x, p.y - this.GEAR, p.z, 0.5).y;
+    this.autopilot = { label: "Atterrissage", points: [new THREE.Vector3(p.x, g + this.GEAR, p.z)], land: true };
   }
 
   exit() {
     if (G.mode !== "ship") return;
     const pp = this.root.position;
-    const agl = pp.y - GEAR - G.physics.ground(pp.x, pp.y - GEAR + 0.6, pp.z, 0.6).y;
+    const agl = pp.y - this.GEAR - G.physics.ground(pp.x, pp.y - this.GEAR + 0.6, pp.z, 0.6).y;
     if (!this.landed && (this.speed > 4 || agl > 4)) {
       bus.emit("toast", { text: "Atterrissez d'abord (H : atterrissage automatique).", kind: "warn" });
       return;
     }
-    const side = this.root.position.clone().add(new THREE.Vector3(-5.2, 0, -2.5).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw));
+    const side = this.root.position.clone().add(new THREE.Vector3(-5.8 * this.S, 0, -2.5 * this.S).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw));
     side.y = G.physics.ground(side.x, this.root.position.y, side.z, 2).y;
     G.mode = "foot";
     G.armor.onVehicle(false);
@@ -319,28 +408,35 @@ export class Ship {
   // ---------------------------------------------------------------- simulation
   update(dt: number, t: number) {
     // animations visuelles
-    this.gearT = damp(this.gearT, this.landed || this.root.position.y - G.physics.ground(this.root.position.x, this.root.position.y - GEAR, this.root.position.z, 0.5).y < 12 ? 1 : 0, 3, dt);
+    this.gearT = damp(this.gearT, this.landed || this.root.position.y - G.physics.ground(this.root.position.x, this.root.position.y - this.GEAR, this.root.position.z, 0.5).y < 12 * this.S ? 1 : 0, 3, dt);
     this.gear.forEach((g) => (g.scale.y = Math.max(0.05, this.gearT)));
     this.canopyT = damp(this.canopyT, this.canopyTarget, 4, dt);
     this.canopy.position.y = 1.55 + this.canopyT * 0.7;
     this.energyTex.offset.y = (t * 0.6) % 1;
     this.canopy.rotation.x = -this.canopyT * 0.5;
     this.lightMat.emissiveIntensity = this.lights ? 2.2 + Math.sin(t * 2) * 0.3 : 0.05;
+    this.padGlow.emissiveIntensity = this.padLights ? 2 + Math.sin(t * 3) : 0.6;
+    cloakTime.value = t;
+    if (this.stealth) {
+      this.energy = Math.max(0, this.energy - dt * 0.015);
+      if (this.energy <= 0.02) this.setStealth(false);
+    }
     const thrVis = this.engines ? 0.35 + this.throttle * 0.65 : 0;
     this.engineGlow.emissiveIntensity = this.engines ? 1.5 + this.throttle * 5 : 0;
     this.exhaust.forEach((e) => {
-      e.visible = this.engines;
+      e.visible = this.engines && !this.stealth;
       e.scale.set(1, thrVis * (1 + Math.random() * 0.1) * (G.input.down("ShiftLeft") && this.canBoost() ? 1.8 : 1), 1);
       e.position.z = this.nozzleZ + 2 * e.scale.y;
     });
 
-    if (G.mode !== "ship") {
+    if (G.mode !== "ship" || G.ship !== this) {
       this.updateIdleGround();
       return;
     }
     const inp = G.input;
     if (inp.hit("KeyR")) this.startEngines(!this.engines);
     if (inp.hit("KeyL")) this.setLights(!this.lights);
+    if (inp.hit("KeyK")) this.setStealth(!this.stealth);
     if (inp.hit("KeyV")) this.cycleView();
     if (inp.hit("KeyF")) return this.exit();
     if (inp.hit("KeyH")) this.land();
@@ -451,10 +547,10 @@ export class Ship {
       if (this.autopilot && this.bumpCooldown <= 0 && this.autopilot.points.length < 8) this.autopilot.points.unshift(p.clone().add(new THREE.Vector3(0, 25, 0)));
       this.bumpCooldown = 1;
     }
-    const g = G.physics.ground(p.x, p.y - GEAR + 0.6, p.z, 0.6).y;
-    if (p.y < g + GEAR) {
+    const g = G.physics.ground(p.x, p.y - this.GEAR + 0.6, p.z, 0.6).y;
+    if (p.y < g + this.GEAR) {
       const impact = -this.vy;
-      p.y = g + GEAR;
+      p.y = g + this.GEAR;
       if (this.vy < 0) this.vy = 0;
       if (!this.landed && this.speed < 45 && Math.abs(this.pitch) < 0.5) {
         this.landed = true;
@@ -469,7 +565,7 @@ export class Ship {
         }
       }
     }
-    G.audio.setEngine(this.engines ? this.throttle + (boost ? 0.4 : 0) : null);
+    G.audio.setEngine(this.engines ? (this.throttle + (boost ? 0.4 : 0)) * (this.stealth ? 0.25 : 1) : null);
     this.checkRings();
     if (!this.landed && p.y > 300) bus.emit("mission", { type: "altitude", y: p.y });
     this.updateCamera(dt);
@@ -494,13 +590,12 @@ export class Ship {
     // vaisseau garé : reste posé
     if (!this.landed) {
       const p = this.root.position;
-      const g = G.physics.ground(p.x, p.y - GEAR + 0.6, p.z, 0.6).y;
-      p.y = Math.max(g + GEAR, p.y - 9 * (1 / 60));
-      if (p.y <= g + GEAR + 0.01) this.landed = true;
+      const g = G.physics.ground(p.x, p.y - this.GEAR + 0.6, p.z, 0.6).y;
+      p.y = Math.max(g + this.GEAR, p.y - 9 * (1 / 60));
+      if (p.y <= g + this.GEAR + 0.01) this.landed = true;
     }
   }
 
-  private samples = [new THREE.Vector3(0, 0.6, -6.3), new THREE.Vector3(0, 0.6, 6.6), new THREE.Vector3(-6.4, 0.6, 2), new THREE.Vector3(6.4, 0.6, 2), new THREE.Vector3(0, 2.3, -1.5), new THREE.Vector3(-3.9, 0.4, -3.5), new THREE.Vector3(3.9, 0.4, -3.5), new THREE.Vector3(-3.5, 0.6, 5), new THREE.Vector3(3.5, 0.6, 5)];
   private collides() {
     this.root.updateMatrixWorld();
     for (const s of this.samples) {
@@ -516,7 +611,7 @@ export class Ship {
     if (!rings.length || G.missions.isDone("rings")) return;
     const r = rings[this.ringIndex % rings.length];
     const d = this.root.position.clone().sub(r.pos);
-    if (d.length() < 15 && Math.abs(d.dot(r.normal)) < 6) {
+    if (d.length() < 38 && Math.abs(d.dot(r.normal)) < 14) {
       (r.mesh.material as THREE.MeshStandardMaterial).emissive.setHex(0x3fff9a);
       this.ringIndex++;
       G.audio.confirm();
@@ -536,14 +631,14 @@ export class Ship {
   private updateCamera(dt: number) {
     const cam = G.camera;
     if (this.view === "cockpit") {
-      cam.position.copy(this.root.localToWorld(new THREE.Vector3(0, 1.95, -1.5)));
+      cam.position.copy(this.root.localToWorld(this.V(0, 1.95, -1.5)));
       cam.quaternion.copy(this.root.quaternion);
       cam.rotateX(-0.08);
       return;
     }
     if (this.view === "chase") {
       const yawQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.pitch * 0.5, this.yaw, 0, "YXZ"));
-      const back = new THREE.Vector3(0, 4.5, 19 + this.speed * 0.03).applyQuaternion(yawQ);
+      const back = new THREE.Vector3(0, 4.5 * this.S, 19 * this.S + this.speed * 0.08).applyQuaternion(yawQ);
       const want = this.root.position.clone().add(back);
       this.camPos.lerp(want, 1 - Math.exp(-dt * 6));
       const g = G.physics.terrain(this.camPos.x, this.camPos.z);
@@ -554,8 +649,8 @@ export class Ship {
       return;
     }
     this.cineAngle += dt * 0.25;
-    const r = 26;
-    const want = this.root.position.clone().add(new THREE.Vector3(Math.cos(this.cineAngle) * r, 6 + Math.sin(this.cineAngle * 0.7) * 3, Math.sin(this.cineAngle) * r));
+    const r = 26 * this.S;
+    const want = this.root.position.clone().add(new THREE.Vector3(Math.cos(this.cineAngle) * r, (6 + Math.sin(this.cineAngle * 0.7) * 3) * this.S, Math.sin(this.cineAngle) * r));
     this.camPos.lerp(want, 1 - Math.exp(-dt * 3));
     cam.position.copy(this.camPos);
     cam.lookAt(this.root.position);

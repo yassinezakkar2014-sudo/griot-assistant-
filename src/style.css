@@ -363,3 +363,44 @@ html:not(.serverless) .key-pill { display: none; }
 body[data-mode="car"] .tbtns.car { display: grid; }
 body[data-mode="car"] .tbtns:not(.car) { display: none; }
 body[data-mode="car"] #crosshair { display: none; }
+
+/* ---------- HUD du casque (Armure Royale) ---------- */
+#visor { --visor: #2a8cff; position: absolute; inset: 0; pointer-events: none; color: #e8f6ff; font: 500 11px "JetBrains Mono", monospace; letter-spacing: 0.06em; z-index: 2; }
+#visor button, #visor .v-panel { pointer-events: auto; }
+.v-frame { position: absolute; inset: 0; border-radius: 40% / 26%; box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--visor) 55%, transparent), inset 0 0 120px color-mix(in srgb, var(--visor) 40%, transparent); background: repeating-linear-gradient(0deg, color-mix(in srgb, var(--visor) 6%, transparent) 0 1px, transparent 1px 3px); }
+#visor.ping .v-frame { animation: vping 1.2s ease-out; }
+@keyframes vping { 0% { box-shadow: inset 0 0 0 2px var(--visor), inset 0 0 400px var(--visor); } 100% {} }
+.v-top { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 18px; padding: 6px 14px; border: 1px solid color-mix(in srgb, var(--visor) 60%, transparent); border-radius: 99px; background: rgba(2, 8, 18, 0.45); white-space: nowrap; }
+.v-wp { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); color: #ffd27a; text-shadow: 0 0 8px #000; }
+.v-panel { position: absolute; top: 90px; width: 220px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--visor) 50%, transparent); border-radius: 14px; background: rgba(2, 8, 18, 0.42); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.v-panel > b { display: block; margin-bottom: 6px; color: var(--visor); letter-spacing: 0.2em; }
+.v-left { left: 16px; }
+.v-right { right: 16px; max-height: 46%; overflow: auto; }
+.vrow { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+.vrow span { flex: 0 0 72px; color: #9fc8e8; }
+.vrow i { flex: 1; height: 5px; background: rgba(255, 255, 255, 0.12); border-radius: 4px; overflow: hidden; }
+.vrow i b { display: block; height: 100%; background: var(--visor); }
+.vrow em { font-style: normal; margin-left: auto; }
+.vitem { display: flex; width: 100%; justify-content: space-between; gap: 6px; background: none; border: 1px solid transparent; border-radius: 8px; padding: 5px 6px; color: inherit; font: inherit; text-align: left; }
+.vitem:hover, .vitem.on { border-color: var(--visor); background: color-mix(in srgb, var(--visor) 18%, transparent); }
+.vitem.on span::before { content: "◆ "; color: #ffd27a; }
+.vitem em { font-style: normal; color: #9fc8e8; }
+#vMarkers { position: absolute; inset: 0; overflow: hidden; }
+.vmark { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.vmark i { width: 12px; height: 12px; margin: -6px 0 0 -6px; border: 2px solid var(--visor); transform: rotate(45deg); }
+.vmark span { font-size: 10px; text-shadow: 0 0 6px #000; }
+.vmark.k-joueur i { border-color: #3fff9a; border-radius: 50%; }
+.vmark.k-véhicule i { border-color: #ffd27a; }
+.vmark.wp i { border-color: #ffd27a; background: rgba(255, 210, 122, 0.4); width: 16px; height: 16px; }
+.vmark.wp span { color: #ffd27a; font-size: 12px; }
+.v-reticle { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px; border: 1px solid color-mix(in srgb, var(--visor) 70%, transparent); border-radius: 50%; }
+.v-reticle i { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; border-radius: 50%; background: var(--visor); }
+.v-modes { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; max-width: 92%; }
+.v-modes button { pointer-events: auto; font: 600 11px "JetBrains Mono", monospace; color: #e8f6ff; background: rgba(2, 8, 18, 0.5); border: 1px solid color-mix(in srgb, var(--visor) 60%, transparent); border-radius: 10px; padding: 8px 11px; }
+#visor[data-mode="nav"] [data-vmode="nav"], #visor[data-mode="scan"] [data-vmode="scan"], #visor[data-mode="bio"] [data-vmode="bio"] { background: color-mix(in srgb, var(--visor) 35%, transparent); }
+#visor[data-mode="bio"] .v-right { display: none; }
+#visor[data-mode="bio"] .v-left { transform: scale(1.15); transform-origin: top left; }
+#visor:not([hidden]) ~ #armorHud { display: none; }
+body:has(#visor:not([hidden])) #crosshair { display: none; }
+.touch .v-modes { bottom: 210px; }
+@media (max-width: 760px) { .v-panel { width: 170px; top: 70px; } .v-top { gap: 8px; font-size: 9px; } }

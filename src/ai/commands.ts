@@ -12,7 +12,7 @@ const V = {
   open: /\b(ouvr\w*|open\w*|abre|abrir|deverrouill\w*|unlock)\b/,
   close: /\b(ferm\w*|close|cierra|cerrar|verrouill\w*)\b/,
   go: /\b(va|vais|aller|allons|amene|emmene|conduis|monte|descends|go|take|bring|show|montre|affiche|ve|lleva|muestra|direction|rends|rejoins|teleport\w*)\b/,
-  fly: /\b(emmene|amene|conduis|take me|fly|vole|volons|pilote|lleva|explor\w*|survol\w*|balade)\b/,
+  fly: /\b(emmene|amene|conduis|take me|fly|vole|volons|pilote|lleva|explor\w*|survol\w*|balade|voyag\w*|travel)\b/,
   ship: /\b(vaisseau|talon|ship|jet|avion|nave|chasseur|fighter|appareil)\b/,
   armor: /\b(armure|armor|armour|suit|combinaison|armadura|tenue de combat)\b/
 };
@@ -33,6 +33,7 @@ function clause(raw: string): Intent | null {
   if (/\b(sauvegard\w*|save|guardar)\b/.test(t) && !/projet/.test(t)) return { action: "save" };
 
   // --- vaisseau ---
+  if (/\b(furtif|furtivite|invisible|camouflage|stealth|cloak)\b/.test(t)) return { action: "toggle_stealth", target: /\b(desactiv\w*|coupe|arrete|enleve|visible|off)\b/.test(t) ? "off" : "on" };
   if (/\b(decoll\w*|take ?off|despeg\w*|leve|en l air)\b/.test(t)) return { action: "takeoff" };
   if (/\b(atterri\w*|land|landing|aterriz\w*|pose.toi|pose le vaisseau)\b/.test(t)) return { action: "land" };
   if (/\b(prepar\w*|ready|apresta|prepara)\b/.test(t) && V.ship.test(t)) return { action: "prepare_ship" };

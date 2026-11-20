@@ -26,7 +26,8 @@ export interface GameContext {
   audio: AudioFX;
   interact: Interactions;
   player: Player;
-  ship: Ship;
+  ship: Ship; // vaisseau actif (celui qu'on pilote ou le dernier utilisé)
+  ships: Ship[];
   armor: ArmorSystem;
   palace: Palace;
   env: Environment;

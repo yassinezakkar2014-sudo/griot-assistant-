@@ -162,3 +162,118 @@ export function buildShipModel(lightMat: THREE.Material, engineGlow: THREE.Mater
   }
   return { group: g, canopy, exhaust, energy: tex, nozzleZ };
 }
+
+// ---------------------------------------------------------------- camouflage (mode furtif)
+/** Horloge partagée de l'effet (mise à jour par le vaisseau). */
+export const cloakTime = { value: 0 };
+let cloak: THREE.ShaderMaterial | null = null;
+/** Matériau « invisible » : seuls les contours scintillent (effet de Fresnel + lignes de balayage). */
+export function cloakMaterial() {
+  if (cloak) return cloak;
+  cloak = new THREE.ShaderMaterial({
+    uniforms: { uTime: cloakTime, uColor: { value: new THREE.Color(0x7fdcff) } },
+    vertexShader: /* glsl */ `
+      varying vec3 vN; varying vec3 vV; varying float vY;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vN = normalize(normalMatrix * normal);
+        vV = normalize(-mv.xyz);
+        vY = (modelMatrix * vec4(position, 1.0)).y;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: /* glsl */ `
+      uniform float uTime; uniform vec3 uColor;
+      varying vec3 vN; varying vec3 vV; varying float vY;
+      void main() {
+        float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 3.0);
+        float scan = 1.0 - smoothstep(0.0, 0.08, abs(fract(vY * 0.05 - uTime * 0.4) - 0.5));
+        float a = f * 0.45 + 0.015 + scan * 0.06;
+        gl_FragColor = vec4(uColor * (0.4 + f * 1.4), a);
+      }`,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+  return cloak;
+}
+
+// ---------------------------------------------------------------- petit vaisseau de Zuria
+/** « Faucon de Zuria » : petit vaisseau d'environ 10 m, coque ivoire et bronze, ailes en delta,
+ *  deux réacteurs latéraux. Même gabarit de cockpit que le Royal Talon (verrière autour de z = -2). */
+export function buildSmallShipModel(lightMat: THREE.Material, engineGlow: THREE.Material): ShipModel {
+  const g = new THREE.Group();
+  const ivory = applyPBR(new THREE.MeshPhysicalMaterial({ color: 0xe9e0cc, metalness: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.1 }), panelPBR(), 0.35, 2) as THREE.MeshPhysicalMaterial;
+  const bronze = new THREE.MeshStandardMaterial({ color: 0xa8743a, metalness: 0.95, roughness: 0.28 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x1d1a17, metalness: 0.6, roughness: 0.5 });
+  const add = (geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, z: number, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) => {
+    const me = new THREE.Mesh(geo, m);
+    me.position.set(x, y, z);
+    me.rotation.set(rx, ry, rz);
+    me.scale.set(sx, sy, sz);
+    me.castShadow = true;
+    g.add(me);
+    return me;
+  };
+  // fuselage effilé
+  add(new THREE.SphereGeometry(1, 40, 20), ivory, 0, 1.0, 0, 0, 0, 0, 1.35, 0.85, 4.6);
+  add(new THREE.ConeGeometry(0.75, 2.4, 24), ivory, 0, 0.95, -5.4, -Math.PI / 2, 0, 0, 1, 1, 0.55);
+  add(new THREE.BoxGeometry(0.08, 0.06, 7), lightMat, 0, 1.82, -0.5);
+  // ailes delta avec bords d'attaque en bronze
+  for (const sx of [-1, 1]) {
+    const w = new THREE.Shape();
+    w.moveTo(sx * 1.1, -1.8);
+    w.lineTo(sx * 5.2, 2.6);
+    w.lineTo(sx * 4.9, 3.3);
+    w.lineTo(sx * 1.1, 3.0);
+    const wg = new THREE.ExtrudeGeometry(w, { depth: 0.16, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.04, bevelSegments: 1 });
+    wg.rotateX(Math.PI / 2);
+    wg.translate(0, 0.75, 0);
+    const wing = new THREE.Mesh(wg, ivory);
+    wing.castShadow = true;
+    g.add(wing);
+    const edge = add(new THREE.BoxGeometry(0.1, 0.1, 5.9), bronze, sx * 3.15, 0.72, 0.4, 0, sx * -0.75, 0);
+    edge.castShadow = true;
+    add(new THREE.BoxGeometry(0.05, 0.05, 1), lightMat, sx * 5.0, 0.78, 3.0);
+    // réacteur latéral
+    add(new THREE.CylinderGeometry(0.42, 0.5, 3.0, 20), bronze, sx * 1.6, 0.85, 2.8, Math.PI / 2);
+    add(new THREE.TorusGeometry(0.44, 0.06, 8, 24), dark, sx * 1.6, 0.85, 4.3);
+  }
+  // dérive
+  add(new THREE.BoxGeometry(0.12, 1.4, 1.8), ivory, 0, 1.9, 3.2, -0.35);
+  add(new THREE.BoxGeometry(0.14, 0.2, 1.6), bronze, 0, 2.55, 3.45, -0.35);
+  // verrière + cuve (même gabarit que le Royal Talon pour le cockpit intérieur)
+  const canopy = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshPhysicalMaterial({ color: 0x3a2a12, metalness: 0.5, roughness: 0.05, transparent: true, opacity: 0.55, side: THREE.FrontSide, depthWrite: false, clearcoat: 1 })
+  );
+  canopy.scale.set(1.0, 0.8, 1.9);
+  canopy.position.set(0, 1.55, -2.0);
+  g.add(canopy);
+  const tub = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x2a2018, metalness: 0.4, roughness: 0.5, side: THREE.BackSide }));
+  tub.scale.set(0.98, 0.55, 1.85);
+  tub.position.set(0, 1.56, -2.0);
+  g.add(tub);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(1, 0.035, 8, 48), bronze);
+  rim.rotation.x = Math.PI / 2;
+  rim.scale.set(1.01, 1.91, 1);
+  rim.position.set(0, 1.56, -2.0);
+  g.add(rim);
+  // tuyères + flammes
+  const exhaust: THREE.Mesh[] = [];
+  const nozzleZ = 4.35;
+  for (const x of [-1.6, 1.6]) {
+    const noz = new THREE.Mesh(new THREE.CircleGeometry(0.36, 24), engineGlow);
+    noz.position.set(x, 0.85, nozzleZ);
+    g.add(noz);
+    const plume = new THREE.Mesh(
+      new THREE.ConeGeometry(0.34, 3.2, 16, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xffa04a, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })
+    );
+    plume.rotation.x = -Math.PI / 2;
+    plume.position.set(x, 0.85, nozzleZ + 1.6);
+    plume.visible = false;
+    g.add(plume);
+    exhaust.push(plume);
+  }
+  return { group: g, canopy, exhaust, energy: energyTexture(), nozzleZ };
+}

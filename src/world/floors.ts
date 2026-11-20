@@ -200,7 +200,7 @@ function hall(p: Palace) {
     c.fillText("THINK. SPEAK. RULE.", 40, 220);
     c.font = "26px Arial";
     c.fillStyle = "#bff0ff";
-    const lines = ["Dites « GRIOT » ou appuyez sur T pour parler.", "Ascenseur : au fond du hall.", "Armurerie : niveau 6 · Hangar : niveau 7.", `Heure du royaume : ${fmtHour(G.env?.hour ?? 0)}`];
+    const lines = ["Dites « GRIOT » ou appuyez sur T pour parler.", "Ascenseur : au fond du hall.", "Armurerie : niveau 6 · Royal Talon : plateforme nord.", `Heure du royaume : ${fmtHour(G.env?.hour ?? 0)}`];
     lines.forEach((l, i) => c.fillText(l, 40, 300 + i * 44));
     c.fillStyle = `rgba(79,210,255,${0.4 + 0.3 * Math.sin(t * 2)})`;
     c.fillRect(40, h - 60, (w - 80) * ((t * 0.1) % 1), 6);

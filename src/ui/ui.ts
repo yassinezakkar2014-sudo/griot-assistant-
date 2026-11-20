@@ -9,12 +9,14 @@ import { Griot, MODE_LABELS, type GriotMode, md, HELP } from "../ai/griot";
 import { LANGS } from "../ai/voice";
 import { WORLD } from "../world/terrain";
 import { getOpenAIKey, setOpenAIKey } from "../ai/localapi";
+import { Visor } from "./visor";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 export class UI {
   griot = new Griot();
+  visor = new Visor();
   tracked: string | null = null;
   modalOpen: string | null = null;
   panelOpen = false;
@@ -31,6 +33,7 @@ export class UI {
     this.bindBus();
     this.bindPanel();
     this.bindHome();
+    this.visor.init();
     this.bindKeys();
     if (G.mobile) this.bindTouch();
     await this.griot.init();
@@ -1024,11 +1027,12 @@ export class UI {
           `<span class="${s.engines ? "on" : ""}">MOTEURS</span>`,
           `<span class="${s.lights ? "on" : ""}">FEUX</span>`,
           `<span class="${s.landed ? "on" : ""}">POSÉ</span>`,
+          s.stealth ? `<span class="on">👁‍🗨 FURTIF ${Math.round(s.energy * 100)}%</span>` : "",
           s.autopilot ? `<span class="on">AUTO ▸ ${esc(s.autopilot.label)}</span>` : "",
           s.canBoost() ? `<span>POST-COMB. ${Math.round(s.energy * 100)}%</span>` : ""
         ].join("");
       }
-      $("armorHud").hidden = !G.armor.worn || G.mode !== "foot";
+      $("armorHud").hidden = !G.armor.worn || G.mode !== "foot" || G.armor.maskUp;
     }
     $("carHud").hidden = (G.mode as string) !== "car";
     if ((G.mode as string) === "car" && G.cars.active) {
@@ -1040,6 +1044,7 @@ export class UI {
       this.drawAttitude();
     }
     if (G.armor.worn) $("armorEnergy").style.width = `${G.armor.energy * 100}%`;
+    this.visor.update(t);
     this.drawMinimap(p, yaw);
     this.drawAvatar(t);
   }

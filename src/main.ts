@@ -19,6 +19,7 @@ import { installLocalApi } from "./ai/localapi";
 import { Multiplayer } from "./net/multiplayer";
 import { buildWings } from "./world/wings";
 import { buildWalls } from "./world/walls";
+import { buildZuria } from "./world/zuria";
 import { CarSystem } from "./game/car";
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -90,12 +91,18 @@ async function boot() {
   progress(0.95, "Garage royal & galerie");
   const wings = buildWings(G.palace);
   buildWalls(G.palace);
+  progress(0.96, "Pays de Zuria");
+  const zuria = buildZuria(G.palace);
+  G.palace.spots.zuria = { pos: zuria.front, yaw: 0, label: "zuria" };
   G.palace.spots.garage = { pos: wings.garageSpot, yaw: -Math.PI / 2, label: "garage" };
   G.palace.spots.gallery = { pos: wings.gallerySpot, yaw: Math.PI / 2, label: "gallery" };
   G.cars = new CarSystem();
   G.cars.build(wings.carSlots);
   G.ship = new Ship();
   G.ship.build();
+  const falcon = new Ship({ name: "Faucon de Zuria", scale: 1, spawn: zuria.pad, yaw: Math.PI / 2, small: true, accent: 0xff9a3a });
+  falcon.build();
+  G.ships = [G.ship, falcon];
   G.armor = new ArmorSystem();
   G.armor.build();
   const companion = buildCompanion();
@@ -244,7 +251,7 @@ async function boot() {
     G.physics.update();
     if (!$("hud").hidden && !ui.modalOpen) {
       G.player.update(dt);
-      G.ship.update(dt, t);
+      for (const s of G.ships) s.update(dt, t);
       G.cars.update(dt, t);
     } else {
       if (G.mode !== "inspect") G.input.consumeMouse();

@@ -83,6 +83,21 @@
       <div class="ship-status glass" id="shipStatus"></div>
     </div>
 
+    <!-- HUD du casque de l'armure -->
+    <div id="visor" hidden>
+      <div class="v-frame"></div>
+      <div class="v-top"><span id="vZone"></span><span id="vCompass"></span><span id="vTime"></span></div>
+      <div id="vWaypoint" class="v-wp"></div>
+      <div id="vLeft" class="v-panel v-left"></div>
+      <div id="vRight" class="v-panel v-right"></div>
+      <div id="vMarkers"></div>
+      <div class="v-reticle"><i></i></div>
+      <div class="v-modes">
+        <button data-vmode="nav">NAV</button><button data-vmode="scan">ANALYSE</button><button data-vmode="bio">BIO</button>
+        <button id="vScan">◎ SCAN</button>
+        <button data-vab="pulse">⚡ 1</button><button data-vab="shield">⬡ 2</button><button data-vab="boost">» 3</button><button data-vab="vision">◐ 4</button>
+      </div>
+    </div>
     <div id="armorHud" class="armor-hud glass" hidden>
       <div class="unit">ARMURE ROYALE</div>
       <div class="bar"><i id="armorEnergy"></i></div>
@@ -189,6 +204,7 @@
       <button data-t="TouchDown">▼</button>
       <button data-t="KeyR">⏻</button>
       <button data-t="KeyH">🛬</button>
+      <button data-t="KeyK">👁‍🗨</button>
       <button data-t="KeyF">⇲</button>
       <button data-t="KeyV">👁</button>
       <button data-t="KeyL">💡</button>
