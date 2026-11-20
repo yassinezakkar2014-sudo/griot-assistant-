@@ -18,6 +18,7 @@ import { mat } from "./world/materials";
 import { installLocalApi } from "./ai/localapi";
 import { Multiplayer } from "./net/multiplayer";
 import { buildWings } from "./world/wings";
+import { buildWalls } from "./world/walls";
 import { CarSystem } from "./game/car";
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -88,6 +89,7 @@ async function boot() {
   await new Promise((r) => setTimeout(r, 0));
   progress(0.95, "Garage royal & galerie");
   const wings = buildWings(G.palace);
+  buildWalls(G.palace);
   G.palace.spots.garage = { pos: wings.garageSpot, yaw: -Math.PI / 2, label: "garage" };
   G.palace.spots.gallery = { pos: wings.gallerySpot, yaw: Math.PI / 2, label: "gallery" };
   G.cars = new CarSystem();

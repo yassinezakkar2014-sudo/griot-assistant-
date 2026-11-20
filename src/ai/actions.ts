@@ -13,6 +13,7 @@ export const COLORS: Record<string, string> = {
 };
 
 const DOOR_WORDS: [RegExp, string][] = [
+  [/barriere|rempart|portail|enceinte|muraille/, "barriers"],
   [/hangar|vaisseau/, "door-hangar"],
   [/garage|voiture/, "door-cargarage"],
   [/terrasse|terrace|balcon/, "door-terrace"],
@@ -140,6 +141,13 @@ export async function runAction(action: string, target?: string | null): Promise
         const f = Math.max(0, G.palace.floorAt(G.player.position));
         G.palace.callElevator(f);
         return "J'appelle l'ascenseur.";
+      }
+      if (id === "barriers") {
+        const n = normalize(String(target ?? ""));
+        const ids = /ville|city/.test(n) ? ["gate-city"] : /palais|domaine|royaume/.test(n) ? [...G.palace.doors.keys()].filter((k) => k.startsWith("gate-") && k !== "gate-city") : [...G.palace.doors.keys()].filter((k) => k.startsWith("gate-"));
+        ids.forEach((k) => (action === "open_door" ? G.palace.doors.get(k)!.open() : G.palace.doors.get(k)!.close()));
+        const what = ids.length === 1 ? "La barrière d'énergie de la ville" : `${ids.length} grandes barrières`;
+        return action === "open_door" ? `${what} : ouverture.` : `${what} : fermeture. Le royaume est sécurisé.`;
       }
       if (!id) return "Je ne vois aucune porte à proximité. Précisez laquelle : garage, terrasse, chambre, archives…";
       const d = G.palace.doors.get(id)!;
