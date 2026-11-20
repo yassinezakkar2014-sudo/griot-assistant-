@@ -18,15 +18,29 @@ const port = Number(process.env.PORT) || 3000;
 const hasKey = () => Boolean(process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes("colle_ta_cle"));
 const client = () => new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// Moteur de conversation : OpenAI direct (par défaut) ou OpenJarvis (`jarvis serve`),
+// qui expose une API compatible OpenAI. La voix (TTS) et Whisper restent sur OpenAI.
+const useJarvis = () => (process.env.GRIOT_AI_BACKEND || "").toLowerCase() === "openjarvis";
+const hasChat = () => useJarvis() || hasKey();
+const chatClient = () =>
+  useJarvis()
+    ? new OpenAI({
+        baseURL: process.env.OPENJARVIS_URL || "http://127.0.0.1:8000/v1",
+        apiKey: process.env.OPENJARVIS_API_KEY || "openjarvis",
+      })
+    : client();
+const chatModel = () =>
+  useJarvis() ? process.env.OPENJARVIS_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini" : process.env.OPENAI_MODEL || "gpt-4o-mini";
+
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, ai: hasKey(), tts: hasKey(), search: true, modes: Object.keys(MODES) });
+  res.json({ ok: true, ai: hasChat(), backend: useJarvis() ? "openjarvis" : "openai", tts: hasKey(), search: true, modes: Object.keys(MODES) });
 });
 
 // ---- Conversation (Server-Sent Events) ----
 app.post("/api/chat", async (req, res) => {
   const { messages, mode = "personal", lang = "fr", game, image } = req.body || {};
   if (!Array.isArray(messages) || !messages.length) return res.status(400).json({ error: "messages manquants" });
-  if (!hasKey()) return res.status(503).json({ error: "OPENAI_API_KEY manquante" });
+  if (!hasChat()) return res.status(503).json({ error: "OPENAI_API_KEY manquante" });
 
   res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
   const emit = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
@@ -40,7 +54,7 @@ app.post("/api/chat", async (req, res) => {
     last.content = [{ type: "text", text: last.content }, { type: "image_url", image_url: { url: image } }];
   }
   try {
-    await chat(client(), { messages: clean, mode, lang, game, model: process.env.OPENAI_MODEL || "gpt-4o-mini" }, (e, d) => {
+    await chat(chatClient(), { messages: clean, mode, lang, game, model: chatModel() }, (e, d) => {
       if (!closed) emit(e, d);
     });
     if (!closed) emit("done", {});
@@ -163,5 +177,6 @@ if (DEV) {
 
 app.listen(port, () => {
   console.log(`GRIOT 2.0 — THINK. SPEAK. RULE. → http://localhost:${port}${DEV ? " (dev)" : ""}`);
-  if (!hasKey()) console.log("ℹ Pas de clé OPENAI_API_KEY : le monde 3D et les commandes locales fonctionnent, l'IA conversationnelle est désactivée.");
+  if (useJarvis()) console.log(`🧠 Moteur IA : OpenJarvis → ${process.env.OPENJARVIS_URL || "http://127.0.0.1:8000/v1"}`);
+  else if (!hasKey()) console.log("ℹ Pas de clé OPENAI_API_KEY : le monde 3D et les commandes locales fonctionnent, l'IA conversationnelle est désactivée.");
 });

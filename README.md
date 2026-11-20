@@ -53,6 +53,27 @@ Inspection orbitale, activation, transformation animée (le nano-alliage se mat�
 ### Missions & progression
 9 missions facultatives (explorer une zone secrète, découvrir une technologie, tester un véhicule, débloquer une pièce, découvrir de nouvelles armures…), XP, niveaux, rangs, récompenses. **Sauvegarde automatique** (navigateur + serveur).
 
+## Moteur IA : OpenJarvis (optionnel)
+
+GRIOT peut faire passer la conversation par [OpenJarvis](https://github.com/open-jarvis/OpenJarvis), un framework d'IA personnelle « local d'abord » qui expose une API compatible OpenAI (modèles locaux via Ollama, ou cloud).
+
+```bash
+# 1. Installer OpenJarvis (macOS / Linux / WSL2)
+curl -fsSL https://open-jarvis.github.io/OpenJarvis/install.sh | bash
+
+# 2. Lancer son serveur compatible OpenAI (port 8000 par défaut)
+jarvis serve
+
+# 3. Dans le .env de GRIOT
+GRIOT_AI_BACKEND=openjarvis
+OPENJARVIS_URL=http://127.0.0.1:8000/v1
+OPENJARVIS_MODEL=qwen3.5:4b     # ou gpt-4o-mini si OpenJarvis utilise le moteur cloud
+```
+
+- La conversation, les appels d'outils et le streaming passent par OpenJarvis.
+- La voix neuronale (TTS) et Whisper restent sur `OPENAI_API_KEY` ; sans cette clé, GRIOT utilise la voix du navigateur.
+- Laissez `GRIOT_AI_BACKEND` vide pour revenir à OpenAI direct.
+
 ## Parler à GRIOT
 
 Touche **T** (ou 🎙) pour parler, **Entrée** pour écrire. Options : conversation continue, mot d'éveil « GRIOT », interruption (parlez par-dessus GRIOT ou ⏹), 10 langues.
