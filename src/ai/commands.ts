@@ -33,6 +33,17 @@ function clause(raw: string): Intent | null {
   if (/\b(sauvegard\w*|save|guardar)\b/.test(t) && !/projet/.test(t)) return { action: "save" };
 
   // --- vaisseau ---
+  if (/\b(anti.?aerien\w*|defense aerienne|dca|tourelles?|radar)\b/.test(t)) {
+    if (/\b(test\w*|tir\w*|demonstration|demo|feu|spectacle)\b/.test(t)) return { action: "antiair", target: "test" };
+    if (/\b(desactiv\w*|coupe|arrete|eteins|off)\b/.test(t)) return { action: "antiair", target: "off" };
+    if (/\b(etat|statut|rapport|status)\b/.test(t)) return { action: "antiair", target: "status" };
+    return { action: "antiair", target: "on" };
+  }
+  if (/\b(super ?soni\w*|mach|vitesse du son|mur du son)\b/.test(t)) {
+    const pl = placeFromText(t);
+    if (pl && pl.outdoor) return { action: "fly_to", target: pl.id + "|super" };
+    return { action: "toggle_supersonic", target: /\b(desactiv\w*|coupe|arrete|ralenti\w*|off)\b/.test(t) ? "off" : "on" };
+  }
   if (/\b(furtif|furtivite|invisible|camouflage|stealth|cloak)\b/.test(t)) return { action: "toggle_stealth", target: /\b(desactiv\w*|coupe|arrete|enleve|visible|off)\b/.test(t) ? "off" : "on" };
   if (/\b(decoll\w*|take ?off|despeg\w*|leve|en l air)\b/.test(t)) return { action: "takeoff" };
   if (/\b(atterri\w*|land|landing|aterriz\w*|pose.toi|pose le vaisseau)\b/.test(t)) return { action: "land" };

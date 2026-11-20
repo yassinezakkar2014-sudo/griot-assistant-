@@ -586,7 +586,10 @@ export class World {
       const f = G.palace.floorAt(p);
       return `Palais — Niveau ${f + 1}`;
     }
-    if (Math.hypot(p.x - ZONES.zuria.x, p.z - ZONES.zuria.z) < ZONES.zuria.r) return Math.hypot(p.x - ZONES.zuria.x, p.z - ZONES.zuria.z) < 60 ? "Palais de Zuria" : "Pays de Zuria";
+    if (Math.hypot(p.x - ZONES.zuria.x, p.z - ZONES.zuria.z) < ZONES.zuria.r) {
+      const dz = Math.hypot(p.x - ZONES.zuria.x, p.z - ZONES.zuria.z);
+      return dz < 45 ? "Palais de Zuria" : dz < 420 ? "Ville de Zuria" : "Pays de Zuria";
+    }
     if (p.x > 60 && p.x < 184 && p.z > -34 && p.z < 62) return "Garage royal";
     if (p.x > -150 && p.x < -60 && p.z > -40 && p.z < 20) return "Galerie royale";
     if (Math.abs(p.z + 20) < 4 && Math.abs(p.x) > 32 && Math.abs(p.x) < 61) return "Galerie vitrée du palais";
