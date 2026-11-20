@@ -13,7 +13,8 @@ export const COLORS: Record<string, string> = {
 };
 
 const DOOR_WORDS: [RegExp, string][] = [
-  [/garage|hangar/, "door-hangar"],
+  [/hangar|vaisseau/, "door-hangar"],
+  [/garage|voiture/, "door-cargarage"],
   [/terrasse|terrace|balcon/, "door-terrace"],
   [/chambre|bedroom/, "door-bedroom"],
   [/dressing|garde.?robe|wardrobe/, "door-dressing"],
@@ -35,7 +36,7 @@ export function floorFromText(t: string): number {
     [/command|controle|control|centre de|salle de controle/, 3],
     [/labo|laboratoire|lab|science/, 4],
     [/armurerie|armory|armoury|armure/, 5],
-    [/hangar|garage/, 6]
+    [/hangar/, 6]
   ];
   for (const [re, f] of words) if (re.test(n)) return f;
   return -1;
@@ -68,7 +69,9 @@ export const PLACES: Place[] = [
   { id: "gardens", name: "les jardins royaux", pos: () => G.palace.spots.gardens.pos.clone(), outdoor: true },
   { id: "palace", name: "le palais", pos: () => G.palace.spots.floor0.pos.clone(), outdoor: false },
   { id: "terrace", name: "la terrasse", pos: () => G.palace.spots.terrace.pos.clone(), outdoor: false },
-  { id: "platform", name: "la plate-forme de lancement", pos: () => G.palace.spots.platform.pos.clone(), outdoor: false }
+  { id: "platform", name: "la plate-forme de lancement", pos: () => G.palace.spots.platform.pos.clone(), outdoor: false },
+  { id: "garage", name: "le garage royal", pos: () => G.palace.spots.garage.pos.clone(), outdoor: false },
+  { id: "gallery", name: "la galerie royale", pos: () => G.palace.spots.gallery.pos.clone(), outdoor: false }
 ];
 
 export function placeFromText(t: string): Place | null {
@@ -83,6 +86,8 @@ export function placeFromText(t: string): Place | null {
     [/jardin|garden|fontaine|parc/, "gardens"],
     [/terrasse|terrace/, "terrace"],
     [/plate.?forme|platform|piste/, "platform"],
+    [/garage|voitures?|autos?/, "garage"],
+    [/galerie|gallery|musee/, "gallery"],
     [/palais|palace|maison|home|chez moi/, "palace"]
   ];
   for (const [re, id] of map) if (re.test(n)) return PLACES.find((p) => p.id === id)!;
@@ -211,7 +216,22 @@ export async function runAction(action: string, target?: string | null): Promise
       if (G.mode !== "ship") return "Nous ne sommes pas en vol.";
       ship.land();
       return "Atterrissage automatique engagé.";
+    case "board_car": {
+      if (G.mode === "ship") return "Atterrissez et sortez du vaisseau d'abord.";
+      if (G.mode === "car") return "Vous êtes déjà au volant.";
+      if (G.mode === "inspect") armor.endInspect();
+      const car = G.cars.nearest(G.player.position, String(target ?? ""));
+      if (G.player.position.distanceTo(car.pos) > 8) G.player.teleport(car.root.localToWorld(car.driverSide.clone()).setY(car.pos.y), car.yaw);
+      car.doorTarget = 1;
+      await new Promise((r) => setTimeout(r, 700));
+      G.cars.board(car);
+      return `Installez-vous dans la ${car.def.name}. Moteur démarré.`;
+    }
     case "exit_vehicle":
+      if (G.mode === "car") {
+        G.cars.exit();
+        return (G.mode as string) === "car" ? "Arrêtez d'abord la voiture." : "Vous êtes sorti de la voiture.";
+      }
       if (G.mode !== "ship") return "Vous n'êtes pas dans un véhicule.";
       if (!ship.landed) {
         ship.land();

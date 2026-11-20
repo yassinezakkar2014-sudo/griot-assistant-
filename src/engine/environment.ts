@@ -6,6 +6,7 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
 import { G, bus, clamp, lerp } from "../core";
 
 export class Environment {
@@ -16,6 +17,8 @@ export class Environment {
   composer: EffectComposer;
   bloom: UnrealBloomPass;
   bloomEnabled = true;
+  /** occlusion ambiante (qualité Ultra) : ombres de contact dans les coins et sous les objets */
+  ao: GTAOPass;
   hour = 17.2; // heure du jour (0..24)
   timeScale = 1 / 40; // heures de jeu par seconde réelle (1 h = 40 s)
   autoTime = true;
@@ -83,6 +86,10 @@ export class Environment {
 
     this.composer = new EffectComposer(renderer);
     this.composer.addPass(new RenderPass(scene, camera));
+    this.ao = new GTAOPass(scene, camera, innerWidth, innerHeight);
+    this.ao.enabled = false;
+    this.ao.blendIntensity = 0.85;
+    this.composer.addPass(this.ao);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.45, 0.35, 1.05);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
@@ -111,6 +118,7 @@ export class Environment {
   resize(w: number, h: number) {
     this.composer.setSize(w, h);
     this.bloom.setSize(w, h);
+    this.ao.setSize(w, h);
   }
 
   update(dt: number) {
@@ -155,7 +163,10 @@ export class Environment {
   }
 
   render() {
-    if (this.bloomEnabled) this.composer.render();
+    if (this.bloomEnabled || this.ao.enabled) {
+      this.bloom.enabled = this.bloomEnabled;
+      this.composer.render();
+    }
     else this.renderer.render(this.scene, this.camera);
   }
 }

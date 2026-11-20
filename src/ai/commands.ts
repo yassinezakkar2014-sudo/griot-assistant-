@@ -40,6 +40,8 @@ function clause(raw: string): Intent | null {
   if (/\b(lumiere|feux|lights?|luces|eclairage)s?\b/.test(t) && (V.ship.test(t) || /\b(vaisseau|systeme)/.test(t))) return { action: "toggle_ship_lights" };
   if (/\b(sors|sortir|descends|exit|get out|quitte|salir)\b/.test(t) && (V.ship.test(t) || /cockpit|vehicule/.test(t))) return { action: "exit_vehicle" };
   if (/\b(monte|entre|embarque|board|get in|sube|installe)\w*\b/.test(t) && (V.ship.test(t) || /cockpit/.test(t))) return { action: "board_ship" };
+  if (/\b(monte|entre|conduis|conduire|prends|drive|installe|essaye|essayer)\w*\b/.test(t) && /\b(voiture|auto|adamas|car|bolide|berline|suv|coupe)\b/.test(t)) return { action: "board_car", target: t };
+  if (/\b(sors|sortir|descends|exit|quitte)\b/.test(t) && /\b(voiture|auto|car)\b/.test(t)) return { action: "exit_vehicle" };
 
   // --- armure ---
   if (V.armor.test(t)) {

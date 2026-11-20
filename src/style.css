@@ -356,3 +356,10 @@ body.full.aisam #hud .ship-status { top: 56px; }
 .in-claude .key-pill { display: none; }
 .key-pill { border-color: rgba(63, 255, 154, 0.5); }
 html:not(.serverless) .key-pill { display: none; }
+
+.car-hud { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); padding: 10px 22px; text-align: center; }
+.touch .car-hud { bottom: 120px; }
+.tbtns.car { display: none; }
+body[data-mode="car"] .tbtns.car { display: grid; }
+body[data-mode="car"] .tbtns:not(.car) { display: none; }
+body[data-mode="car"] #crosshair { display: none; }

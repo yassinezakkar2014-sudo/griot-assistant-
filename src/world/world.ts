@@ -585,6 +585,9 @@ export class World {
       const f = G.palace.floorAt(p);
       return `Palais — Niveau ${f + 1}`;
     }
+    if (p.x > 60 && p.x < 184 && p.z > -34 && p.z < 62) return "Garage royal";
+    if (p.x > -150 && p.x < -60 && p.z > -40 && p.z < 20) return "Galerie royale";
+    if (Math.abs(p.z + 20) < 4 && Math.abs(p.x) > 32 && Math.abs(p.x) < 61) return "Galerie vitrée du palais";
     if (Math.hypot(p.x - ZONES.base.x, p.z - ZONES.base.z) < ZONES.base.r * 1.5) return "Base secrète";
     if (Math.hypot(p.x - ZONES.night.x, p.z - ZONES.night.z) < ZONES.night.r * 1.3) return "Vallée nocturne";
     if (Math.hypot(p.x, p.z) < 300) return p.z < -40 ? "Jardins royaux" : "Domaine du palais";

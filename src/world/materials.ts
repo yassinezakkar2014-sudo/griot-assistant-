@@ -1,5 +1,6 @@
 // Matériaux et textures procédurales (aucun asset externe : chargement instantané).
 import * as THREE from "three";
+import { applyPBR, marblePBR, tilePBR, panelPBR, brushedPBR } from "./pbr";
 
 function canvasTex(size: number, draw: (c: CanvasRenderingContext2D, s: number) => void, repeat = 1) {
   const cv = document.createElement("canvas");
@@ -155,6 +156,16 @@ export const mat = {
   hedge: new THREE.MeshStandardMaterial({ color: 0x2f6b3a, roughness: 0.95 }),
   wood: new THREE.MeshStandardMaterial({ color: 0x3b2a20, roughness: 0.6 })
 };
+
+// relief et rugosité procéduraux : marbre, dalles, panneaux et métaux brossés
+applyPBR(mat.marble, marblePBR(), 0.35);
+applyPBR(mat.floor, tilePBR(), 0.9);
+applyPBR(mat.darkFloor, panelPBR(), 0.7);
+applyPBR(mat.silver, brushedPBR(), 0.3);
+applyPBR(mat.gold, brushedPBR(), 0.25);
+applyPBR(mat.graphite, panelPBR(), 0.5);
+mat.white.normalMap = marblePBR().normal;
+mat.white.normalScale.set(0.15, 0.15);
 
 /** Écran holographique animé (canvas mis à jour à la demande). */
 export class HoloScreen {
