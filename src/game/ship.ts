@@ -229,6 +229,127 @@ export class Ship {
 
   }
 
+  // ---------------------------------------------------------------- mode supersonique
+  supersonic = false;
+  private supersonicFx: { cone: THREE.Mesh; streaks: THREE.LineSegments; booms: { m: THREE.Mesh; t: number }[] } | null = null;
+  private wasSupersonicSpeed = false;
+
+  get mach() {
+    return Math.abs(this.speed) / 343;
+  }
+
+  setSupersonic(on: boolean) {
+    if (on === this.supersonic) return;
+    if (on && this.opts.small) return bus.emit("toast", { text: "Le Faucon de Zuria n'a pas de mode supersonique.", kind: "warn" });
+    if (on && this.energy < 0.15) return bus.emit("toast", { text: "Énergie insuffisante pour le mode supersonique.", kind: "warn" });
+    if (on && !this.engines) this.startEngines(true);
+    if (on && this.landed) return bus.emit("toast", { text: "Décollez d'abord : le mode supersonique s'enclenche en vol.", kind: "warn" });
+    this.supersonic = on;
+    G.audio.whoosh(1.2, on ? 200 : 2000, on ? 3000 : 150, 0.25);
+    bus.emit("toast", { text: on ? "🚀 Mode supersonique : post-combustion maximale, jusqu'à Mach 2,8." : "Mode supersonique désactivé." });
+  }
+
+  private ensureFx() {
+    if (this.supersonicFx) return this.supersonicFx;
+    // cône de vapeur (Prandtl-Glauert) autour du fuselage
+    const cone = new THREE.Mesh(
+      new THREE.ConeGeometry(4.2 * this.S, 7 * this.S, 40, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })
+    );
+    cone.rotation.x = -Math.PI / 2;
+    cone.position.set(0, 0.8 * this.S, -0.5 * this.S);
+    this.root.add(cone);
+    // traînées de vitesse autour de la caméra
+    const N = 160;
+    const pos = new Float32Array(N * 6);
+    for (let i = 0; i < N; i++) {
+      const a = Math.random() * Math.PI * 2,
+        r = 6 + Math.random() * 30,
+        z = -Math.random() * 300;
+      pos.set([Math.cos(a) * r, Math.sin(a) * r, z, Math.cos(a) * r, Math.sin(a) * r, z - 12], i * 6);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    const streaks = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xcfefff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+    streaks.frustumCulled = false;
+    G.scene.add(streaks);
+    return (this.supersonicFx = { cone, streaks, booms: [] });
+  }
+
+  /** Bang sonique : onde de choc visible + détonation sourde. */
+  private sonicBoom() {
+    const fx = this.ensureFx();
+    const m = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), new THREE.MeshBasicMaterial({ color: 0xbfe9ff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    m.position.copy(this.root.position);
+    G.scene.add(m);
+    fx.booms.push({ m, t: 0 });
+    G.audio.pulse();
+    G.audio.tone(55, 1.2, "sawtooth", 0.25, 25);
+    bus.emit("shake", 1.2);
+    bus.emit("caption", "💥 BANG SONIQUE — Mach 1 franchi");
+    bus.emit("mission", { type: "supersonic" });
+  }
+
+  private updateSupersonic(dt: number) {
+    const mach = this.mach;
+    const fast = mach >= 1;
+    if (fast !== this.wasSupersonicSpeed) {
+      this.wasSupersonicSpeed = fast;
+      if (fast) this.sonicBoom();
+    }
+    if (this.supersonic) {
+      this.energy = Math.max(0, this.energy - dt * 0.025);
+      if (this.energy <= 0.03) this.setSupersonic(false);
+      // sécurité : garde une marge au-dessus du relief
+      const p = this.root.position;
+      const g = G.physics.terrain(p.x, p.z);
+      if (p.y - g < 50 && !this.landed) this.vy = Math.max(this.vy, 25);
+    }
+    if (!this.supersonicFx && mach < 0.7) return;
+    const fx = this.ensureFx();
+    const coneOp = Math.max(0, 1 - Math.abs(mach - 1) / 0.25) * 0.55;
+    (fx.cone.material as THREE.MeshBasicMaterial).opacity = coneOp * (this.stealth ? 0.2 : 1);
+    fx.cone.visible = coneOp > 0.01;
+    const streakOp = G.mode === "ship" && G.ship === this ? Math.min(0.8, Math.max(0, mach - 0.6)) : 0;
+    const sm = fx.streaks.material as THREE.LineBasicMaterial;
+    sm.opacity = streakOp;
+    fx.streaks.visible = streakOp > 0.01;
+    if (fx.streaks.visible) {
+      fx.streaks.position.copy(G.camera.position);
+      fx.streaks.quaternion.copy(G.camera.quaternion);
+      const arr = fx.streaks.geometry.attributes.position.array as Float32Array;
+      const move = Math.abs(this.speed) * dt * 0.35;
+      for (let i = 0; i < arr.length; i += 6) {
+        arr[i + 2] += move;
+        arr[i + 5] += move;
+        if (arr[i + 2] > 5) {
+          arr[i + 2] -= 300;
+          arr[i + 5] -= 300;
+        }
+      }
+      fx.streaks.geometry.attributes.position.needsUpdate = true;
+    }
+    for (const b of fx.booms) {
+      b.t += dt;
+      b.m.scale.setScalar(5 + b.t * 260);
+      (b.m.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.5 - b.t * 0.45);
+    }
+    fx.booms = fx.booms.filter((b) => {
+      if (b.t < 1.2) return true;
+      G.scene.remove(b.m);
+      b.m.geometry.dispose();
+      return false;
+    });
+    // champ de vision élargi à grande vitesse
+    if (G.mode === "ship" && G.ship === this) {
+      const fov = 70 + Math.min(22, Math.max(0, mach - 0.5) * 12);
+      if (Math.abs(G.camera.fov - fov) > 0.05) {
+        G.camera.fov = damp(G.camera.fov, fov, 3, dt);
+        G.camera.updateProjectionMatrix();
+      }
+    }
+  }
+
   // ---------------------------------------------------------------- mode furtif
   stealth = false;
   private originals = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
@@ -399,6 +520,9 @@ export class Ship {
     const side = this.root.position.clone().add(new THREE.Vector3(-5.8 * this.S, 0, -2.5 * this.S).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw));
     side.y = G.physics.ground(side.x, this.root.position.y, side.z, 2).y;
     G.mode = "foot";
+    this.supersonic = false;
+    G.camera.fov = 70;
+    G.camera.updateProjectionMatrix();
     G.armor.onVehicle(false);
     this.throttle = 0;
     G.player.teleport(side, this.yaw);
@@ -417,6 +541,7 @@ export class Ship {
     this.lightMat.emissiveIntensity = this.lights ? 2.2 + Math.sin(t * 2) * 0.3 : 0.05;
     this.padGlow.emissiveIntensity = this.padLights ? 2 + Math.sin(t * 3) : 0.6;
     cloakTime.value = t;
+    this.updateSupersonic(dt);
     if (this.stealth) {
       this.energy = Math.max(0, this.energy - dt * 0.015);
       if (this.energy <= 0.02) this.setStealth(false);
@@ -437,6 +562,7 @@ export class Ship {
     if (inp.hit("KeyR")) this.startEngines(!this.engines);
     if (inp.hit("KeyL")) this.setLights(!this.lights);
     if (inp.hit("KeyK")) this.setStealth(!this.stealth);
+    if (inp.hit("KeyB")) this.setSupersonic(!this.supersonic);
     if (inp.hit("KeyV")) this.cycleView();
     if (inp.hit("KeyF")) return this.exit();
     if (inp.hit("KeyH")) this.land();
@@ -454,7 +580,8 @@ export class Ship {
     }
 
     const tech = G.missions.state.tech;
-    const maxSpeed = 140 * (tech.includes("fusion") ? 1.25 : 1);
+    const maxSpeed = this.supersonic ? 950 : 140 * (tech.includes("fusion") ? 1.25 : 1);
+    if (this.supersonic && !this.autopilot && !this.landed) this.throttle = Math.max(this.throttle, 0.9);
     const boost = inp.down("ShiftLeft", "ShiftRight") && this.canBoost();
     if (boost) this.energy = Math.max(0, this.energy - dt * 0.08);
     else this.energy = Math.min(1, this.energy + dt * 0.03);
@@ -503,7 +630,7 @@ export class Ship {
       vyTarget = this.landed ? 0 : -30;
     }
     const target = this.throttle * maxSpeed * (boost ? 1.8 : 1);
-    this.speed = damp(this.speed, this.landed ? Math.min(target, 10) : target, this.engines ? 0.9 : 0.3, dt);
+    this.speed = damp(this.speed, this.landed ? Math.min(target, 10) : target, this.engines ? (this.supersonic ? 0.45 : 0.9) : 0.3, dt);
     this.vy = damp(this.vy, vyTarget, this.engines ? 2.5 : 0.8, dt);
     this.yaw += yawRate * dt;
     this.pitch = this.landed ? damp(this.pitch, 0, 6, dt) : pitchTarget;
@@ -517,7 +644,13 @@ export class Ship {
     const prev = this.root.position.clone();
     const vel = this.forward().multiplyScalar(this.speed).add(new THREE.Vector3(0, this.vy, 0));
     const p = this.root.position;
-    p.addScaledVector(vel, dt);
+    const steps = Math.max(1, Math.ceil((vel.length() * dt) / 6));
+    let hit: ReturnType<Ship["collides"]> = null;
+    for (let k = 0; k < steps && !hit; k++) {
+      prev.copy(p);
+      p.addScaledVector(vel, dt / steps);
+      hit = this.collides();
+    }
     p.y = Math.min(p.y, 2600);
     if (Math.abs(p.x) > 3800 || Math.abs(p.z) > 3800) {
       p.x = clamp(p.x, -3800, 3800);
@@ -525,7 +658,6 @@ export class Ship {
       this.yaw += Math.PI * dt;
     }
     this.bumpCooldown -= dt;
-    const hit = this.collides();
     if (hit) {
       p.copy(prev);
       // déjà en contact (immobile contre un obstacle) : on se dégage latéralement

@@ -1028,6 +1028,8 @@ export class UI {
           `<span class="${s.lights ? "on" : ""}">FEUX</span>`,
           `<span class="${s.landed ? "on" : ""}">POSÉ</span>`,
           s.stealth ? `<span class="on">👁‍🗨 FURTIF ${Math.round(s.energy * 100)}%</span>` : "",
+          s.supersonic || s.mach > 0.8 ? `<span class="on">🚀 MACH ${s.mach.toFixed(2)}</span>` : "",
+          G.antiair?.armed && G.antiair.lockedName ? `<span>🛡 DCA : ${esc(G.antiair.lockedName)}</span>` : "",
           s.autopilot ? `<span class="on">AUTO ▸ ${esc(s.autopilot.label)}</span>` : "",
           s.canBoost() ? `<span>POST-COMB. ${Math.round(s.energy * 100)}%</span>` : ""
         ].join("");

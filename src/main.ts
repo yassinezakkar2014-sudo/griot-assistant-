@@ -20,6 +20,7 @@ import { Multiplayer } from "./net/multiplayer";
 import { buildWings } from "./world/wings";
 import { buildWalls } from "./world/walls";
 import { buildZuria } from "./world/zuria";
+import { AntiAir } from "./world/antiair";
 import { CarSystem } from "./game/car";
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -91,6 +92,8 @@ async function boot() {
   progress(0.95, "Garage royal & galerie");
   const wings = buildWings(G.palace);
   buildWalls(G.palace);
+  G.antiair = new AntiAir();
+  G.antiair.build();
   progress(0.96, "Pays de Zuria");
   const zuria = buildZuria(G.palace);
   G.palace.spots.zuria = { pos: zuria.front, yaw: 0, label: "zuria" };
@@ -252,6 +255,7 @@ async function boot() {
     if (!$("hud").hidden && !ui.modalOpen) {
       G.player.update(dt);
       for (const s of G.ships) s.update(dt, t);
+      G.antiair.update(dt, t);
       G.cars.update(dt, t);
     } else {
       if (G.mode !== "inspect") G.input.consumeMouse();

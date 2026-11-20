@@ -136,7 +136,7 @@ export async function runAction(action: string, target?: string | null): Promise
   if (!W.__aisamActive) await W.__aisamActivate?.();
   if (action === "aisam_on") return "AISAM activé. Bienvenue dans votre royaume, Majesté.";
   // à pied : on utilise le vaisseau le plus proche (Royal Talon ou Faucon de Zuria)
-  if (G.mode !== "ship" && G.ships && /ship|engines|takeoff|fly_to|stealth/.test(action)) {
+  if (G.mode !== "ship" && G.ships && /ship|engines|takeoff|fly_to|stealth|supersonic/.test(action)) {
     G.ship = [...G.ships].sort((a, b) => a.root.position.distanceTo(G.player.position) - b.root.position.distanceTo(G.player.position))[0];
   }
   const ship = G.ship;
@@ -176,7 +176,9 @@ export async function runAction(action: string, target?: string | null): Promise
     }
     case "teleport":
     case "fly_to": {
-      const pl = placeFromText(String(target ?? ""));
+      const sup = String(target ?? "").endsWith("|super");
+      if (sup) target = String(target).replace("|super", "");
+      const pl = PLACES.find((x) => x.id === target) ?? placeFromText(String(target ?? ""));
       if (!pl) {
         const f = floorFromText(String(target ?? ""));
         if (f >= 0) return runAction("go_to_floor", String(f + 1));
@@ -190,6 +192,10 @@ export async function runAction(action: string, target?: string | null): Promise
           await ship.board();
         }
         ship.flyTo(pl.pos(), `Vol vers ${pl.name}`);
+        if (sup && !ship.opts.small) {
+          ship.supersonic = true;
+          return `Cap sur ${pl.name} en mode supersonique. Accrochez-vous, Majesté.`;
+        }
         return `Cap sur ${pl.name}. Pilote automatique engagé — reprenez les commandes quand vous voulez.`;
       }
       if (G.mode === "ship") {
@@ -218,6 +224,24 @@ export async function runAction(action: string, target?: string | null): Promise
       }
       ship.startEngines(true);
       return "Moteurs démarrés. Puissance stable.";
+    case "toggle_supersonic": {
+      const off = /off/.test(String(target ?? ""));
+      if (!off && G.mode !== "ship") return "Montez d'abord à bord du Royal Talon et décollez.";
+      ship.setSupersonic(!off);
+      return ship.supersonic ? "Mode supersonique engagé. Mach 1 dans quelques secondes." : "Mode supersonique désactivé.";
+    }
+    case "antiair": {
+      const aa = G.antiair;
+      const n = String(target ?? "on");
+      if (n === "test") {
+        aa.armed = true;
+        aa.demo();
+        return "Tir de démonstration de la défense anti-aérienne. Regardez le ciel au-dessus des remparts.";
+      }
+      if (n === "status") return aa.armed ? `Défense anti-aérienne active : ${aa.turrets.length} tourelles et un radar. ${aa.lockedName ? "Contact suivi : " + aa.lockedName + "." : "Aucun appareil suivi."}` : "Défense anti-aérienne désactivée.";
+      aa.armed = n !== "off";
+      return aa.armed ? `Défense anti-aérienne activée : ${aa.turrets.length} tourelles en veille sur les remparts du palais.` : "Défense anti-aérienne désactivée.";
+    }
     case "toggle_stealth": {
       const n = normalize(String(target ?? ""));
       const on = /desactiv|coupe|arrete|off|visible/.test(n) ? false : !/^(on|active)$/.test(n) && ship.stealth ? false : true;
