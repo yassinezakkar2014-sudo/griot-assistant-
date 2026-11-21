@@ -143,9 +143,9 @@ export class Player {
     }
     // filet de sécurité
     if (p.y < -80) this.teleport(G.palace.spots.gardens.pos, Math.PI);
-    if (Math.abs(p.x) > 3900 || Math.abs(p.z) > 3900) {
-      p.x = clamp(p.x, -3900, 3900);
-      p.z = clamp(p.z, -3900, 3900);
+    if (Math.abs(p.x) > 15800 || Math.abs(p.z) > 15800) {
+      p.x = clamp(p.x, -15800, 15800);
+      p.z = clamp(p.z, -15800, 15800);
     }
 
     this.moveSpeed = Math.hypot(this.velocity.x, this.velocity.z);

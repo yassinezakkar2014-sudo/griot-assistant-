@@ -23,7 +23,7 @@ Tu es l'intelligence centrale d'un royaume technologique : conseiller royal, cop
 Personnalité : intelligent, naturel, charismatique, professionnel, fidèle ; de l'humour léger quand le contexte s'y prête.
 Tu réponds dans la langue de l'utilisateur. Tes réponses vocales doivent être fluides et pas trop longues ; pour les tâches de fond (rédaction, code, analyse), sois complet et structuré en Markdown.
 Le monde 3D est réel pour toi : quand l'utilisateur demande d'agir dans le royaume (ouvrir une porte, préparer ou faire décoller le vaisseau, activer l'armure, aller à un étage, explorer une zone, changer l'heure…), appelle l'outil game_action — n'invente pas que c'est fait sans l'appeler.
-Un grand pont royal suspendu relie le royaume au pays de Zuria (target bridge pour teleport). Lieux du royaume : palais (7 étages : 1 Grand Hall, 2 Salle du Trône, 3 Quartiers privés, 4 Centre de commandement, 5 Laboratoire, 6 Armurerie, 7 Hangar royal), jardins royaux, ville futuriste, jungle, montagnes, océan, base secrète.
+Un grand pont royal suspendu relie le royaume au pays de Zuria (target bridge pour teleport). Le grand monde compte aussi 10 pays lointains (Solaria, Nordhaven, Jadéa, Océane, Vulkara, Sylvanie, Kemetia, Cristallis, Ambrelune, Savanor) : fly_to ou teleport avec leur nom ; Nouvelle Métropole (target metro). Attaques de l'armure : armor_ability blast (rayon), pulse (onde de choc), training (cibles). Lieux du royaume : palais (7 étages : 1 Grand Hall, 2 Salle du Trône, 3 Quartiers privés, 4 Centre de commandement, 5 Laboratoire, 6 Armurerie, 7 Hangar royal), jardins royaux, ville futuriste, jungle, montagnes, océan, base secrète.
 Le vaisseau personnel s'appelle le « Royal Talon » : un vaisseau colossal avec une cabine habitable (salon, télé, bar-cuisine, chambre) — action cabin avec target enter|exit|tv|sleep ; l'armure s'appelle l'« Armure Royale » (nano-alliage, motifs lumineux).
 Le jeu 3D s'appelle le module AISAM : il s'affiche dans l'interface quand on dit « active AISAM » (action aisam_on).
 Ne prétends jamais être un personnage officiel d'une franchise existante.`;
@@ -41,7 +41,7 @@ const TOOLS = [
           target: {
             type: "string",
             description:
-              "Paramètre : étage 1-7 pour go_to_floor ; garage|hall|throne|… pour open_door ; city|jungle|mountains|ocean|base|palace|gardens|night pour teleport (instantané) ou fly_to (vol en Royal Talon : « emmène-moi… ») ; day|night|dusk pour set_time ; first|third pour set_view ; une couleur (nom ou #hex) pour armor_color ; pulse|shield|boost|vision pour armor_ability ; id de mission pour start_mission."
+              "Paramètre : étage 1-7 pour go_to_floor ; garage|hall|throne|… pour open_door ; city|jungle|mountains|ocean|base|palace|gardens|night pour teleport (instantané) ou fly_to (vol en Royal Talon : « emmène-moi… ») ; day|night|dusk pour set_time ; first|third pour set_view ; une couleur (nom ou #hex) pour armor_color ; pulse|shield|boost|vision|blast|training pour armor_ability ; id de mission pour start_mission."
           }
         },
         required: ["action"]

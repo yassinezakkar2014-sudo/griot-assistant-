@@ -8,6 +8,7 @@ import { runAction, PLACES } from "../ai/actions";
 import { Griot, MODE_LABELS, type GriotMode, md, HELP } from "../ai/griot";
 import { LANGS } from "../ai/voice";
 import { WORLD } from "../world/terrain";
+import { EARTH } from "../world/countryData";
 import { getGroqKey, getOpenAIKey, setGroqKey, setOpenAIKey } from "../ai/localapi";
 import { Visor } from "./visor";
 
@@ -572,24 +573,33 @@ export class UI {
   }
 
   // ---------------------------------------------------------------- carte
-  map(tab: "world" | "palace" = G.palace.floorAt(G.player.position) >= 0 && G.mode === "foot" ? "palace" : "world") {
+  map(tab: "world" | "palace" | "earth" = G.palace.floorAt(G.player.position) >= 0 && G.mode === "foot" ? "palace" : "world") {
     const card = this.openModal(
       "map",
       `<h2 class="mt">Carte du royaume</h2>
-      <nav class="tabs inline"><button data-mt="world" class="${tab === "world" ? "on" : ""}">Monde</button><button data-mt="palace" class="${tab === "palace" ? "on" : ""}">Palais</button></nav>
+      <nav class="tabs inline"><button data-mt="world" class="${tab === "world" ? "on" : ""}">Monde</button><button data-mt="earth" class="${tab === "earth" ? "on" : ""}">Grand monde</button><button data-mt="palace" class="${tab === "palace" ? "on" : ""}">Palais</button></nav>
       <div id="mapBody"></div>`,
       "wide"
     );
     const body = card.querySelector("#mapBody") as HTMLElement;
-    if (tab === "world") {
-      body.innerHTML = `<div class="map-wrap"><canvas id="bigMap" width="720" height="720"></canvas></div><p class="hint">Cliquez sur un lieu : voyage instantané à pied, ou pilote automatique si vous êtes aux commandes du Royal Talon.</p>`;
+    if (tab === "world" || tab === "earth") {
+      const big = tab === "earth";
+      const toM = (x: number, z: number, sz: number): [number, number] => (big ? G.world.toWorldMap(x, z, sz) : G.world.toMap(x, z, sz));
+      const shown = (mk: { pos: THREE.Vector3 }) => !big || Math.max(Math.abs(mk.pos.x), Math.abs(mk.pos.z)) > WORLD / 2;
+      body.innerHTML = `<div class="map-wrap"><canvas id="bigMap" width="720" height="720"></canvas></div><p class="hint">${big ? "Le grand monde : 10 pays au-delà de l'océan. " : ""}Cliquez sur un lieu : voyage instantané à pied, ou pilote automatique si vous êtes aux commandes du Royal Talon.</p>`;
       const cv = body.querySelector("canvas")!;
       const c = cv.getContext("2d")!;
       const draw = () => {
-        c.drawImage(G.world.mapCanvas, 0, 0, 720, 720);
+        c.drawImage(big ? G.world.worldCanvas : G.world.mapCanvas, 0, 0, 720, 720);
+        if (big) {
+          c.fillStyle = "#ffd27a";
+          c.font = "bold 13px Manrope, Arial";
+          c.textAlign = "center";
+          c.fillText("VOTRE ROYAUME", 360, 345);
+        }
         for (const mk of G.world.markers) {
-          if (!mk.visible()) continue;
-          const [x, y] = G.world.toMap(mk.pos.x, mk.pos.z, 720);
+          if (!mk.visible() || !shown(mk)) continue;
+          const [x, y] = toM(mk.pos.x, mk.pos.z, 720);
           c.fillStyle = "rgba(4,10,24,.7)";
           c.beginPath();
           c.arc(x, y, 14, 0, Math.PI * 2);
@@ -602,15 +612,15 @@ export class UI {
           c.font = "12px Manrope, Arial";
           c.fillText(mk.name, x, y + 28);
         }
-        G.world.rings.forEach((r, i) => {
-          const [x, y] = G.world.toMap(r.pos.x, r.pos.z, 720);
+        if (!big) G.world.rings.forEach((r, i) => {
+          const [x, y] = toM(r.pos.x, r.pos.z, 720);
           c.strokeStyle = i < G.missions.state.rings ? "#3fff9a" : "#ffc861";
           c.beginPath();
           c.arc(x, y, 3, 0, Math.PI * 2);
           c.stroke();
         });
         const p = G.mode === "ship" ? G.ship.root.position : G.player.position;
-        const [px, py] = G.world.toMap(p.x, p.z, 720);
+        const [px, py] = toM(p.x, p.z, 720);
         const yaw = G.mode === "ship" ? G.ship.yaw : G.player.yaw;
         c.save();
         c.translate(px, py);
@@ -632,8 +642,8 @@ export class UI {
         let best: any = null,
           bd = 30;
         for (const mk of G.world.markers) {
-          if (!mk.visible()) continue;
-          const [x, y] = G.world.toMap(mk.pos.x, mk.pos.z, 720);
+          if (!mk.visible() || !shown(mk)) continue;
+          const [x, y] = toM(mk.pos.x, mk.pos.z, 720);
           const d = Math.hypot(x - mx, y - my);
           if (d < bd) {
             bd = d;
@@ -1072,12 +1082,13 @@ export class UI {
     c.clip();
     const span = G.mode === "ship" ? 2600 : 700; // mètres affichés
     const scale = S / span;
-    const pxPerM = 512 / WORLD;
+    const inCore = Math.max(Math.abs(p.x), Math.abs(p.z)) < WORLD / 2 - span / 2;
+    const pxPerM = inCore ? 512 / WORLD : 720 / EARTH;
     c.translate(S / 2, S / 2);
     c.rotate(yaw);
-    const [mx, my] = G.world.toMap(p.x, p.z, 512);
+    const [mx, my] = inCore ? G.world.toMap(p.x, p.z, 512) : G.world.toWorldMap(p.x, p.z, 720);
     const srcSpan = span * pxPerM;
-    c.drawImage(G.world.mapCanvas, mx - srcSpan / 2, my - srcSpan / 2, srcSpan, srcSpan, -S / 2, -S / 2, S, S);
+    c.drawImage(inCore ? G.world.mapCanvas : G.world.worldCanvas, mx - srcSpan / 2, my - srcSpan / 2, srcSpan, srcSpan, -S / 2, -S / 2, S, S);
     for (const mk of G.world.markers) {
       if (!mk.visible()) continue;
       const dx = (mk.pos.x - p.x) * scale,

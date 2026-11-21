@@ -683,9 +683,9 @@ export class Ship {
       hit = this.collides();
     }
     p.y = Math.min(p.y, 2600);
-    if (Math.abs(p.x) > 3800 || Math.abs(p.z) > 3800) {
-      p.x = clamp(p.x, -3800, 3800);
-      p.z = clamp(p.z, -3800, 3800);
+    if (Math.abs(p.x) > 15500 || Math.abs(p.z) > 15500) {
+      p.x = clamp(p.x, -15500, 15500);
+      p.z = clamp(p.z, -15500, 15500);
       this.yaw += Math.PI * dt;
     }
     this.bumpCooldown -= dt;

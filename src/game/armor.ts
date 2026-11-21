@@ -276,9 +276,9 @@ export class ArmorSystem {
       bus.emit("toast", { text: "Capacité indisponible : l'armure n'est pas portée.", kind: "warn" });
       return false;
     }
-    const cost: Record<string, number> = { pulse: 0.35, shield: 0.3, boost: 0.25, vision: 0 };
-    if (name === "shield" && !G.missions.state.tech.includes("nano")) {
-      bus.emit("toast", { text: "Bouclier : analysez le Nano-tissage au laboratoire (niveau 5).", kind: "warn" });
+    const cost: Record<string, number> = { pulse: 0.3, shield: 0.25, boost: 0.2, vision: 0, blast: 0.06 };
+    if (G.mode !== "foot" && name !== "vision") {
+      bus.emit("toast", { text: "Sortez du véhicule pour utiliser les attaques de l'armure.", kind: "warn" });
       return false;
     }
     if ((cost[name] ?? 0) > this.energy) {
@@ -294,6 +294,9 @@ export class ArmorSystem {
       this.pulses.push({ mesh: m, t: 0 });
       G.audio.pulse();
       bus.emit("shake", 0.5);
+      bus.emit("armor:pulse", new THREE.Vector3(p.x, p.y + 1, p.z));
+    } else if (name === "blast") {
+      G.combat.fire();
     } else if (name === "shield") {
       this.shieldT = 6;
       G.audio.tone(300, 0.8, "triangle", 0.1, 900);
@@ -330,6 +333,7 @@ export class ArmorSystem {
       if (inp.hit("Digit2")) this.ability("shield");
       if (inp.hit("Digit3")) this.ability("boost");
       if (inp.hit("Digit4")) this.ability("vision");
+      if (inp.hit("Digit5", "KeyG")) this.ability("blast");
       if (inp.hit("KeyX")) this.toggleMask();
     }
 
