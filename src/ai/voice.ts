@@ -256,13 +256,17 @@ export class Voice {
   }
 
   /** À appeler dans un geste utilisateur (iPad/iPhone) : débloque audio et synthèse vocale. */
+  private synthUnlocked = false;
   unlock() {
     try {
       this.ensureCtx();
     } catch {}
-    if ("speechSynthesis" in window) {
-      const u = new SpeechSynthesisUtterance(" ");
+    if ("speechSynthesis" in window && !this.synthUnlocked && !this.speaking) {
+      // iOS : la synthèse vocale ne parle qu'après un premier « speak » fait pendant un toucher
+      this.synthUnlocked = true;
+      const u = new SpeechSynthesisUtterance(".");
       u.volume = 0;
+      u.lang = this.settings.lang;
       speechSynthesis.speak(u);
     }
   }
@@ -370,7 +374,7 @@ export class Voice {
       this.analyser.fftSize = 256;
       this.analyser.connect(this.audioCtx.destination);
     }
-    if (this.audioCtx.state === "suspended") this.audioCtx.resume();
+    if (this.audioCtx.state !== "running") this.audioCtx.resume().catch(() => {});
     return this.audioCtx;
   }
 
@@ -425,7 +429,10 @@ export class Voice {
       u.onend = done;
       u.onerror = done;
       if (gen !== this.generation) return done();
+      if (speechSynthesis.paused) speechSynthesis.resume(); // bug Safari : synthèse restée en pause
       speechSynthesis.speak(u);
+      // garde-fou : si Safari n'émet jamais « onend », on ne bloque pas la file
+      setTimeout(done, 1500 + text.length * 120);
     });
   }
 
