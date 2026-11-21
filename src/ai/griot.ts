@@ -508,7 +508,23 @@ export class Griot {
     } catch {
       lines.push("❌ Le serveur ne répond pas (il se réveille peut-être : sur l'offre gratuite de Render, comptez jusqu'à une minute).");
     }
-    lines.push(getGroqKey() ? "🔑 Votre clé Groq est enregistrée dans ce navigateur : elle est utilisée en premier." : "🔑 Pas de clé Groq dans ce navigateur (bouton « 🔑 Clés IA » pour en coller une, c'est gratuit).");
+    const gk = getGroqKey();
+    if (gk) {
+      // test direct depuis l'iPad : la clé est-elle acceptée par Groq ?
+      try {
+        const r = await fetch("https://api.groq.com/openai/v1/models", { headers: { Authorization: `Bearer ${gk}` } });
+        if (r.ok) {
+          const d = await r.json();
+          lines.push(`✅ Test direct depuis cet appareil : Groq accepte votre clé (${d.data?.length ?? "?"} modèles disponibles).`);
+        } else {
+          const d = await r.json().catch(() => ({}));
+          lines.push(`❌ Test direct depuis cet appareil : Groq refuse la clé (${r.status}) — ${String(d?.error?.message || "").slice(0, 140)}${r.status === 401 ? " → recopiez la clé en entier ou créez-en une nouvelle." : ""}`);
+        }
+      } catch (e: any) {
+        lines.push(`ℹ Test direct depuis cet appareil impossible (${e?.message || "réseau"}).`);
+      }
+    }
+    lines.push(gk ? "🔑 Votre clé Groq est enregistrée dans ce navigateur : elle est utilisée en premier." : "🔑 Pas de clé Groq dans ce navigateur (bouton « 🔑 Clés IA » pour en coller une, c'est gratuit).");
     if (getOpenAIKey()) lines.push("🔑 Une clé OpenAI est aussi enregistrée dans ce navigateur (secours).");
     return "Diagnostic de mes moteurs d'IA :\n" + lines.map((l) => "- " + l).join("\n");
   }
