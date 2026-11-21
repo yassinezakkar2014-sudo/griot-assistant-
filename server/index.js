@@ -55,10 +55,42 @@ const chatClient = () =>
     : hasGroq()
       ? groq()
       : client();
-const chatModel = () => {
+// Groq retire régulièrement des modèles : sans GROQ_MODEL, on interroge la liste des
+// modèles du compte et on prend le meilleur disponible (résultat mis en cache).
+const GROQ_PREFERRED = [
+  "openai/gpt-oss-120b",
+  "llama-3.3-70b-versatile",
+  "moonshotai/kimi-k2-instruct-0905",
+  "moonshotai/kimi-k2-instruct",
+  "meta-llama/llama-4-maverick-17b-128e-instruct",
+  "qwen/qwen3-32b",
+  "openai/gpt-oss-20b",
+  "meta-llama/llama-4-scout-17b-16e-instruct",
+  "llama-3.1-8b-instant",
+];
+let groqModelCache = null;
+function pickGroqModel(ids) {
+  const usable = ids.filter((id) => !/whisper|guard|tts|orpheus|playai|distil|compound|prompt-guard/i.test(id));
+  return GROQ_PREFERRED.find((m) => usable.includes(m)) || usable.sort()[0] || GROQ_PREFERRED[0];
+}
+async function groqModel() {
+  if (process.env.GROQ_MODEL) return process.env.GROQ_MODEL;
+  if (groqModelCache) return groqModelCache;
+  try {
+    const ids = [];
+    for await (const m of groq().models.list()) if (m.active !== false) ids.push(m.id);
+    groqModelCache = pickGroqModel(ids);
+    console.log(`🧠 Modèle Groq choisi automatiquement : ${groqModelCache}`);
+  } catch (e) {
+    console.error("Liste des modèles Groq indisponible:", e.message);
+    return GROQ_PREFERRED[0];
+  }
+  return groqModelCache;
+}
+const chatModel = async () => {
   const b = backend();
   if (b === "openjarvis") return process.env.OPENJARVIS_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini";
-  if (b === "groq") return process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+  if (b === "groq") return groqModel();
   return process.env.OPENAI_MODEL || "gpt-4o-mini";
 };
 
@@ -84,7 +116,7 @@ app.post("/api/chat", async (req, res) => {
     last.content = [{ type: "text", text: last.content }, { type: "image_url", image_url: { url: image } }];
   }
   try {
-    await chat(chatClient(), { messages: clean, mode, lang, game, model: chatModel() }, (e, d) => {
+    await chat(chatClient(), { messages: clean, mode, lang, game, model: await chatModel() }, (e, d) => {
       if (!closed) emit(e, d);
     });
     if (!closed) emit("done", {});
@@ -208,6 +240,6 @@ if (DEV) {
 app.listen(port, () => {
   console.log(`GRIOT 2.0 — THINK. SPEAK. RULE. → http://localhost:${port}${DEV ? " (dev)" : ""}`);
   if (useJarvis()) console.log(`🧠 Moteur IA : OpenJarvis → ${process.env.OPENJARVIS_URL || "http://127.0.0.1:8000/v1"}`);
-  else if (hasGroq()) console.log(`🧠 Moteur IA : Groq (${chatModel()})`);
+  else if (hasGroq()) console.log(`🧠 Moteur IA : Groq (${process.env.GROQ_MODEL || "modèle choisi automatiquement"})`);
   else if (!hasKey()) console.log("ℹ Pas de clé OPENAI_API_KEY : le monde 3D et les commandes locales fonctionnent, l'IA conversationnelle est désactivée.");
 });
