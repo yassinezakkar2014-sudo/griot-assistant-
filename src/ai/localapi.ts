@@ -249,12 +249,15 @@ export function chatStream(key: string, body: any): Response {
         const parts: any[] = [];
         if (typeof body.image === "string" && body.image.startsWith("data:image/")) parts.push({ type: "image_url", image_url: { url: body.image } });
         if (typeof body.pdf === "string" && body.pdf.startsWith("data:application/pdf")) parts.push({ type: "file", file: { filename: body.pdfName || "document.pdf", file_data: body.pdf } });
-        if (parts.length && last && !groq) last.content = [{ type: "text", text: String(last.content) }, ...parts];
+        // Groq : seules les images passent (modèle vision Llama 4), pas les PDF
+        if (groq) parts.splice(0, parts.length, ...parts.filter((x) => x.type === "image_url"));
+        const vision = groq && parts.length > 0;
+        if (parts.length && last) last.content = [{ type: "text", text: String(last.content) }, ...parts];
         for (let step = 0; step < 5; step++) {
           const r = await realFetch(`${base}/chat/completions`, {
             method: "POST",
             headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ model: groq ? GROQ_MODEL : localStorage.getItem("griot-openai-model") || "gpt-4o-mini", messages: groq ? msgs.slice(0, 1).concat(msgs.slice(-12)) : msgs, tools: TOOLS, stream: true, max_tokens: 2000, temperature: body.mode === "creative" ? 0.95 : 0.6 })
+            body: JSON.stringify({ model: groq ? (vision ? "meta-llama/llama-4-scout-17b-16e-instruct" : GROQ_MODEL) : localStorage.getItem("griot-openai-model") || "gpt-4o-mini", messages: groq ? msgs.slice(0, 1).concat(msgs.slice(-12)) : msgs, tools: TOOLS, stream: true, max_tokens: 2000, temperature: body.mode === "creative" ? 0.95 : 0.6 })
           });
           if (!r.ok || !r.body) {
             const err = await r.json().catch(() => ({}));

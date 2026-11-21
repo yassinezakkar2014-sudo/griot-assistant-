@@ -7,6 +7,7 @@ import { Humanoid } from "../game/humanoid";
 import { buildShipModel, buildSmallShipModel, cloakMaterial } from "../game/shipmodel";
 import { ArmorSet, type ArmorStyle } from "../game/armor";
 import { SHIP_SCALE } from "../game/ship";
+import { Mecha } from "../game/mecha";
 
 export interface NetState {
   n: string; // nom
@@ -26,6 +27,10 @@ export interface NetState {
   r?: string;
   /** portes et barrières partagées : id → [ouverte, horodatage] */
   d?: Record<string, [number, number]>;
+  /** pouvoir d'armure spécial : "spectre" (invisible) ou "titan" (robot géant) */
+  sp?: string;
+  /** décoration du palais (envoyée régulièrement ; la plus récente gagne) */
+  dk?: { v: number; t: string; i: [any, number, number, number, number][] };
 }
 
 /** Portes synchronisées entre joueurs (barrières, portails, grandes portes). */
@@ -139,11 +144,21 @@ class Remote {
     }
   }
 
+  private mecha: Mecha | null = null;
+
   update(dt: number) {
     const st = this.state;
     if (!st) return;
     const inShip = (st.m === "ship" && st.s) || st.m === "car" || st.m === "passenger";
-    this.body.root.visible = !inShip;
+    this.body.root.visible = !inShip && st.sp !== "spectre" && st.sp !== "titan";
+    if (st.sp === "titan" && !inShip) {
+      if (!this.mecha) {
+        this.mecha = new Mecha();
+        this.mecha.build();
+      }
+      if (st.ar) this.mecha.setColors(st.ar[0], st.ar[1]);
+      this.mecha.drive(this.body.root.position, this.body.root.rotation.y, false, dt);
+    } else if (this.mecha) this.mecha.root.visible = false;
     this.shipGroup.visible = !!st.s;
     this.prev.copy(this.body.root.position);
     this.body.root.position.lerp(this.target, 1 - Math.exp(-dt * 10));
@@ -167,6 +182,7 @@ class Remote {
 
   dispose() {
     G.scene.remove(this.body.root, this.shipGroup);
+    if (this.mecha) G.scene.remove(this.mecha.root);
     G.interact.remove("peer-ship-" + this.id);
   }
 }
@@ -326,6 +342,8 @@ export class Multiplayer {
     r.apply({ ...st, n: String(st.n || "Joueur").slice(0, 16) });
     if (st.r === this.id && !wasRiding) bus.emit("toast", { text: `🧑‍🚀 ${r.state!.n} est monté à bord avec vous.` });
     if (st.r !== this.id && wasRiding) bus.emit("toast", { text: `${r.state!.n} est descendu.` });
+    // décoration du palais : la plus récente gagne
+    if (st.dk && typeof st.dk === "object" && Number(st.dk.v) > G.deco.version) G.deco.load(st.dk as any);
     // portes et barrières : le changement le plus récent gagne
     if (st.d && typeof st.d === "object")
       for (const [did, v] of Object.entries(st.d)) {
@@ -394,11 +412,15 @@ export class Multiplayer {
         : {}),
       ...(G.passenger?.ride ? { r: G.passenger.ride.owner } : {}),
       d: this.sharedDoors(),
+      ...(G.armor.worn && G.armor.style.special ? { sp: G.armor.style.special } : {}),
+      ...(G.deco.version && performance.now() - this.decoSent > 3000 ? ((this.decoSent = performance.now()), { dk: G.deco.compact() }) : {}),
       s: shipOut ? [r2(sh.root.position.x), r2(sh.root.position.y), r2(sh.root.position.z), r2(sh.root.quaternion.x), r2(sh.root.quaternion.y), r2(sh.root.quaternion.z), r2(sh.root.quaternion.w), sh.engines ? r2(sh.throttle) : 0, sh.stealth ? 1 : 0, sh.opts.small ? 1 : 0] : 0,
       z: G.world.zoneName(G.mode === "ship" ? sh.root.position : pl.position),
       ...(this.lastSay ? { say: this.lastSay } : {})
     };
   }
+
+  private decoSent = 0;
 
   private sharedDoors() {
     const out: Record<string, [number, number]> = {};

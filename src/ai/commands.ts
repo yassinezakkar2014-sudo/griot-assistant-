@@ -41,6 +41,17 @@ function clause(raw: string): Intent | null {
     if (/\b(dors|dormir|sommeil|coucher|lit)\b/.test(t)) return { action: "cabin", target: "sleep" };
     return { action: "cabin", target: "enter" };
   }
+  // --- espace ---
+  if (/\b(retourne sur terre|rentre sur terre|redescends sur terre|quitte l espace|rentree atmospherique)\b/.test(t)) return { action: "space", target: "exit" };
+  const goWord = V.go.test(t) || V.fly.test(t) || /\b(decolle|part|partons|direction|envoie|vise|cap sur)\b/.test(t);
+  if (/\b(espace|orbite|cosmos|les etoiles|space)\b/.test(t) && !/\b(lune|station)\b/.test(t) && goWord) return { action: "space", target: "enter" };
+  if (/\b(lune|station spatiale|station orbitale)\b/.test(t) && (goWord || /teleport/.test(t))) return { action: /teleport/.test(t) ? "teleport" : "fly_to", target: /lune/.test(t) ? "moon" : "station" };
+  // --- décoration du palais (atelier royal) ---
+  if (/\b(atelier|decor\w*|personnalis\w*|amenag\w*)\b/.test(t) && !/\b(pose|mets|ajoute|installe)\b/.test(t)) return { action: "deco", target: "open" };
+  if (/\btheme\b/.test(t) || /\b(palais|murs?) (en )?(or|noir|jade|rose|glace|rubis|blanc)\b/.test(t)) return { action: "deco", target: "theme:" + t };
+  if (/\b(enleve|retire|supprime)\b.*\b(objet|meuble|deco\w*|ca)\b/.test(t)) return { action: "deco", target: "remove" };
+  if (/\b(tourne|pivote)\b.*\b(objet|meuble)\b/.test(t)) return { action: "deco", target: "rotate" };
+  if (/\b(pose|mets|ajoute|installe|place|construis)\b/.test(t) && /\b(canape|sofa|trone|statue|fontaine|plante|fleur|lampe|piano|aquarium|bibliotheque|tele|ecran|tapis|colonne|pilier|arbre|drapeau|lit|table)\b/.test(t)) return { action: "deco", target: t };
   // --- vaisseau ---
   if (/\b(anti.?aerien\w*|defense aerienne|dca|tourelles?|radar)\b/.test(t)) {
     if (/\b(test\w*|tir\w*|demonstration|demo|feu|spectacle)\b/.test(t)) return { action: "antiair", target: "test" };
@@ -53,7 +64,7 @@ function clause(raw: string): Intent | null {
     if (pl && pl.outdoor) return { action: "fly_to", target: pl.id + "|super" };
     return { action: "toggle_supersonic", target: /\b(desactiv\w*|coupe|arrete|ralenti\w*|off)\b/.test(t) ? "off" : "on" };
   }
-  if (/\b(furtif|furtivite|invisible|camouflage|stealth|cloak)\b/.test(t)) return { action: "toggle_stealth", target: /\b(desactiv\w*|coupe|arrete|enleve|visible|off)\b/.test(t) ? "off" : "on" };
+  if (/\b(furtif|furtivite|camouflage|stealth|cloak)\b/.test(t) || (/\binvisible\b/.test(t) && V.ship.test(t))) return { action: "toggle_stealth", target: /\b(desactiv\w*|coupe|arrete|enleve|visible|off)\b/.test(t) ? "off" : "on" };
   if (/\b(decoll\w*|take ?off|despeg\w*|leve|en l air)\b/.test(t)) return { action: "takeoff" };
   if (/\b(atterri\w*|land|landing|aterriz\w*|pose.toi|pose le vaisseau)\b/.test(t)) return { action: "land" };
   if (/\b(prepar\w*|ready|apresta|prepara)\b/.test(t) && V.ship.test(t)) return { action: "prepare_ship" };
@@ -64,6 +75,11 @@ function clause(raw: string): Intent | null {
   if (/\b(monte|entre|conduis|conduire|prends|drive|installe|essaye|essayer)\w*\b/.test(t) && /\b(voiture|auto|adamas|car|bolide|berline|suv|coupe)\b/.test(t)) return { action: "board_car", target: t };
   if (/\b(sors|sortir|descends|exit|quitte)\b/.test(t) && /\b(voiture|auto|car)\b/.test(t)) return { action: "exit_vehicle" };
 
+  // --- armures spéciales ---
+  if (/\b(sors du titan|descends du titan|quitte le titan|enleve le robot|plus de robot|redeviens visible|deviens visible)\b/.test(t)) return { action: "armor_variant", target: "off" };
+  if (/\b(titan|robot geant|mecha|robot de combat|transforme.toi en robot)\b/.test(t)) return { action: "armor_variant", target: "titan" };
+  if (/\b(spectre|invisible|invisibilite)\b/.test(t) && !/\b(vaisseau|talon)\b/.test(t)) return { action: "armor_variant", target: "spectre" };
+  if (/\b(armure (d or|doree|en or|imperiale)|or imperial)\b/.test(t)) return { action: "armor_variant", target: "imperial" };
   // --- armure ---
   if (V.armor.test(t)) {
     if (/\b(retire|enleve|remove|desactive|range|quita|take off)\w*\b/.test(t)) return { action: "remove_armor" };

@@ -3,7 +3,8 @@ import * as THREE from "three";
 import { G, bus, normalize } from "../core";
 import { FLOORS, BASE } from "../world/palace";
 import { ZONES, SEA } from "../world/terrain";
-import { VARIANTS } from "../game/armor";
+import { VARIANTS, armorUnlocked } from "../game/armor";
+import { THEMES, ITEMS, kindFromText } from "../game/deco";
 import { fmtHour } from "../world/floors";
 
 export const COLORS: Record<string, string> = {
@@ -51,6 +52,8 @@ export interface Place {
   hour?: number;
   /** point de vol (aire d'atterrissage) si différent */
   fly?: () => THREE.Vector3;
+  /** lieu dans l'espace (station, Lune) */
+  space?: boolean;
 }
 
 function ground(x: number, z: number) {
@@ -85,6 +88,8 @@ export function placeFromText(t: string): Place | null {
   // pays du grand monde (noms exacts)
   for (const p of PLACES) if (p.id.startsWith("country:") && new RegExp(`\\b${normalize(p.name)}\\b`).test(n)) return p;
   if (/metropole|nouvelle ville/.test(n)) return PLACES.find((p) => p.id === "metro") ?? null;
+  if (/\blune\b|moon|base lunaire/.test(n)) return PLACES.find((p) => p.id === "moon") ?? null;
+  if (/station (spatiale|orbitale)|\bla station\b/.test(n)) return PLACES.find((p) => p.id === "station") ?? null;
   const map: [RegExp, string][] = [
     [/ville|city|ciudad|cite|downtown/, "city"],
     [/jungle|foret tropicale|selva|temple/, "jungle"],
@@ -192,6 +197,22 @@ export async function runAction(action: string, target?: string | null): Promise
         return `Destination inconnue. Je connais : ville, métropole, jungle, montagnes, océan, base secrète, vallée nocturne, jardins, palais, Zuria, et les pays ${PLACES.filter((p) => p.id.startsWith("country:")).map((p) => p.name).join(", ")}.`;
       }
       if (pl.hour !== undefined) G.env.setHour(pl.hour);
+      // lieux de l'espace : on y monte d'abord ; lieux sur Terre : on redescend
+      if (pl.space && !G.space.active) {
+        if (action === "teleport" && G.mode !== "ship") {
+          G.space.enter();
+          G.player.teleport(pl.pos());
+          return `Vous voici sur ${pl.name}. ${pl.id === "moon" ? "Gravité lunaire : sautez !" : "Admirez la Terre depuis la salle d'observation."}`;
+        }
+        if (G.mode !== "ship") {
+          if (!ship.ready) ship.prepare();
+          await ship.board();
+        }
+        G.space.enter();
+        ship.flyTo((pl.fly ?? pl.pos)(), `Vol vers ${pl.name}`);
+        return `Décollage vers l'espace ! Cap sur ${pl.name}.`;
+      }
+      if (!pl.space && G.space.active && G.mode === "ship") G.space.exit();
       if (G.mode === "inspect") armor.endInspect();
       if (action === "fly_to" && pl.outdoor && pl.id !== "gardens") {
         if (G.mode !== "ship") {
@@ -348,13 +369,70 @@ export async function runAction(action: string, target?: string | null): Promise
       let col = /^#?[0-9a-f]{6}$/.test(n) ? (n.startsWith("#") ? n : "#" + n) : null;
       if (!col) for (const [k, v] of Object.entries(COLORS)) if (n.includes(k)) col = v;
       const variant = Object.entries(VARIANTS).find(([, v]) => normalize(v.name).includes(n) || n.includes(normalize(v.name).split(" ")[1] ?? "~"));
-      if (variant && G.missions.state.armors.includes(variant[0])) {
+      if (variant && armorUnlocked(variant[0])) {
         armor.setStyle({ ...variant[1].style });
         return `Style ${variant[1].name} appliqué.`;
       }
       if (!col) return "Quelle couleur ? Bleu, violet, rouge, vert, or, blanc, cyan, orange…";
       armor.setStyle({ ...armor.style, glow: col });
       return "Couleur des circuits mise à jour.";
+    }
+    case "space": {
+      const n = String(target ?? "");
+      if (n === "exit") {
+        if (!G.space.active) return "Nous sommes déjà sur Terre.";
+        G.space.exit();
+        return "Rentrée atmosphérique. Bienvenue sur Terre.";
+      }
+      if (G.space.active) return "Nous sommes déjà dans l'espace. Dites « emmène-moi sur la Lune » ou « pose-toi sur la station ».";
+      if (G.mode !== "ship") {
+        if (!ship.ready) ship.prepare();
+        await ship.board();
+      }
+      if (!G.space.enter()) return "Seul le Royal Talon peut aller dans l'espace.";
+      return "Cap sur les étoiles ! Nous sommes en orbite, face à la Station orbitale royale.";
+    }
+    case "deco": {
+      const n = normalize(String(target ?? ""));
+      const d = G.deco;
+      if (/^theme:/.test(n)) {
+        const id = Object.keys(THEMES).find((k) => n.includes(k) || n.includes(normalize(THEMES[k].name)));
+        if (!id) return "Thèmes : " + Object.values(THEMES).map((x) => x.name).join(", ") + ".";
+        d.setTheme(id);
+        return `Le palais adopte le thème ${THEMES[id].name}.`;
+      }
+      if (n === "remove") return d.removeNearest() ? "Objet retiré." : "Aucun objet décoratif à proximité.";
+      if (n === "rotate") return d.rotateNearest() ? "Objet tourné." : "Aucun objet décoratif à proximité.";
+      if (n === "clear") {
+        d.clear();
+        return "Toute la décoration a été retirée.";
+      }
+      if (n === "open") {
+        bus.emit("ui:deco");
+        return "Voici l'Atelier royal : thèmes et objets à poser.";
+      }
+      const k = kindFromText(n);
+      if (!k) return "Je peux poser : " + Object.values(ITEMS).map((x) => x.name.toLowerCase()).join(", ") + ".";
+      if (G.mode !== "foot") return "Descendez d'abord du véhicule pour décorer.";
+      d.place(k);
+      return `${ITEMS[k].name} posé devant vous.`;
+    }
+    case "armor_variant": {
+      const id = String(target ?? "");
+      if (id === "off") {
+        armor.setStyle({ ...VARIANTS.royal.style });
+        return "Retour à l'Armure Royale.";
+      }
+      const v = VARIANTS[id];
+      if (!v) return "Armures spéciales : Or impériale, Spectre (invisible), Titan (robot géant).";
+      if (G.mode === "ship" || G.mode === "car") return "Sortez d'abord du véhicule.";
+      armor.setStyle({ ...v.style });
+      if (!armor.worn) armor.equip();
+      return id === "titan"
+        ? "Titan en approche ! Robot géant de 15 mètres : 5 pour le canon, 1 pour la frappe au sol, Espace pour les réacteurs."
+        : id === "spectre"
+          ? "Armure Spectre : vous devenez invisible, même pour les autres joueurs."
+          : `${v.name} : rayon et onde de choc géants.`;
     }
     case "armor_ability": {
       const n = normalize(String(target ?? ""));

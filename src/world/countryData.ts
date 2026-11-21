@@ -21,7 +21,7 @@ export interface CountryDef {
 }
 
 /** Côté de la carte du grand monde (m). Le cœur du royaume (8 km) est au centre. */
-export const EARTH = 32000;
+export const EARTH = 64000;
 
 export const COUNTRIES: CountryDef[] = [
   { id: "solaria", name: "Solaria", x: 9000, z: -6000, r: 2600, style: "desert", base: 8, hills: 60, ground: [0.82, 0.66, 0.4], desc: "désert doré, palais à dômes de grès" },
@@ -33,7 +33,18 @@ export const COUNTRIES: CountryDef[] = [
   { id: "kemetia", name: "Kemetia", x: 12500, z: -500, r: 2000, style: "pyramid", base: 7, hills: 40, ground: [0.86, 0.72, 0.44], desc: "sables d'or et grandes pyramides" },
   { id: "cristallis", name: "Cristallis", x: -11800, z: -1200, r: 2000, style: "crystal", base: 6, hills: 50, ground: [0.6, 0.62, 0.72], desc: "cité de cristal lumineuse" },
   { id: "ambrelune", name: "Ambrelune", x: 4500, z: 12000, r: 2200, style: "redhills", base: 8, hills: 140, ground: [0.56, 0.27, 0.16], desc: "collines rouges et villages en terre cuite" },
-  { id: "savanor", name: "Savanor", x: -6000, z: -12500, r: 2300, style: "savanna", base: 6, hills: 45, ground: [0.6, 0.5, 0.24], desc: "grande savane et cases rondes" }
+  { id: "savanor", name: "Savanor", x: -6000, z: -12500, r: 2300, style: "savanna", base: 6, hills: 45, ground: [0.6, 0.5, 0.24], desc: "grande savane et cases rondes" },
+  // ---- les terres lointaines (deuxième anneau, 20 à 28 km du palais)
+  { id: "glacea", name: "Glacéa", x: -21000, z: 19000, r: 3200, style: "snow", base: 12, hills: 320, ground: [0.93, 0.95, 1], desc: "empire des glaces et des aurores" },
+  { id: "sahrane", name: "Sahrane", x: 22000, z: -19000, r: 3400, style: "desert", base: 8, hills: 90, ground: [0.86, 0.62, 0.36], desc: "mer de dunes et oasis royales" },
+  { id: "tropica", name: "Tropica", x: 1000, z: -25000, r: 3000, style: "ocean", base: 5, hills: 60, ground: [0.42, 0.66, 0.3], desc: "îles tropicales et lagons turquoise" },
+  { id: "mirabel", name: "Mirabel", x: 24000, z: 15000, r: 3200, style: "jade", base: 8, hills: 160, ground: [0.24, 0.52, 0.32], desc: "terrasses de jade et cascades" },
+  { id: "pyros", name: "Pyros", x: -25000, z: -5000, r: 3000, style: "volcano", base: 9, hills: 110, ground: [0.2, 0.12, 0.1], desc: "royaume de feu aux trois volcans" },
+  { id: "verdania", name: "Verdania", x: -9000, z: 25000, r: 3300, style: "forest", base: 8, hills: 140, ground: [0.08, 0.3, 0.1], desc: "forêt primaire aux arbres de 200 m" },
+  { id: "orakis", name: "Orakis", x: 27000, z: -1500, r: 2800, style: "pyramid", base: 7, hills: 50, ground: [0.9, 0.76, 0.48], desc: "vallée des mille pyramides" },
+  { id: "lumina", name: "Lumina", x: 10000, z: 25500, r: 3000, style: "crystal", base: 6, hills: 70, ground: [0.66, 0.64, 0.8], desc: "capitale de lumière et de cristal" },
+  { id: "rubis", name: "Rubis", x: -20500, z: -21000, r: 3100, style: "redhills", base: 8, hills: 180, ground: [0.6, 0.22, 0.14], desc: "canyons rouges et citadelles" },
+  { id: "zambara", name: "Zambara", x: 13000, z: -25500, r: 3000, style: "savanna", base: 6, hills: 55, ground: [0.66, 0.54, 0.26], desc: "grandes plaines et villages royaux" }
 ];
 
 export function countryAt(x: number, z: number, margin = 1): CountryDef | null {

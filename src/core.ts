@@ -18,6 +18,9 @@ import type { AntiAir } from "./world/antiair";
 import type { Passenger } from "./net/passenger";
 import type { Cabin } from "./game/cabin";
 import type { Combat } from "./game/combat";
+import type { Space } from "./game/space";
+import type { Deco } from "./game/deco";
+import type { Mecha } from "./game/mecha";
 
 export type Mode = "foot" | "ship" | "inspect" | "cinematic" | "car" | "passenger";
 
@@ -43,6 +46,9 @@ export interface GameContext {
   passenger: Passenger;
   cabin: Cabin;
   combat: Combat;
+  space: Space;
+  deco: Deco;
+  mecha: Mecha;
   mode: Mode;
   time: number; // secondes écoulées
   uiFocus: boolean; // vrai quand un champ texte / menu a le focus

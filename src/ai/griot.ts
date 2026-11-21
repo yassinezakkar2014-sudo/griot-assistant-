@@ -473,6 +473,7 @@ export class Griot {
       this.history.push({ role: "assistant", content: full || "(action effectuée)" });
       this.persist();
       bus.emit("caption", full.slice(0, 220));
+      bus.emit("griot:answer", full);
     } catch (e: any) {
       bubble.classList.remove("typing");
       if (e.name === "AbortError") bubble.innerHTML = md(full + "\n\n*(interrompu)*");

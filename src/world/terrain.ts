@@ -5,7 +5,7 @@ import { COUNTRIES, EARTH, countryAt } from "./countryData";
 export const WORLD = 8000; // côté de la carte en mètres
 export const SEA = -2;
 const RES = 320; // segments de la grille
-const ORES = 320; // grille du grand monde (100 m)
+const ORES = 400; // grille du grand monde (160 m)
 
 // --- bruit de valeur 2D (déterministe) ---
 function hash(x: number, y: number) {

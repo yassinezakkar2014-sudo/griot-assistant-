@@ -11,7 +11,7 @@ import { Player } from "./game/player";
 import { Palace } from "./world/palace";
 import { World } from "./world/world";
 import { Ship } from "./game/ship";
-import { ArmorSystem } from "./game/armor";
+import { ArmorSystem, VARIANTS } from "./game/armor";
 import { Missions } from "./game/missions";
 import { UI } from "./ui/ui";
 import { mat } from "./world/materials";
@@ -23,6 +23,9 @@ import { buildWalls } from "./world/walls";
 import { buildZuria } from "./world/zuria";
 import { Cabin } from "./game/cabin";
 import { Combat } from "./game/combat";
+import { Space, STATION, MOON_BASE } from "./game/space";
+import { Deco } from "./game/deco";
+import { Mecha } from "./game/mecha";
 import { buildCountries } from "./world/countries";
 import { buildPalaceCrown, buildHyperTowers, buildMetropolis } from "./world/giant";
 import { PLACES } from "./ai/actions";
@@ -88,7 +91,7 @@ async function boot() {
   };
   for (const ev of ["touchend", "pointerup", "click", "keydown"]) addEventListener(ev, gesture, { capture: true, passive: true });
   await ui.init();
-  Object.assign(window as any, { __G: G, __ui: ui });
+  Object.assign(window as any, { __G: G, __ui: ui, __VARIANTS: VARIANTS });
   // « active AISAM » avant la fin du chargement : on mémorise la demande
   const early = bus.on("aisam:on", () => {
     document.body.classList.add("aisam");
@@ -124,6 +127,8 @@ async function boot() {
   await new Promise((r) => setTimeout(r, 0));
   for (const ci of buildCountries())
     PLACES.push({ id: "country:" + ci.def.id, name: ci.def.name, pos: () => ci.front.clone(), fly: () => ci.pad.clone(), outdoor: true });
+  PLACES.push({ id: "station", name: "la Station orbitale royale", pos: () => STATION.clone().add(new THREE.Vector3(30, 0.2, 60)), fly: () => STATION.clone(), outdoor: true, space: true });
+  PLACES.push({ id: "moon", name: "la Lune", pos: () => MOON_BASE.clone().add(new THREE.Vector3(10, 0.2, 10)), fly: () => MOON_BASE.clone().add(new THREE.Vector3(50, 0, 50)), outdoor: true, space: true });
   PLACES.push({ id: "metro", name: "la Nouvelle Métropole", pos: () => new THREE.Vector3(3020, G.physics.terrain(3020, 0) + 0.5, 0), outdoor: true });
   G.palace.spots.garage = { pos: wings.garageSpot, yaw: -Math.PI / 2, label: "garage" };
   G.palace.spots.gallery = { pos: wings.gallerySpot, yaw: Math.PI / 2, label: "gallery" };
@@ -138,6 +143,12 @@ async function boot() {
   G.cabin.build(G.ship);
   G.combat = new Combat();
   G.combat.build();
+  G.space = new Space();
+  G.space.build();
+  G.deco = new Deco();
+  G.deco.build();
+  G.mecha = new Mecha();
+  G.mecha.build();
   G.armor = new ArmorSystem();
   G.armor.build();
   const companion = buildCompanion();
