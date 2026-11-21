@@ -1,6 +1,6 @@
 // LE ROYAL TALON — vaisseau personnel : modèle, cockpit holographique, physique de vol, pilote automatique.
 import * as THREE from "three";
-import { G, bus, clamp, damp, lerp } from "../core";
+import { G, bus, clamp, damp, lerp, normalize } from "../core";
 import { mat, HoloScreen } from "../world/materials";
 import { buildShipModel, buildSmallShipModel, cloakMaterial, cloakTime } from "./shipmodel";
 import { cyl, glowLine } from "../world/build";
@@ -22,6 +22,11 @@ export interface ShipOptions {
   /** construit la plateforme royale géante */
   pad?: boolean;
   accent?: number;
+  /** couleurs de la coque et des bords (petits vaisseaux) */
+  hull?: number;
+  trim?: number;
+  /** couleur des réacteurs */
+  flame?: number;
 }
 
 /** Plateforme d'atterrissage géante, dans la cour nord du palais. */
@@ -78,7 +83,7 @@ export class Ship {
     this.GEAR = 1.35 * this.S; // hauteur du centre au-dessus du sol (train sorti)
     this.name = opts.name;
     const accent = opts.accent ?? 0x3fc8ff;
-    this.engineGlow = new THREE.MeshStandardMaterial({ color: 0, emissive: opts.small ? 0xff8a2a : 0x2a9dff, emissiveIntensity: 0 });
+    this.engineGlow = new THREE.MeshStandardMaterial({ color: 0, emissive: opts.flame ?? (opts.small ? 0xff8a2a : 0x2a9dff), emissiveIntensity: 0 });
     this.lightMat = new THREE.MeshStandardMaterial({ color: 0x050810, emissive: accent, emissiveIntensity: 0.05 });
     this.samples = [this.V(0, 0.6, -6.3), this.V(0, 0.6, 6.6), this.V(-6.4, 0.6, 2), this.V(6.4, 0.6, 2), this.V(0, 2.3, -1.5), this.V(-3.9, 0.4, -3.5), this.V(3.9, 0.4, -3.5), this.V(-3.5, 0.6, 5), this.V(3.5, 0.6, 5)];
   }
@@ -91,7 +96,7 @@ export class Ship {
     const trimMat = new THREE.MeshStandardMaterial({ color: 0x23262f, metalness: 0.95, roughness: 0.2 });
     const m = this.model;
     // coque du Royal Talon (modèle partagé avec les vaisseaux des autres joueurs)
-    const built = (this.opts.small ? buildSmallShipModel : buildShipModel)(this.lightMat, this.engineGlow);
+    const built = this.opts.small ? buildSmallShipModel(this.lightMat, this.engineGlow, { hull: this.opts.hull, trim: this.opts.trim }) : buildShipModel(this.lightMat, this.engineGlow);
     m.add(built.group);
     this.canopy = built.canopy;
     this.exhaust = built.exhaust;
@@ -195,7 +200,7 @@ export class Ship {
     G.physics.addDynamic(hullBox, "ship");
 
     G.interact.add({
-      id: this.opts.small ? "ship-small" : "ship",
+      id: this.opts.small ? "ship-" + normalize(this.name).replace(/\s+/g, "-") : "ship",
       pos: () => this.root.position.clone().add(new THREE.Vector3(-5.6 * this.S, -this.GEAR + 1, -2.5 * this.S).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw)),
       radius: 9,
       enabled: () => G.mode === "foot",
@@ -270,7 +275,7 @@ export class Ship {
 
   setSupersonic(on: boolean) {
     if (on === this.supersonic) return;
-    if (on && this.opts.small) return bus.emit("toast", { text: "Le Faucon de Zuria n'a pas de mode supersonique.", kind: "warn" });
+    if (on && this.opts.small) return bus.emit("toast", { text: `${this.name} n'a pas de mode supersonique.`, kind: "warn" });
     if (on && this.energy < 0.15) return bus.emit("toast", { text: "Énergie insuffisante pour le mode supersonique.", kind: "warn" });
     if (on && !this.engines) this.startEngines(true);
     if (on && this.landed) return bus.emit("toast", { text: "Décollez d'abord : le mode supersonique s'enclenche en vol.", kind: "warn" });

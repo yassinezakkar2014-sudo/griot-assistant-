@@ -142,7 +142,28 @@ async function boot() {
   G.ship.build();
   const falcon = new Ship({ name: "Faucon de Zuria", scale: 1, spawn: zuria.pad, yaw: Math.PI / 2, small: true, accent: 0xff9a3a });
   falcon.build();
-  G.ships = [G.ship, falcon];
+  // les petits vaisseaux du Palais des Princesses (un chacune), sur leurs plateformes
+  const pr = countryList.find((c) => c.def.id === "princesses")!.def;
+  const minis = [
+    { name: "Améthyste", dx: -112, dz: 40, hull: 0xb27ae6, trim: 0x6a2a9a, accent: 0xc87aff, flame: 0xb46bff },
+    { name: "Turquoise", dx: 112, dz: 30, hull: 0x5ad8cc, trim: 0x147a74, accent: 0x3fe8d8, flame: 0x3fd8ff }
+  ].map((m) => {
+    const x = pr.x + m.dx,
+      z = pr.z + m.dz;
+    const y = G.physics.terrain(x, z);
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(11, 11, 0.4, 40), new THREE.MeshStandardMaterial({ color: 0xf4f0ea, roughness: 0.4 }));
+    pad.position.set(x, y + 0.2, z);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(9.6, 10.2, 64), new THREE.MeshStandardMaterial({ color: 0, emissive: m.accent, emissiveIntensity: 2 }));
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(x, y + 0.42, z);
+    G.scene.add(pad, ring);
+    G.physics.addBox({ x: x - 8, y: y - 1, z: z - 8 }, { x: x + 8, y: y + 0.4, z: z + 8 }, "pad");
+    const sh = new Ship({ name: m.name, scale: 1, spawn: new THREE.Vector3(x, y + 0.4, z), yaw: 0, small: true, accent: m.accent, hull: m.hull, trim: m.trim, flame: m.flame });
+    sh.build();
+    G.world.markers.push({ id: "ship-" + m.name, name: `Vaisseau ${m.name}`, pos: new THREE.Vector3(x, y, z), icon: "✈", visible: () => true });
+    return sh;
+  });
+  G.ships = [G.ship, falcon, ...minis];
   G.cabin = new Cabin();
   G.cabin.build(G.ship);
   G.combat = new Combat();

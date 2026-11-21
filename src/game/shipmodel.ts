@@ -200,10 +200,10 @@ export function cloakMaterial() {
 // ---------------------------------------------------------------- petit vaisseau de Zuria
 /** « Faucon de Zuria » : petit vaisseau d'environ 10 m, coque ivoire et bronze, ailes en delta,
  *  deux réacteurs latéraux. Même gabarit de cockpit que le Royal Talon (verrière autour de z = -2). */
-export function buildSmallShipModel(lightMat: THREE.Material, engineGlow: THREE.Material): ShipModel {
+export function buildSmallShipModel(lightMat: THREE.Material, engineGlow: THREE.Material, colors: { hull?: number; trim?: number } = {}): ShipModel {
   const g = new THREE.Group();
-  const ivory = applyPBR(new THREE.MeshPhysicalMaterial({ color: 0xe9e0cc, metalness: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.1 }), panelPBR(), 0.35, 2) as THREE.MeshPhysicalMaterial;
-  const bronze = new THREE.MeshStandardMaterial({ color: 0xa8743a, metalness: 0.95, roughness: 0.28 });
+  const ivory = applyPBR(new THREE.MeshPhysicalMaterial({ color: colors.hull ?? 0xe9e0cc, metalness: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.1 }), panelPBR(), 0.35, 2) as THREE.MeshPhysicalMaterial;
+  const bronze = new THREE.MeshStandardMaterial({ color: colors.trim ?? 0xa8743a, metalness: 0.95, roughness: 0.28 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x1d1a17, metalness: 0.6, roughness: 0.5 });
   const add = (geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, z: number, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) => {
     const me = new THREE.Mesh(geo, m);
