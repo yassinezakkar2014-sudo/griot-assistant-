@@ -55,6 +55,8 @@ export class Griot {
   history: Msg[] = [];
   pending: Attachment[] = [];
   busy = false;
+  /** appel en direct : réponses courtes et rapides */
+  callMode = false;
   /** Cerveau Claude fourni par la page hébergée (capacité « sample »), quand il n'y a pas de serveur. */
   sampleFn: any = null;
   /** le serveur ne répond pas : on parle directement à OpenAI avec la clé du navigateur */
@@ -421,7 +423,7 @@ export class Griot {
     let extra = "";
     this.abort = new AbortController();
     try {
-      const payload = { messages: this.history.slice(-20), mode: this.mode, lang: this.voice.settings.lang.slice(0, 2), game: gameSummary(), image, pdf: pdf?.data, pdfName: pdf?.name };
+      const payload = { brief: this.callMode, messages: this.history.slice(this.callMode ? -10 : -20), mode: this.mode, lang: this.voice.settings.lang.slice(0, 2), game: gameSummary(), image, pdf: pdf?.data, pdfName: pdf?.name };
       const res = this.useBrowserKey
         ? chatStream(browserAIKey(), payload)
         : await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json", ...aiHeaders() }, body: JSON.stringify(payload), signal: this.abort.signal });

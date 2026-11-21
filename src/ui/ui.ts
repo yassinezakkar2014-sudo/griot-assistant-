@@ -60,6 +60,9 @@ export class UI {
     $("homeTalk").onclick = () => this.talk();
     $("keyBtn").onclick = () => this.keyPanel();
     $("visBtn").onclick = () => this.vision();
+    $("callBtn").onclick = () => this.call();
+    bus.on("ui:call", () => this.call());
+    bus.on("ui:train", (from: string) => this.trainPanel(from));
     if ((window as any).claude) document.documentElement.classList.add("in-claude");
     document.querySelectorAll<HTMLElement>("[data-say]").forEach((b) => (b.onclick = () => this.griot.send(b.dataset.say!)));
     $("vActivate").onclick = () => this.griot.send("active AISAM");
@@ -540,6 +543,11 @@ export class UI {
         <hr>
         <label><input type="checkbox" ${v.neural ? "checked" : ""} data-s="neural"> Voix neuronale premium (serveur)</label>
         <label>Timbre neuronal <select data-s="nv">${["onyx", "echo", "fable", "alloy", "nova", "shimmer"].map((x) => `<option ${x === v.neuralVoice ? "selected" : ""}>${x}</option>`).join("")}</select></label>
+        <label>Voix de GRIOT (gratuite) <select data-s="bv"><option value="">Automatique (la plus réaliste)</option>${this.griot.voice
+          .voicesFor(v.lang)
+          .map((x) => `<option value="${x.name.replace(/"/g, "")}" ${x.name === v.browserVoice ? "selected" : ""}>${x.name}${/premium|enhanced|am[ée]lior|natural|neural/i.test(x.name) ? " ⭐" : ""}</option>`)
+          .join("")}</select></label>
+        <p class="hint">⭐ = voix ultra réaliste. Sur iPad, gratuit : Réglages → Accessibilité → Contenu énoncé → Voix → Français → téléchargez une voix « Premium » ou « Améliorée » (ex. Thomas, Audrey), puis rechargez GRIOT et choisissez-la ici.</p>
         <label>Débit de parole <input type="range" min="0.7" max="1.4" step="0.05" value="${v.rate}" data-s="rate"></label>
         <label>Langue <select data-s="lang">${LANGS.map((l) => `<option value="${l.code}" ${l.code === v.lang ? "selected" : ""}>${l.label}</option>`).join("")}</select></label>
         <button class="btn small" data-s="test">🔊 Tester la voix</button>
@@ -558,6 +566,7 @@ export class UI {
       if (k === "pr") s.pixelRatio = +el.value;
       if (k === "neural") v.neural = el.checked;
       if (k === "nv") v.neuralVoice = el.value;
+      if (k === "bv") v.browserVoice = el.value || undefined;
       if (k === "rate") v.rate = +el.value;
       if (k === "lang") {
         v.lang = el.value;
@@ -739,6 +748,151 @@ export class UI {
       this.closeModal();
       this.toast(getGroqKey() ? "⚡ Clé Groq enregistrée : GRIOT réfléchit avec Groq (gratuit)." : getOpenAIKey() ? "🔑 Clé OpenAI enregistrée : GRIOT est connecté." : "Clés retirées.");
     };
+  }
+
+  // ---------------------------------------------------------------- train royal
+  trainPanel(from: string) {
+    const list = G.train.stations.filter((s) => s.id !== from);
+    const card = this.openModal(
+      "train",
+      `<h2 class="mt">🚄 Train royal</h2><p class="hint">Train à grande vitesse sur viaduc, jusqu'à 340 km/h. Choisissez votre destination :</p>
+      <div class="row wrap">${list.map((s) => `<button class="btn primary" data-to="${s.id}">➜ ${s.name}</button>`).join("")}</div>`
+    );
+    card.onclick = (e) => {
+      const to = (e.target as HTMLElement).closest<HTMLElement>("[data-to]")?.dataset.to;
+      if (!to) return;
+      this.closeModal();
+      this.toast(G.train.rideTo(to));
+    };
+  }
+
+  // ---------------------------------------------------------------- appel vidéo avec GRIOT
+  private inCall = false;
+  async call() {
+    if (this.inCall) return;
+    this.inCall = true;
+    const g = this.griot;
+    const v = g.voice;
+    G.audio.unlock();
+    v.unlock();
+    const el = document.createElement("div");
+    el.className = "call-screen";
+    el.innerHTML = `
+      <div class="call-top"><span class="call-dot"></span> Appel avec <b>GRIOT</b> · <span class="call-time">00:00</span></div>
+      <canvas class="call-face" width="480" height="480"></canvas>
+      <div class="call-state">Connexion…</div>
+      <div class="call-sub you"></div>
+      <div class="call-sub griot"></div>
+      <video class="call-self" playsinline autoplay muted hidden></video>
+      <div class="call-bar">
+        <button data-c="mic" title="Micro">🎙️</button>
+        <button data-c="cam" title="Caméra">📷</button>
+        <button data-c="look" title="Montre-lui">👁️</button>
+        <button data-c="end" class="end" title="Raccrocher">📞</button>
+      </div>`;
+    document.body.appendChild(el);
+    const face = (el.querySelector(".call-face") as HTMLCanvasElement).getContext("2d")!;
+    const stateEl = el.querySelector(".call-state") as HTMLElement;
+    const youEl = el.querySelector(".call-sub.you") as HTMLElement;
+    const griotEl = el.querySelector(".call-sub.griot") as HTMLElement;
+    const timeEl = el.querySelector(".call-time") as HTMLElement;
+    const self = el.querySelector(".call-self") as HTMLVideoElement;
+    let cam: MediaStream | null = null;
+    let wantLook = false;
+    const prevCont = v.settings.continuous;
+    const prevSpeak = v.settings.speak;
+    const prevFinal = v.onFinal;
+    const t0 = performance.now();
+    g.callMode = true;
+    v.settings.speak = true;
+    const snap = () => {
+      const w = Math.min(768, self.videoWidth || 640);
+      const h = Math.round(w * ((self.videoHeight || 480) / (self.videoWidth || 640)));
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      c.getContext("2d")!.drawImage(self, 0, 0, w, h);
+      return c.toDataURL("image/jpeg", 0.8);
+    };
+    // chaque phrase prononcée part directement à GRIOT ; s'il est question de « regarder », il voit par la caméra
+    v.onFinal = (text: string) => {
+      youEl.textContent = `Vous : ${text}`;
+      griotEl.textContent = "";
+      const n = text.toLowerCase();
+      if (cam && self.videoWidth && (wantLook || /regarde|tu vois|vois.tu|c'est quoi|qu'est-ce que|montre|devant moi|lis |traduis|ma tête|comment je suis|mon visage|ce que je tiens/.test(n))) {
+        g.attachImage(snap(), "appel.jpg");
+        wantLook = false;
+      }
+      g.send(text, { spoken: true });
+    };
+    const offs = [
+      bus.on("voice:state", (st: string) => {
+        stateEl.textContent = { listening: "Je vous écoute…", thinking: "GRIOT réfléchit…", speaking: "GRIOT parle…", idle: "En ligne" }[st] ?? "En ligne";
+        el.dataset.state = st;
+      }),
+      bus.on("voice:interim", (t: string) => {
+        if (t) youEl.textContent = `Vous : ${t}`;
+      }),
+      bus.on("griot:answer", (t: string) => (griotEl.textContent = t.replace(/[*#`_>]/g, "").slice(0, 400)))
+    ];
+    let raf = 0;
+    const draw = (ms: number) => {
+      raf = requestAnimationFrame(draw);
+      face.save();
+      face.scale(4, 4);
+      this.drawAvatar(ms / 1000, face);
+      face.restore();
+      const s = Math.floor((performance.now() - t0) / 1000);
+      timeEl.textContent = `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+    };
+    raf = requestAnimationFrame(draw);
+    const end = () => {
+      cancelAnimationFrame(raf);
+      offs.forEach((o) => o());
+      cam?.getTracks().forEach((t) => t.stop());
+      v.interrupt();
+      v.onFinal = prevFinal;
+      v.settings.speak = prevSpeak;
+      v.setContinuous(prevCont);
+      if (!prevCont && v.listening) v.toggleListen();
+      g.callMode = false;
+      el.remove();
+      this.inCall = false;
+      this.toast("📞 Appel terminé.");
+    };
+    el.onclick = async (e) => {
+      const c = (e.target as HTMLElement).closest<HTMLElement>("[data-c]")?.dataset.c;
+      if (c === "end") end();
+      if (c === "mic") {
+        v.toggleListen();
+        (e.target as HTMLElement).classList.toggle("off", !v.listening);
+      }
+      if (c === "cam") {
+        if (cam) {
+          cam.getTracks().forEach((t) => t.stop());
+          cam = null;
+          self.hidden = true;
+        } else {
+          try {
+            cam = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+            self.srcObject = cam;
+            self.hidden = false;
+          } catch {
+            this.toast("Caméra refusée.", "warn");
+          }
+        }
+      }
+      if (c === "look") {
+        if (!cam) return this.toast("Activez d'abord la caméra (📷).", "warn");
+        wantLook = true;
+        this.toast("👁️ GRIOT regardera avec votre prochaine phrase.");
+      }
+    };
+    // conversation continue (le micro se rouvre après chaque réponse, on peut couper la parole)
+    v.setContinuous(true);
+    if (!v.listening) v.startListening();
+    stateEl.textContent = "En ligne";
+    v.say("Allô ! Je vous écoute, Majesté.");
   }
 
   // ---------------------------------------------------------------- GRIOT voit (caméra)

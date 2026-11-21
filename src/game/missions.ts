@@ -113,6 +113,16 @@ export class Missions {
     this.save();
   }
 
+  /** TOUT GRATUIT : toutes les armures, toutes les technologies, toutes les portes, sans rien payer ni débloquer. */
+  unlockAll() {
+    for (const id of Object.keys(VARIANTS)) if (!this.state.armors.includes(id)) this.state.armors.push(id);
+    for (const pr of PROTOTYPES) if (!this.state.tech.includes(pr.id)) this.state.tech.push(pr.id);
+    for (const id of ["door-archives", "door-vault"]) {
+      const d = G.palace.doors.get(id);
+      if (d) d.locked = false;
+    }
+  }
+
   unlockArmor(id: string) {
     if (this.state.armors.includes(id)) return;
     this.state.armors.push(id);

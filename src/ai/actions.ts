@@ -87,6 +87,7 @@ export function placeFromText(t: string): Place | null {
   const n = normalize(t);
   // pays du grand monde (noms exacts)
   for (const p of PLACES) if (p.id.startsWith("country:") && new RegExp(`\\b${normalize(p.name)}\\b`).test(n)) return p;
+  if (/mariem|sandra|attia|el ayadi/.test(n)) return PLACES.find((p) => p.id === "country:mariem-sandra") ?? null;
   if (/metropole|nouvelle ville/.test(n)) return PLACES.find((p) => p.id === "metro") ?? null;
   if (/\blune\b|moon|base lunaire/.test(n)) return PLACES.find((p) => p.id === "moon") ?? null;
   if (/station (spatiale|orbitale)|\bla station\b/.test(n)) return PLACES.find((p) => p.id === "station") ?? null;
@@ -376,6 +377,13 @@ export async function runAction(action: string, target?: string | null): Promise
       if (!col) return "Quelle couleur ? Bleu, violet, rouge, vert, or, blanc, cyan, orange…";
       armor.setStyle({ ...armor.style, glow: col });
       return "Couleur des circuits mise à jour.";
+    }
+    case "call":
+      bus.emit("ui:call");
+      return "Je vous appelle, Majesté.";
+    case "train": {
+      const n = normalize(String(target ?? ""));
+      return G.train.rideTo(n);
     }
     case "space": {
       const n = String(target ?? "");

@@ -238,6 +238,7 @@ export function chatStream(key: string, body: any): Response {
           MODE_RULES[body.mode] ?? MODE_RULES.personal,
           `Langue : ${body.lang || "fr"}. Date : ${new Date().toLocaleDateString("fr-FR", { dateStyle: "full" })}.`,
           "Pour agir dans le royaume, appelle game_action (ne prétends jamais l'avoir fait sans l'appeler). Pas d'accès Internet dans cette version.",
+          body.brief ? "APPEL EN DIRECT : conversation vocale comme au téléphone. Réponds en 1 à 3 phrases courtes et naturelles, sans Markdown ni listes ni emojis." : "",
           db.facts.length ? "Ce que tu sais de l'utilisateur :\n- " + db.facts.map((f) => f.text).join("\n- ") : "",
           db.projects.length ? "Projets : " + JSON.stringify(db.projects.map((p) => ({ nom: p.name, statut: p.status, taches: p.tasks }))).slice(0, 4000) : "",
           body.game ? "État du jeu : " + JSON.stringify(body.game).slice(0, 1500) : ""
@@ -257,7 +258,7 @@ export function chatStream(key: string, body: any): Response {
           const r = await realFetch(`${base}/chat/completions`, {
             method: "POST",
             headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ model: groq ? (vision ? "meta-llama/llama-4-scout-17b-16e-instruct" : GROQ_MODEL) : localStorage.getItem("griot-openai-model") || "gpt-4o-mini", messages: groq ? msgs.slice(0, 1).concat(msgs.slice(-12)) : msgs, tools: TOOLS, stream: true, max_tokens: 2000, temperature: body.mode === "creative" ? 0.95 : 0.6 })
+            body: JSON.stringify({ model: groq ? (vision ? "meta-llama/llama-4-scout-17b-16e-instruct" : GROQ_MODEL) : localStorage.getItem("griot-openai-model") || "gpt-4o-mini", messages: groq ? msgs.slice(0, 1).concat(msgs.slice(-12)) : msgs, tools: TOOLS, stream: true, max_tokens: body.brief ? 400 : 2000, temperature: body.mode === "creative" ? 0.95 : 0.6 })
           });
           if (!r.ok || !r.body) {
             const err = await r.json().catch(() => ({}));

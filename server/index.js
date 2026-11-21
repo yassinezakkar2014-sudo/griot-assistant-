@@ -100,7 +100,7 @@ app.get("/api/health", (_req, res) => {
 
 // ---- Conversation (Server-Sent Events) ----
 app.post("/api/chat", async (req, res) => {
-  const { messages, mode = "personal", lang = "fr", game, image } = req.body || {};
+  const { messages, mode = "personal", lang = "fr", game, image, brief = false } = req.body || {};
   if (!Array.isArray(messages) || !messages.length) return res.status(400).json({ error: "messages manquants" });
   const userKey = userGroqKey(req);
   if (!hasChat() && !userKey) return res.status(503).json({ error: "Aucune clé d'IA : touchez 🔑 Clés IA et collez une clé Groq gratuite." });
@@ -117,7 +117,7 @@ app.post("/api/chat", async (req, res) => {
     last.content = [{ type: "text", text: last.content }, { type: "image_url", image_url: { url: image } }];
   }
   try {
-    await chatWithFallback({ messages: clean, mode, lang, game }, userKey, (e, d) => {
+    await chatWithFallback({ messages: brief ? clean.slice(-10) : clean, mode, lang, game, brief: !!brief }, userKey, (e, d) => {
       if (!closed) emit(e, d);
     });
     if (!closed) emit("done", {});

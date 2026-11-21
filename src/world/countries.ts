@@ -23,7 +23,8 @@ const PALETTES: Record<CountryDef["style"], Pal> = {
   pyramid: { wall: [0xe0c08a, 0xd4b078, 0xc8a26a], roof: 0xd8b25a, accent: 0x1f4a8a, glow: 0xffd27a },
   crystal: { wall: [0xb8c8f0, 0xd0b8f0, 0xa8e0f0], roof: 0xffffff, accent: 0x8a5cff, glow: 0x9fd8ff },
   redhills: { wall: [0xb5653e, 0xa4552f, 0xc4774c], roof: 0x8a3a22, accent: 0xf1c40f, glow: 0xffa04a },
-  savanna: { wall: [0xb8865a, 0xa8764a, 0xc8966a], roof: 0xc8a050, accent: 0x1f6b4a, glow: 0xffb050 }
+  savanna: { wall: [0xb8865a, 0xa8764a, 0xc8966a], roof: 0xc8a050, accent: 0x1f6b4a, glow: 0xffb050 },
+  royal: { wall: [0xf6f2ec, 0xf4d8e0, 0xe8f0f6], roof: 0xd86a9a, accent: 0xd8b25a, glow: 0xffc8e0 }
 };
 
 export interface CountryInfo {
@@ -91,7 +92,8 @@ function buildCountry(c: CountryDef): CountryInfo {
   // ---------------------------------------------------------------- socle + palais
   const W = 34,
     D = 26;
-  box(W * 2 + 30, 2, D * 2 + 40, walls[2], cx, y0 - 1, cz + 4);
+  const custom = c.style === "royal"; // grand palais sur mesure (construit à part)
+  if (!custom) box(W * 2 + 30, 2, D * 2 + 40, walls[2], cx, y0 - 1, cz + 4);
   const py = y0 + 1;
   const front = new THREE.Vector3(cx, py, cz - D - 22);
   switch (c.style) {
@@ -244,7 +246,7 @@ function buildCountry(c: CountryDef): CountryInfo {
     }
   }
   // porte d'honneur + mât au drapeau
-  box(8, 11, 0.6, glowM, cx, py, front.z + 21.5, false);
+  if (!custom) box(8, 11, 0.6, glowM, cx, py, front.z + 21.5, false);
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 26, 8), mat.silver);
   pole.position.set(cx + 14, py + 13, front.z + 4);
   const flag = new THREE.Mesh(new THREE.PlaneGeometry(8, 5), new THREE.MeshStandardMaterial({ color: pal.accent, side: THREE.DoubleSide }));
@@ -259,6 +261,7 @@ function buildCountry(c: CountryDef): CountryInfo {
   const roadM = std(c.style === "crystal" ? 0x30344a : c.style === "volcano" ? 0x1a1414 : 0x8a7a62, { roughness: 0.95 });
   const L = c.r * 0.82;
   for (const [w, d, ox, oz] of [[16, L, 0, -L / 2 - 50], [16, L, 0, L / 2 + 50], [L, 16, -L / 2 - 50, 0], [L, 16, L / 2 + 50, 0]] as number[][]) {
+    if (custom && oz > 0) continue; // le grand palais et sa piscine occupent le nord
     const n = 24;
     const pos: number[] = [];
     const idx: number[] = [];
@@ -305,7 +308,7 @@ function buildCountry(c: CountryDef): CountryInfo {
   const rMax = c.r * 0.42;
   for (let tries = 0; tries < 6000 && houses.length < target; tries++) {
     const a = rnd() * Math.PI * 2,
-      r = 95 + Math.pow(rnd(), 0.75) * (rMax - 95);
+      r = (c.clear ?? 95) + Math.pow(rnd(), 0.75) * (rMax - (c.clear ?? 95));
     const x = cx + Math.cos(a) * r,
       z = cz + Math.sin(a) * r;
     if (Math.abs(x - cx) < 14 || Math.abs(z - cz) < 14) continue; // avenues
@@ -341,7 +344,7 @@ function buildCountry(c: CountryDef): CountryInfo {
   let roofKind: "cone" | "dome" | "eave" | "spike" | null = null;
   if (c.style === "snow" || c.style === "forest") (roofGeo = new THREE.ConeGeometry(0.75, 1, 4).rotateY(Math.PI / 4)), (roofKind = "cone");
   else if (c.style === "savanna") (roofGeo = new THREE.ConeGeometry(0.7, 1, 16)), (roofKind = "cone");
-  else if (c.style === "ocean" || c.style === "desert") (roofGeo = new THREE.SphereGeometry(0.5, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2)), (roofKind = "dome");
+  else if (c.style === "ocean" || c.style === "desert" || c.style === "royal") (roofGeo = new THREE.SphereGeometry(0.5, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2)), (roofKind = "dome");
   else if (c.style === "jade") (roofGeo = new THREE.BoxGeometry(1, 1, 1)), (roofKind = "eave");
   else if (c.style === "crystal") (roofGeo = new THREE.ConeGeometry(0.6, 1, 6)), (roofKind = "spike");
   if (roofGeo) {
@@ -382,6 +385,7 @@ function buildCountry(c: CountryDef): CountryInfo {
     const x = cx + Math.cos(a) * r,
       z = cz + Math.sin(a) * r;
     if (Math.abs(x - cx) < 12 || Math.abs(z - cz) < 12) continue;
+    if (c.clear && r < c.clear) continue;
     const y = ground(x, z);
     if (y < 1 || y > 360) continue;
     if (houses.some((h) => Math.abs(h.x - x) < h.w / 2 + 3 && Math.abs(h.z - z) < h.d / 2 + 3)) continue;
