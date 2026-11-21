@@ -583,6 +583,8 @@ export class World {
 
   zoneName(p: THREE.Vector3): string {
     const c = ZONES.city;
+    if (G.cabin?.inside && p.distanceTo(G.player.position) < 1) return "Royal Talon — Cabine";
+    if (p.x < -1000 && p.x > -2450 && (this as any).highway?.onRoad(p.x, p.z)) return "Pont royal de Zuria";
     if (G.palace.inside(p)) {
       const f = G.palace.floorAt(p);
       return `Palais — Niveau ${f + 1}`;

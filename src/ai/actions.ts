@@ -72,6 +72,7 @@ export const PLACES: Place[] = [
   { id: "terrace", name: "la terrasse", pos: () => G.palace.spots.terrace.pos.clone(), outdoor: false },
   { id: "platform", name: "la plate-forme de lancement", pos: () => G.palace.spots.platform.pos.clone(), outdoor: false },
   { id: "pad", name: "la plateforme du Royal Talon", pos: () => G.palace.shipSpawn.clone().add(new THREE.Vector3(-30, 0.3, -42)), outdoor: false },
+  { id: "bridge", name: "le pont royal de Zuria", pos: () => (G.world.markers.find((m) => m.id === "bridge")?.pos.clone() ?? G.palace.spots.zuria.pos.clone()).add(new THREE.Vector3(0, 0.5, 0)), outdoor: true },
   { id: "zuria", name: "le pays de Zuria", pos: () => G.palace.spots.zuria.pos.clone(), outdoor: true },
   { id: "garage", name: "le garage royal", pos: () => G.palace.spots.garage.pos.clone(), outdoor: false },
   { id: "gallery", name: "la galerie royale", pos: () => G.palace.spots.gallery.pos.clone(), outdoor: false }
@@ -89,6 +90,7 @@ export function placeFromText(t: string): Place | null {
     [/jardin|garden|fontaine|parc/, "gardens"],
     [/terrasse|terrace/, "terrace"],
     [/plate.?forme|platform|piste/, "platform"],
+    [/\bpont\b|bridge|puente/, "bridge"],
     [/zuria|autre pays|pays voisin|autre royaume|etranger|voisin/, "zuria"],
     [/garage|voitures?|autos?/, "garage"],
     [/plateforme royale|plateforme du vaisseau|aire d atterrissage/, "pad"],
@@ -257,6 +259,25 @@ export async function runAction(action: string, target?: string | null): Promise
       if (n === "status") return aa.armed ? `Défense anti-aérienne active : ${aa.turrets.length} tourelles et un radar. ${aa.lockedName ? "Contact suivi : " + aa.lockedName + "." : "Aucun appareil suivi."}` : "Défense anti-aérienne désactivée.";
       aa.armed = n !== "off";
       return aa.armed ? `Défense anti-aérienne activée : ${aa.turrets.length} tourelles en veille sur les remparts du palais.` : "Défense anti-aérienne désactivée.";
+    }
+    case "cabin": {
+      const c = G.cabin;
+      const n = normalize(String(target ?? ""));
+      if (n === "exit") {
+        if (!c.inside) return "Vous n'êtes pas dans la cabine.";
+        c.exit();
+        return "Vous êtes sorti par le sas arrière du Royal Talon.";
+      }
+      if (!c.inside && !c.enter()) return "Posez d'abord le Royal Talon, puis je vous ouvre la cabine.";
+      if (n === "tv") {
+        c.setChannel(c.channel === 0 || c.channel === 3 ? 1 : c.channel + 1);
+        return "La télé est allumée. Dites « change de chaîne » pour la suivante.";
+      }
+      if (n === "sleep") {
+        G.interact.get("cabin-bed")?.action();
+        return "Bonne nuit, Majesté. Je veille sur le vaisseau.";
+      }
+      return "Bienvenue dans la cabine du Royal Talon : salon avec télé, bar-cuisine, chambre, et le poste de pilotage à l'avant.";
     }
     case "toggle_stealth": {
       const n = normalize(String(target ?? ""));

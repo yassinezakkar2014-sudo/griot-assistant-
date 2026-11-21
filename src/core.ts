@@ -16,6 +16,7 @@ import type { Multiplayer } from "./net/multiplayer";
 import type { CarSystem } from "./game/car";
 import type { AntiAir } from "./world/antiair";
 import type { Passenger } from "./net/passenger";
+import type { Cabin } from "./game/cabin";
 
 export type Mode = "foot" | "ship" | "inspect" | "cinematic" | "car" | "passenger";
 
@@ -39,6 +40,7 @@ export interface GameContext {
   cars: CarSystem;
   antiair: AntiAir;
   passenger: Passenger;
+  cabin: Cabin;
   mode: Mode;
   time: number; // secondes écoulées
   uiFocus: boolean; // vrai quand un champ texte / menu a le focus

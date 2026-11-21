@@ -34,6 +34,13 @@ function clause(raw: string): Intent | null {
   if (/^(aide|help|ayuda|que peux.tu faire|what can you do|commandes)\b/.test(t)) return { action: "help" };
   if (/\b(sauvegard\w*|save|guardar)\b/.test(t) && !/projet/.test(t)) return { action: "save" };
 
+  // --- cabine habitable du Royal Talon ---
+  if (/\b(cabine|interieur du (vaisseau|talon|royal talon)|salon du vaisseau|chambre du vaisseau|appartement du vaisseau|cabin)\b/.test(t) || (/\b(tele|television|tv|chaine)\b/.test(t) && /\b(allume|mets|change|chaine)\w*\b/.test(t)) || /\b(je veux dormir|va dormir|dors dans le vaisseau)\b/.test(t)) {
+    if (/\b(sors|sortir|quitte|quitter|exit)\b/.test(t)) return { action: "cabin", target: "exit" };
+    if (/\b(tele|television|tv|chaine)\b/.test(t)) return { action: "cabin", target: "tv" };
+    if (/\b(dors|dormir|sommeil|coucher|lit)\b/.test(t)) return { action: "cabin", target: "sleep" };
+    return { action: "cabin", target: "enter" };
+  }
   // --- vaisseau ---
   if (/\b(anti.?aerien\w*|defense aerienne|dca|tourelles?|radar)\b/.test(t)) {
     if (/\b(test\w*|tir\w*|demonstration|demo|feu|spectacle)\b/.test(t)) return { action: "antiair", target: "test" };
