@@ -21,6 +21,7 @@ import { Passenger } from "./net/passenger";
 import { buildWings } from "./world/wings";
 import { buildWalls } from "./world/walls";
 import { buildZuria } from "./world/zuria";
+import { Cabin } from "./game/cabin";
 import { AntiAir } from "./world/antiair";
 import { buildHighway, buildRoyalTowers } from "./world/expansion";
 import { CarSystem } from "./game/car";
@@ -112,6 +113,8 @@ async function boot() {
   const falcon = new Ship({ name: "Faucon de Zuria", scale: 1, spawn: zuria.pad, yaw: Math.PI / 2, small: true, accent: 0xff9a3a });
   falcon.build();
   G.ships = [G.ship, falcon];
+  G.cabin = new Cabin();
+  G.cabin.build(G.ship);
   G.armor = new ArmorSystem();
   G.armor.build();
   const companion = buildCompanion();

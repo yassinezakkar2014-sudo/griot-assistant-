@@ -17,8 +17,13 @@ export interface Highway {
 export function buildHighway(): Highway {
   const routes: [number, number][][] = [
     [[0, -275], [0, -430], [280, -700], [900, -1250], [1700, -1310], [2550, -1250], [2860, -800], [2920, 0], [2900, 700], [2960, 1050]],
-    [[-275, 0], [-480, -40], [-760, -160], [-980, -240]]
+    // branche ouest → GRAND PONT ROYAL au-dessus de l'océan, jusqu'au marché de Zuria
+    [[-275, 0], [-480, -40], [-760, -160], [-980, -240], [-1300, -210], [-1800, -70], [-2200, 50], [-2460, 135], [-2700, 178], [-2872, 185]]
   ];
+  const BRIDGE_ROUTE = 1;
+  const DECK = 34; // hauteur du tablier au-dessus de l'océan (les navires passent dessous)
+  const bridgeTowers: THREE.Vector3[] = [];
+  const bridgeDirs: THREE.Vector3[] = [];
   const segs: { ax: number; az: number; ay: number; bx: number; bz: number; by: number }[] = [];
   const grid = new Map<string, number[]>();
   const cell = 64;
@@ -32,7 +37,8 @@ export function buildHighway(): Highway {
   const pillars: { p: THREE.Vector3; h: number }[] = [];
   let total = 0;
 
-  for (const ctrl of routes) {
+  for (const [ri, ctrl] of routes.entries()) {
+    const bridge = ri === BRIDGE_ROUTE;
     const curve = new THREE.CatmullRomCurve3(ctrl.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, "centripetal");
     const len = curve.getLength();
     total += len;
@@ -40,12 +46,15 @@ export function buildHighway(): Highway {
     const pts = curve.getSpacedPoints(n);
     // profil en long : relief lissé, jamais sous le terrain ni sous la mer
     const raw = pts.map((p) => Math.max(G.physics.terrain(p.x, p.z), SEA + 2.5));
+    // pont : au-dessus de l'eau le tablier monte à DECK m, avec de longues rampes d'accès
+    const target = bridge ? raw.map((y) => (y <= SEA + 2.6 ? DECK : y)) : raw;
+    const win = bridge ? 34 : 12;
     const smooth = raw.map((_, i) => {
       let s = 0,
         c = 0;
-      for (let k = -12; k <= 12; k++) {
+      for (let k = -win; k <= win; k++) {
         const j = Math.min(raw.length - 1, Math.max(0, i + k));
-        s += raw[j];
+        s += target[j];
         c++;
       }
       return s / c;
@@ -87,6 +96,10 @@ export function buildHighway(): Highway {
       }
       if (i % 10 === 0) lamps.push(new THREE.Vector3(p.x + nx * (HALF_W + 0.6) * (i % 20 ? 1 : -1), y, p.z + nz * (HALF_W + 0.6) * (i % 20 ? 1 : -1)));
       if (i % 5 === 0 && y - raw[i] > 2.5) pillars.push({ p: new THREE.Vector3(p.x, y, p.z), h: y - raw[i] + 2 });
+      if (bridge && i % 55 === 27 && y > DECK - 1 && raw[i] <= SEA + 2.6) {
+        bridgeTowers.push(new THREE.Vector3(p.x, y, p.z));
+        bridgeDirs.push(new THREE.Vector3(nx, 0, nz));
+      }
     });
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
@@ -128,6 +141,8 @@ export function buildHighway(): Highway {
   });
   pil.count = pillars.length;
   root.add(pil);
+  buildBridgeTowers(root, bridgeTowers, bridgeDirs);
+
   // portique d'entrée
   const sign = document.createElement("canvas");
   sign.width = 1024;
@@ -142,7 +157,7 @@ export function buildHighway(): Highway {
   c.font = "bold 64px Arial";
   c.fillText("A1  AUTOROUTE ROYALE", 40, 82);
   c.font = "36px Arial";
-  c.fillText("Ville futuriste  ·  Montagnes  ·  Océan ↰", 40, 132);
+  c.fillText("Ville futuriste  ·  Montagnes  ·  Pont royal → Zuria ↰", 40, 132);
   const st = new THREE.CanvasTexture(sign);
   st.colorSpace = THREE.SRGBColorSpace;
   const gy = G.physics.terrain(0, -360) + 0.1;
@@ -173,6 +188,74 @@ export function buildHighway(): Highway {
   G.world.markers.push({ id: "highway", name: "Autoroute royale", pos: new THREE.Vector3(1700, 0, -1310), icon: "═", visible: () => true });
   bus.emit("highway", Math.round(total));
   return { heightAt, onRoad: (x, z) => heightAt(x, z) > -Infinity };
+}
+
+/** Pylônes du pont suspendu (blancs et or), câbles porteurs dorés, suspentes, feux de balisage. */
+function buildBridgeTowers(root: THREE.Group, towers: THREE.Vector3[], dirs: THREE.Vector3[]) {
+  if (!towers.length) return;
+  const TH = 62; // hauteur des pylônes au-dessus du tablier
+  const off = HALF_W + 2;
+  const white = new THREE.MeshStandardMaterial({ color: 0xe8eaf0, roughness: 0.4, metalness: 0.2 });
+  const cableMat = new THREE.MeshStandardMaterial({ color: 0xd8b25a, metalness: 1, roughness: 0.25 });
+  const beacon = new THREE.MeshStandardMaterial({ color: 0, emissive: 0xff3030, emissiveIntensity: 3 });
+  const tops: THREE.Vector3[][] = [[], []];
+  towers.forEach((t, k) => {
+    const n = dirs[k];
+    [-1, 1].forEach((sd, si) => {
+      const x = t.x + n.x * off * sd,
+        z = t.z + n.z * off * sd;
+      const base = SEA - 6;
+      const h = t.y + TH - base;
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(3.4, h, 3.4), white);
+      leg.position.set(x, base + h / 2, z);
+      leg.castShadow = true;
+      root.add(leg);
+      G.physics.addBox({ x: x - 1.7, y: base, z: z - 1.7 }, { x: x + 1.7, y: t.y + TH, z: z + 1.7 }, "bridge");
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(2.4, 6, 4), mat.gold);
+      cap.position.set(x, t.y + TH + 3, z);
+      cap.rotation.y = Math.PI / 4;
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 8), beacon);
+      lamp.position.set(x, t.y + TH + 6.6, z);
+      root.add(cap, lamp);
+      tops[si].push(new THREE.Vector3(x, t.y + TH, z));
+    });
+    // traverses entre les deux pylônes (au-dessus de la circulation)
+    for (const hy of [TH * 0.55, TH - 3]) {
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(off * 2, 2.2, 2.4), white);
+      beam.position.set(t.x, t.y + hy, t.z);
+      beam.rotation.y = Math.atan2(-n.z, n.x);
+      root.add(beam);
+    }
+    // portique doré « PONT ROYAL »
+    const arch = new THREE.Mesh(new THREE.TorusGeometry(off - 1, 0.5, 8, 40, Math.PI), mat.gold);
+    arch.position.set(t.x, t.y + TH * 0.55 - 1, t.z);
+    arch.rotation.y = Math.atan2(-n.z, n.x);
+    arch.rotation.z = Math.PI;
+    root.add(arch);
+  });
+  // câbles porteurs : du sol des culées aux sommets, avec une flèche entre pylônes
+  const hangers: number[] = [];
+  for (const side of tops) {
+    for (let k = 0; k < side.length - 1; k++) {
+      const a = side[k],
+        b = side[k + 1];
+      if (a.distanceTo(b) > 520) continue;
+      const pts: THREE.Vector3[] = [];
+      for (let i = 0; i <= 24; i++) {
+        const u = i / 24;
+        const p = a.clone().lerp(b, u);
+        p.y -= (TH - 6) * 4 * u * (1 - u);
+        pts.push(p);
+        if (i > 0 && i < 24) hangers.push(p.x, p.y, p.z, p.x, a.y - TH + 1, p.z);
+      }
+      const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 48, 0.45, 6), cableMat);
+      root.add(tube);
+    }
+  }
+  const hg = new THREE.BufferGeometry();
+  hg.setAttribute("position", new THREE.Float32BufferAttribute(hangers, 3));
+  root.add(new THREE.LineSegments(hg, new THREE.LineBasicMaterial({ color: 0xd8b25a })));
+  G.world.markers.push({ id: "bridge", name: "Pont royal de Zuria", pos: towers[Math.floor(towers.length / 2)].clone(), icon: "⌒", visible: () => true });
 }
 
 function asphaltTexture() {

@@ -3,6 +3,7 @@ import { G, bus } from "../core";
 import { parseCommands, type Intent } from "./commands";
 import { runAction, gameSummary } from "./actions";
 import { GAME_ACTIONS, MODE_RULES, PERSONA } from "./persona";
+import { chatStream, getOpenAIKey } from "./localapi";
 import { Voice } from "./voice";
 
 export type GriotMode = "personal" | "business" | "research" | "creative" | "coder";
@@ -56,6 +57,9 @@ export class Griot {
   busy = false;
   /** Cerveau Claude fourni par la page hébergée (capacité « sample »), quand il n'y a pas de serveur. */
   sampleFn: any = null;
+  /** le serveur ne répond pas : on parle directement à OpenAI avec la clé du navigateur */
+  private useBrowserKey = false;
+  backendName = "";
   private sampleTools = false;
   private abort: AbortController | null = null;
   private list = document.getElementById("messages")!;
@@ -64,10 +68,17 @@ export class Griot {
     try {
       const h = await (await fetch("/api/health")).json();
       this.ai = h.ai;
+      this.backendName = h.backend && h.backend !== "none" ? h.backend : h.openai ? "openai" : "";
       this.voice.serverTTS = h.tts;
       this.voice.serverSTT = h.stt ?? h.ai;
     } catch {
       this.ai = false;
+    }
+    // sans moteur côté serveur mais avec une clé OpenAI enregistrée : on l'utilise directement
+    if (!this.ai && getOpenAIKey() && !document.documentElement.classList.contains("serverless")) {
+      this.ai = true;
+      this.useBrowserKey = true;
+      this.backendName = "openai (navigateur)";
     }
     try {
       const saved = JSON.parse(localStorage.getItem("griot-chat") || "null");
@@ -92,7 +103,7 @@ export class Griot {
       }
     });
     this.refreshProjects();
-    bus.emit("griot:status", this.ai ? "IA CONNECTÉE" : "MODE LOCAL");
+    bus.emit("griot:status", this.ai ? (this.backendName ? `IA ${this.backendName.toUpperCase()}` : "IA CONNECTÉE") : "MODE LOCAL");
     const cl = (window as any).claude;
     if (!this.ai && cl?.use) {
       cl.use("sample").then(async (fn: any) => {
@@ -260,6 +271,8 @@ export class Griot {
     switch (it.action) {
       case "help":
         return HELP;
+      case "diag":
+        return this.diagnostic();
       case "multiplayer": {
         bus.emit("ui:multi");
         const list = G.net?.list() ?? [];
@@ -391,7 +404,7 @@ export class Griot {
     }
   }
 
-  private async stream(image: string | null, spoken = false, pdf: { data: string; name: string } | null = null) {
+  private async stream(image: string | null, spoken = false, pdf: { data: string; name: string } | null = null): Promise<void> {
     this.busy = true;
     bus.emit("voice:state", "thinking");
     const bubble = this.render("assistant", "");
@@ -400,12 +413,10 @@ export class Griot {
     let extra = "";
     this.abort = new AbortController();
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: this.history.slice(-20), mode: this.mode, lang: this.voice.settings.lang.slice(0, 2), game: gameSummary(), image, pdf: pdf?.data, pdfName: pdf?.name }),
-        signal: this.abort.signal
-      });
+      const payload = { messages: this.history.slice(-20), mode: this.mode, lang: this.voice.settings.lang.slice(0, 2), game: gameSummary(), image, pdf: pdf?.data, pdfName: pdf?.name };
+      const res = this.useBrowserKey
+        ? chatStream(getOpenAIKey(), payload)
+        : await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: this.abort.signal });
       if (!res.ok || !res.body) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
       const reader = res.body.getReader();
       const dec = new TextDecoder();
@@ -457,13 +468,40 @@ export class Griot {
     } catch (e: any) {
       bubble.classList.remove("typing");
       if (e.name === "AbortError") bubble.innerHTML = md(full + "\n\n*(interrompu)*");
-      else bubble.innerHTML = md(`Je ne parviens pas à joindre mon moteur d'IA (${esc(e.message)}). Les commandes du royaume restent disponibles.`);
+      else if (!full && !this.useBrowserKey && getOpenAIKey()) {
+        // secours : la clé OpenAI enregistrée dans ce navigateur
+        this.useBrowserKey = true;
+        bubble.closest(".msg")?.remove();
+        bus.emit("toast", { text: "Serveur d'IA indisponible : je passe par votre clé OpenAI." });
+        bus.emit("griot:status", "IA OPENAI (NAVIGATEUR)");
+        this.busy = false;
+        return this.stream(image, spoken, pdf);
+      } else bubble.innerHTML = md(`⚠ ${esc(e.message)}\n\nDites **« diagnostic »** pour que je teste mes moteurs d'IA, ou touchez **🔑 Clé OpenAI** pour me brancher sur votre propre clé. Les commandes du royaume restent disponibles.`);
       this.history.pop();
     } finally {
       this.busy = false;
       this.abort = null;
       bus.emit("voice:state", this.voice.listening ? "listening" : "idle");
     }
+  }
+
+  /** Teste chaque moteur d'IA du serveur et explique ce qui ne va pas. */
+  async diagnostic(): Promise<string> {
+    const lines: string[] = [];
+    try {
+      const r = await fetch("/api/diag");
+      if (r.status === 401) return "Le serveur demande le mot de passe GRIOT : rechargez la page et saisissez-le.";
+      const d = await r.json();
+      if (d.results?.length)
+        for (const x of d.results) lines.push(x.ok ? `✅ ${x.engine} (${x.model}) répond en ${x.ms} ms.` : `❌ ${x.engine} (${x.model}) : ${x.error}`);
+      else if (d.advice) lines.push(`❌ ${d.advice}`);
+      else if (d.error) lines.push(`ℹ ${d.error}`);
+    } catch {
+      lines.push("❌ Le serveur ne répond pas (il se réveille peut-être : sur l'offre gratuite de Render, comptez jusqu'à une minute).");
+    }
+    const key = getOpenAIKey();
+    lines.push(key ? "🔑 Une clé OpenAI est enregistrée dans ce navigateur : elle sert de secours." : "🔑 Aucune clé OpenAI dans ce navigateur (bouton « Clé OpenAI » pour en ajouter une en secours).");
+    return "Diagnostic de mes moteurs d'IA :\n" + lines.map((l) => "- " + l).join("\n");
   }
 
   private offline(text: string): string {

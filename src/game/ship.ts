@@ -7,8 +7,8 @@ import { cyl, glowLine } from "../world/build";
 
 export type ShipView = "cockpit" | "chase" | "cinematic";
 
-/** Échelle du Royal Talon : vaisseau géant (~52 m de long, ~58 m d'envergure). */
-export const SHIP_SCALE = 4;
+/** Échelle du Royal Talon : vaisseau colossal (~78 m de long, ~87 m d'envergure) avec une cabine habitable. */
+export const SHIP_SCALE = 6;
 
 export interface ShipOptions {
   name: string;
@@ -201,7 +201,36 @@ export class Ship {
       label: () => `Monter à bord : ${this.name}`,
       action: () => this.board()
     });
+    if (!this.opts.small) this.buildRamp();
   }
+
+  // ---------------------------------------------------------------- rampe arrière → cabine habitable
+  private buildRamp() {
+    const ramp = new THREE.Group();
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.08, 2.6), new THREE.MeshStandardMaterial({ color: 0x2a2e38, metalness: 0.85, roughness: 0.35 }));
+    plate.position.set(0, 0, 1.3);
+    ramp.add(plate);
+    for (const sx of [-1, 1]) {
+      const edge = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 2.6), this.lightMat);
+      edge.position.set(sx * 1.08, 0.05, 1.3);
+      ramp.add(edge);
+    }
+    ramp.position.set(0, -0.15, 6.2);
+    ramp.rotation.x = 0.38;
+    const door = new THREE.Mesh(new THREE.PlaneGeometry(2, 1.2), new THREE.MeshStandardMaterial({ color: 0, emissive: 0xffd2a0, emissiveIntensity: 1.4, side: THREE.DoubleSide }));
+    door.position.set(0, 0.45, 6.15);
+    this.model.add(ramp, door);
+    this.ramp = ramp;
+    G.interact.add({
+      id: "ship-cabin",
+      pos: () => this.root.position.clone().add(new THREE.Vector3(0, -this.GEAR + 1, 8.6 * this.S).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw)),
+      radius: 10,
+      enabled: () => G.mode === "foot" && this.landed && !!G.cabin && !G.cabin.inside,
+      label: () => "Entrer dans la cabine du Royal Talon (salon, chambre, télé)",
+      action: () => G.cabin.enter()
+    });
+  }
+  ramp: THREE.Object3D | null = null;
 
   // ---------------------------------------------------------------- plateforme royale
   padLights = false;
@@ -210,8 +239,8 @@ export class Ship {
     const g = new THREE.Group();
     G.scene.add(g);
     const c = PAD;
-    cyl(g, 46, 0.35, mat.darkFloor, c.x, -0.2, c.z, { seg: 72 });
-    for (const [r, w] of [[44, 0.4], [30, 0.25], [14, 0.2]] as [number, number][]) {
+    cyl(g, 62, 0.35, mat.darkFloor, c.x, -0.2, c.z, { seg: 72 });
+    for (const [r, w] of [[60, 0.5], [41, 0.3], [19, 0.25]] as [number, number][]) {
       const ring = new THREE.Mesh(new THREE.RingGeometry(r - w, r, 96), this.padGlow);
       ring.rotation.x = -Math.PI / 2;
       ring.position.set(c.x, 0.17, c.z);
@@ -220,12 +249,12 @@ export class Ship {
     for (let k = 0; k < 12; k++) {
       const a = (k / 12) * Math.PI * 2;
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 3, 10), mat.black);
-      post.position.set(c.x + Math.cos(a) * 46, 1.5, c.z + Math.sin(a) * 46);
+      post.position.set(c.x + Math.cos(a) * 62, 1.5, c.z + Math.sin(a) * 62);
       const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 8), this.padGlow);
       lamp.position.set(post.position.x, 3.2, post.position.z);
       g.add(post, lamp);
     }
-    for (let k = -3; k <= 3; k++) glowLine(g, c.x - 1, 0.18, c.z - 46 + 3 + (k + 3) * 6, c.x + 1, 0.19, c.z - 46 + 6 + (k + 3) * 6, mat.glowGold, 0.01);
+    for (let k = -4; k <= 4; k++) glowLine(g, c.x - 1, 0.18, c.z - 62 + 4 + (k + 4) * 7, c.x + 1, 0.19, c.z - 62 + 8 + (k + 4) * 7, mat.glowGold, 0.01);
 
   }
 
@@ -445,7 +474,7 @@ export class Ship {
           G.mode = "ship";
           this.view = "cockpit";
           this.camPos.copy(G.camera.position);
-          bus.emit("toast", { text: "Aux commandes. R : moteurs · Espace : monter · W/this.S : poussée · V : vue · F : sortir" });
+          bus.emit("toast", { text: "Aux commandes. R : moteurs · Espace : monter · W/S : poussée · V : vue · I : cabine · F : sortir" });
           bus.emit("mode");
           resolve();
         }
@@ -534,6 +563,7 @@ export class Ship {
     // animations visuelles
     this.gearT = damp(this.gearT, this.landed || this.root.position.y - G.physics.ground(this.root.position.x, this.root.position.y - this.GEAR, this.root.position.z, 0.5).y < 12 * this.S ? 1 : 0, 3, dt);
     this.gear.forEach((g) => (g.scale.y = Math.max(0.05, this.gearT)));
+    if (this.ramp) this.ramp.rotation.x = damp(this.ramp.rotation.x, this.landed && G.mode !== "ship" ? 0.38 : -0.05, 3, dt);
     this.canopyT = damp(this.canopyT, this.canopyTarget, 4, dt);
     this.canopy.position.y = 1.55 + this.canopyT * 0.7;
     this.energyTex.offset.y = (t * 0.6) % 1;
@@ -566,6 +596,7 @@ export class Ship {
     if (inp.hit("KeyV")) this.cycleView();
     if (inp.hit("KeyF")) return this.exit();
     if (inp.hit("KeyH")) this.land();
+    if (inp.hit("KeyI") && !this.opts.small && G.cabin) return void G.cabin.enter();
 
     const look = inp.consumeMouse();
     const thrIn = inp.axis(["KeyS"], ["KeyW"]) + (inp.down("TouchThrottleUp") ? 1 : 0) - (inp.down("TouchThrottleDown") ? 1 : 0);

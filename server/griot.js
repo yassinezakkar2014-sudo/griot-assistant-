@@ -6,7 +6,7 @@ import crypto from "node:crypto";
 
 export const GAME_ACTIONS = [
   "aisam_on", "aisam_off", "open_door", "close_door", "go_to_floor", "teleport", "fly_to", "prepare_ship", "board_ship", "start_engines",
-  "toggle_ship_lights", "toggle_stealth", "toggle_supersonic", "antiair", "ride", "board_car", "takeoff", "land", "exit_vehicle", "equip_armor", "remove_armor", "armor_color",
+  "toggle_ship_lights", "toggle_stealth", "toggle_supersonic", "antiair", "cabin", "ride", "board_car", "takeoff", "land", "exit_vehicle", "equip_armor", "remove_armor", "armor_color",
   "armor_ability", "toggle_mask", "set_time", "show_map", "set_view", "mission_report", "start_mission", "status_report"
 ];
 
@@ -23,8 +23,8 @@ Tu es l'intelligence centrale d'un royaume technologique : conseiller royal, cop
 Personnalité : intelligent, naturel, charismatique, professionnel, fidèle ; de l'humour léger quand le contexte s'y prête.
 Tu réponds dans la langue de l'utilisateur. Tes réponses vocales doivent être fluides et pas trop longues ; pour les tâches de fond (rédaction, code, analyse), sois complet et structuré en Markdown.
 Le monde 3D est réel pour toi : quand l'utilisateur demande d'agir dans le royaume (ouvrir une porte, préparer ou faire décoller le vaisseau, activer l'armure, aller à un étage, explorer une zone, changer l'heure…), appelle l'outil game_action — n'invente pas que c'est fait sans l'appeler.
-Lieux du royaume : palais (7 étages : 1 Grand Hall, 2 Salle du Trône, 3 Quartiers privés, 4 Centre de commandement, 5 Laboratoire, 6 Armurerie, 7 Hangar royal), jardins royaux, ville futuriste, jungle, montagnes, océan, base secrète.
-Le vaisseau personnel s'appelle le « Royal Talon » ; l'armure s'appelle l'« Armure Royale » (nano-alliage, motifs lumineux).
+Un grand pont royal suspendu relie le royaume au pays de Zuria (target bridge pour teleport). Lieux du royaume : palais (7 étages : 1 Grand Hall, 2 Salle du Trône, 3 Quartiers privés, 4 Centre de commandement, 5 Laboratoire, 6 Armurerie, 7 Hangar royal), jardins royaux, ville futuriste, jungle, montagnes, océan, base secrète.
+Le vaisseau personnel s'appelle le « Royal Talon » : un vaisseau colossal avec une cabine habitable (salon, télé, bar-cuisine, chambre) — action cabin avec target enter|exit|tv|sleep ; l'armure s'appelle l'« Armure Royale » (nano-alliage, motifs lumineux).
 Le jeu 3D s'appelle le module AISAM : il s'affiche dans l'interface quand on dit « active AISAM » (action aisam_on).
 Ne prétends jamais être un personnage officiel d'une franchise existante.`;
 
@@ -187,7 +187,7 @@ async function runTool(name, args, ctx) {
 }
 
 // Conversation en streaming avec boucle d'outils.
-export async function chat(client, { messages, mode, lang, game, model }, emit) {
+export async function chat(client, { messages, mode, lang, game, model, maxTokens = 2000 }, emit) {
   const convo = [{ role: "system", content: systemPrompt({ mode, lang, game }) }, ...messages];
   const ctx = { emit, lang };
   for (let step = 0; step < 5; step++) {
@@ -196,7 +196,7 @@ export async function chat(client, { messages, mode, lang, game, model }, emit) 
       messages: convo,
       tools: TOOLS,
       stream: true,
-      max_tokens: 2000,
+      max_tokens: maxTokens,
       temperature: mode === "creative" ? 0.95 : 0.6
     });
     let content = "";

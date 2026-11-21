@@ -190,6 +190,7 @@ function buildTown(root: THREE.Group, cx: number, cz: number) {
   let seed = 7;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const ground = (x: number, z: number) => G.physics.terrain(x, z);
+  const road = (G.world as any).highway as { onRoad: (x: number, z: number) => boolean } | undefined;
   const colors = [0xc58457, 0xb8784c, 0xd29a68, 0xa96e45];
   const houses: { x: number; z: number; w: number; d: number; h: number; y: number; c: number; tower: boolean }[] = [];
   const market = new THREE.Vector3(cx, 0, cz - 115);
@@ -207,6 +208,7 @@ function buildTown(root: THREE.Group, cx: number, cz: number) {
       d = 6 + rnd() * 8;
     const rad = Math.hypot(w, d) / 2;
     if (blocked(x, z, rad)) continue;
+    if (road && [[0, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]].some(([a, b]) => road.onRoad(x + a * (w / 2 + 4), z + b * (d / 2 + 4)))) continue; // route du pont
     if (houses.some((h) => Math.abs(h.x - x) < (h.w + w) / 2 + 3 && Math.abs(h.z - z) < (h.d + d) / 2 + 3)) continue;
     const y = ground(x, z);
     if (y < 0) continue;
