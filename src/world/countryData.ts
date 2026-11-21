@@ -46,7 +46,7 @@ export const COUNTRIES: CountryDef[] = [
   { id: "orakis", name: "Orakis", x: 27000, z: -1500, r: 2800, style: "pyramid", base: 7, hills: 50, ground: [0.9, 0.76, 0.48], desc: "vallée des mille pyramides" },
   { id: "lumina", name: "Lumina", x: 10000, z: 25500, r: 3000, style: "crystal", base: 6, hills: 70, ground: [0.66, 0.64, 0.8], desc: "capitale de lumière et de cristal" },
   { id: "rubis", name: "Rubis", x: -20500, z: -21000, r: 3100, style: "redhills", base: 8, hills: 180, ground: [0.6, 0.22, 0.14], desc: "canyons rouges et citadelles" },
-  { id: "mariem-sandra", name: "Mariem & Sandra", x: 7000, z: -15500, r: 2400, style: "royal", base: 8, hills: 70, ground: [0.34, 0.6, 0.3], desc: "la grande cité de Mariem Attia et Sandra El Ayadi", clear: 240 },
+  { id: "princesses", name: "Cité des Princesses", x: 7000, z: -15500, r: 2400, style: "royal", base: 8, hills: 70, ground: [0.34, 0.6, 0.3], desc: "la grande cité royale et le Palais des Princesses", clear: 240 },
   { id: "zambara", name: "Zambara", x: 13000, z: -25500, r: 3000, style: "savanna", base: 6, hills: 55, ground: [0.66, 0.54, 0.26], desc: "grandes plaines et villages royaux" }
 ];
 
