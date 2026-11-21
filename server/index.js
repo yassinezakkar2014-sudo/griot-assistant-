@@ -34,22 +34,36 @@ const port = Number(process.env.PORT) || 3000;
 const hasKey = () => Boolean(process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes("colle_ta_cle"));
 const client = () => new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Moteur de conversation : OpenAI direct (par défaut) ou OpenJarvis (`jarvis serve`),
-// qui expose une API compatible OpenAI. La voix (TTS) et Whisper restent sur OpenAI.
+// Moteur de conversation, par ordre de priorité :
+//   1. OpenJarvis (`GRIOT_AI_BACKEND=openjarvis`, serveur `jarvis serve`)
+//   2. Groq (`GROQ_API_KEY`), API compatible OpenAI
+//   3. OpenAI (`OPENAI_API_KEY`)
+// La voix neuronale (TTS) reste sur OpenAI ; Whisper utilise OpenAI, sinon Groq.
+const realKey = (k) => Boolean(k && !k.includes("colle_ta_cle"));
+const hasGroq = () => realKey(process.env.GROQ_API_KEY);
+const groq = () => new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" });
 const useJarvis = () => (process.env.GRIOT_AI_BACKEND || "").toLowerCase() === "openjarvis";
-const hasChat = () => useJarvis() || hasKey();
+const backend = () => (useJarvis() ? "openjarvis" : hasGroq() ? "groq" : hasKey() ? "openai" : "none");
+const hasChat = () => backend() !== "none";
+const hasSTT = () => hasKey() || hasGroq();
 const chatClient = () =>
   useJarvis()
     ? new OpenAI({
         baseURL: process.env.OPENJARVIS_URL || "http://127.0.0.1:8000/v1",
         apiKey: process.env.OPENJARVIS_API_KEY || "openjarvis",
       })
-    : client();
-const chatModel = () =>
-  useJarvis() ? process.env.OPENJARVIS_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini" : process.env.OPENAI_MODEL || "gpt-4o-mini";
+    : hasGroq()
+      ? groq()
+      : client();
+const chatModel = () => {
+  const b = backend();
+  if (b === "openjarvis") return process.env.OPENJARVIS_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini";
+  if (b === "groq") return process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+  return process.env.OPENAI_MODEL || "gpt-4o-mini";
+};
 
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, ai: hasChat(), backend: useJarvis() ? "openjarvis" : "openai", tts: hasKey(), search: true, modes: Object.keys(MODES) });
+  res.json({ ok: true, ai: hasChat(), backend: backend(), tts: hasKey(), stt: hasSTT(), search: true, modes: Object.keys(MODES) });
 });
 
 // ---- Conversation (Server-Sent Events) ----
@@ -103,12 +117,12 @@ app.post("/api/tts", async (req, res) => {
 
 // ---- Reconnaissance vocale serveur (navigateurs sans Web Speech) ----
 app.post("/api/stt", upload.single("audio"), async (req, res) => {
-  if (!hasKey()) return res.status(503).json({ error: "STT serveur indisponible" });
+  if (!hasSTT()) return res.status(503).json({ error: "STT serveur indisponible" });
   if (!req.file) return res.status(400).json({ error: "audio manquant" });
   try {
-    const out = await client().audio.transcriptions.create({
+    const out = await (hasKey() ? client() : groq()).audio.transcriptions.create({
       file: await toFile(req.file.buffer, "voice.webm", { type: req.file.mimetype || "audio/webm" }),
-      model: "whisper-1",
+      model: hasKey() ? "whisper-1" : "whisper-large-v3-turbo",
       language: (req.body.lang || "").slice(0, 2) || undefined
     });
     res.json({ text: out.text });
@@ -194,5 +208,6 @@ if (DEV) {
 app.listen(port, () => {
   console.log(`GRIOT 2.0 — THINK. SPEAK. RULE. → http://localhost:${port}${DEV ? " (dev)" : ""}`);
   if (useJarvis()) console.log(`🧠 Moteur IA : OpenJarvis → ${process.env.OPENJARVIS_URL || "http://127.0.0.1:8000/v1"}`);
+  else if (hasGroq()) console.log(`🧠 Moteur IA : Groq (${chatModel()})`);
   else if (!hasKey()) console.log("ℹ Pas de clé OPENAI_API_KEY : le monde 3D et les commandes locales fonctionnent, l'IA conversationnelle est désactivée.");
 });

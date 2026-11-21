@@ -57,8 +57,8 @@ Inspection orbitale, activation, transformation animée (le nano-alliage se mat�
 
 1. Créez un compte sur [render.com](https://render.com) (connexion avec GitHub).
 2. **New → Blueprint**, choisissez le dépôt `griot-assistant-` : Render lit `render.yaml`.
-3. Renseignez les deux secrets demandés :
-   - `OPENAI_API_KEY` : votre clé OpenAI ;
+3. Renseignez les secrets demandés :
+   - `GROQ_API_KEY` (gratuit, [console.groq.com/keys](https://console.groq.com/keys)) **ou** `OPENAI_API_KEY` : une seule suffit, laissez l'autre vide. Avec Groq, la conversation et Whisper fonctionnent ; la voix neuronale et l'analyse d'images demandent OpenAI (sinon voix du navigateur) ;
    - `GRIOT_PASSWORD` : le mot de passe d'accès au site (obligatoire en pratique, sinon n'importe qui consomme votre clé).
 4. **Apply**. Après quelques minutes, ouvrez l'adresse `https://griot-….onrender.com` dans Safari ; identifiant : ce que vous voulez, mot de passe : `GRIOT_PASSWORD`.
 
