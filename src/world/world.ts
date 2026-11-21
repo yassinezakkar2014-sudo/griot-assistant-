@@ -619,6 +619,7 @@ export class World {
   zoneName(p: THREE.Vector3): string {
     const c = ZONES.city;
     if (G.cabin?.inside && p.distanceTo(G.player.position) < 1) return "Royal Talon — Cabine";
+    if (G.space?.active && p.y > 20000) return G.space.zone(p);
     const kc = countryAt(p.x, p.z, 1.05);
     if (kc) return Math.hypot(p.x - kc.x, p.z - kc.z) < kc.r * 0.45 ? `${kc.name} — capitale` : `Pays de ${kc.name}`;
     if (Math.max(Math.abs(p.x), Math.abs(p.z)) > WORLD / 2) return "Grand océan";

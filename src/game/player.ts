@@ -14,6 +14,12 @@ export class Player {
   onGround = true;
   view: "first" | "third" = "third";
   camDist = 4.2;
+  /** gravité (Lune : 0,17) */
+  gravityMul = 1;
+  /** hauteur supplémentaire de la caméra (robot géant) */
+  camLift = 0;
+  /** corps masqué (pilotage du robot géant, invisibilité) */
+  hideBody = false;
   radius = 0.38;
   height = 1.8;
   sitting: { pos: THREE.Vector3; yaw: number } | null = null;
@@ -105,7 +111,7 @@ export class Player {
       this.velocity.y = 8 * this.jumpMul;
       this.onGround = false;
     }
-    this.velocity.y -= 24 * dt;
+    this.velocity.y -= 24 * dt * this.gravityMul;
     if (this.velocity.y < -60) this.velocity.y = -60;
 
     // plates-formes mobiles (ascenseur)
@@ -143,9 +149,9 @@ export class Player {
     }
     // filet de sécurité
     if (p.y < -80) this.teleport(G.palace.spots.gardens.pos, Math.PI);
-    if (Math.abs(p.x) > 15800 || Math.abs(p.z) > 15800) {
-      p.x = clamp(p.x, -15800, 15800);
-      p.z = clamp(p.z, -15800, 15800);
+    if (Math.abs(p.x) > 31500 || Math.abs(p.z) > 31500) {
+      p.x = clamp(p.x, -31500, 31500);
+      p.z = clamp(p.z, -31500, 31500);
     }
 
     this.moveSpeed = Math.hypot(this.velocity.x, this.velocity.z);
@@ -176,7 +182,7 @@ export class Player {
 
   private updateCamera(dt: number) {
     const cam = G.camera;
-    const head = new THREE.Vector3(this.position.x, this.position.y + (this.sitting ? 1.15 : 1.62), this.position.z);
+    const head = new THREE.Vector3(this.position.x, this.position.y + (this.sitting ? 1.15 : 1.62) + this.camLift, this.position.z);
     this.camPos.lerp(head, 1 - Math.exp(-dt * 25));
     const dir = new THREE.Vector3(-Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), -Math.cos(this.yaw) * Math.cos(this.pitch));
     if (this.view === "first") {
@@ -184,7 +190,7 @@ export class Player {
       cam.position.copy(this.camPos);
       cam.lookAt(this.camPos.clone().add(dir));
     } else {
-      this.body.root.visible = true;
+      this.body.root.visible = !this.hideBody;
       const pivot = this.camPos.clone().add(new THREE.Vector3(0, 0.15, 0));
       let dist = this.camDist;
       const probe = new THREE.Vector3();

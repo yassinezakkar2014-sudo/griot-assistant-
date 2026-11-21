@@ -3,7 +3,8 @@ import * as THREE from "three";
 import { G, bus, clamp } from "../core";
 import { FLOORS } from "../world/palace";
 import { fmtHour } from "../world/floors";
-import { VARIANTS, type Pattern } from "../game/armor";
+import { VARIANTS, armorUnlocked, type Pattern } from "../game/armor";
+import { THEMES, ITEMS } from "../game/deco";
 import { runAction, PLACES } from "../ai/actions";
 import { Griot, MODE_LABELS, type GriotMode, md, HELP } from "../ai/griot";
 import { LANGS } from "../ai/voice";
@@ -58,6 +59,7 @@ export class UI {
     requestAnimationFrame(tick);
     $("homeTalk").onclick = () => this.talk();
     $("keyBtn").onclick = () => this.keyPanel();
+    $("visBtn").onclick = () => this.vision();
     if ((window as any).claude) document.documentElement.classList.add("in-claude");
     document.querySelectorAll<HTMLElement>("[data-say]").forEach((b) => (b.onclick = () => this.griot.send(b.dataset.say!)));
     $("vActivate").onclick = () => this.griot.send("active AISAM");
@@ -129,6 +131,7 @@ export class UI {
     bus.on("ui:command", () => this.command());
     bus.on("ui:elevator", () => this.elevator());
     bus.on("ui:map", () => this.map());
+    bus.on("ui:deco", () => this.decoPanel());
     bus.on("ui:multi", () => this.multi());
     bus.on("mp:chat", (d: { name: string; text: string }) => {
       this.toast(`💬 <b>${esc(d.name)}</b> : ${esc(d.text)}`, "", 7000);
@@ -441,8 +444,11 @@ export class UI {
     return $("modalCard");
   }
 
+  private onModalClose: (() => void) | null = null;
   closeModal() {
     if (!this.modalOpen) return;
+    this.onModalClose?.();
+    this.onModalClose = null;
     this.modalOpen = null;
     $("modal").hidden = true;
     G.uiFocus = this.panelOpen && document.activeElement === $("input");
@@ -735,6 +741,136 @@ export class UI {
     };
   }
 
+  // ---------------------------------------------------------------- GRIOT voit (caméra)
+  async vision() {
+    const card = this.openModal(
+      "vision",
+      `<h2 class="mt">👁️ GRIOT voit</h2>
+      <p class="hint">Montrez quelque chose à la caméra : GRIOT regarde, comprend et vous répond à voix haute.</p>
+      <div class="vision-wrap"><video id="visVideo" playsinline autoplay muted></video></div>
+      <div class="row wrap">
+        <button class="btn primary" data-v="what">👁️ Qu'est-ce que c'est ?</button>
+        <button class="btn" data-v="read">📖 Lis le texte</button>
+        <button class="btn" data-v="translate">🌍 Traduis</button>
+        <button class="btn" data-v="solve">🧮 Résous l'exercice</button>
+        <button class="btn" data-v="describe">🎨 Décris la scène</button>
+        <button class="btn ghost" data-v="flip">🔄 Avant / arrière</button>
+        <button class="btn ghost" data-v="live">⏱ Mode continu</button>
+      </div>
+      <div class="form"><label>Votre question <input id="visQ" autocomplete="off" placeholder="Ex. : c'est quelle plante ? combien de calories ? que dit ce panneau ?"></label></div>
+      <div class="row wrap"><button class="btn" data-v="ask">Demander à GRIOT</button></div>
+      <div id="visAns" class="md vis-ans">La réponse de GRIOT s'affichera ici.</div>`,
+      "wide"
+    );
+    const video = card.querySelector("#visVideo") as HTMLVideoElement;
+    const ans = card.querySelector("#visAns") as HTMLElement;
+    let facing: "environment" | "user" = "environment";
+    let stream: MediaStream | null = null;
+    let live: ReturnType<typeof setInterval> | null = null;
+    const start = async () => {
+      stream?.getTracks().forEach((t) => t.stop());
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 } }, audio: false });
+        video.srcObject = stream;
+        await video.play().catch(() => {});
+      } catch {
+        ans.textContent = "Caméra indisponible ou refusée : autorisez la caméra pour ce site (Réglages de Safari → Caméra).";
+      }
+    };
+    const snap = () => {
+      const w = Math.min(1024, video.videoWidth || 640);
+      const h = Math.round(w * ((video.videoHeight || 480) / (video.videoWidth || 640)));
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      c.getContext("2d")!.drawImage(video, 0, 0, w, h);
+      return c.toDataURL("image/jpeg", 0.82);
+    };
+    const QUESTIONS: Record<string, string> = {
+      what: "Qu'est-ce que c'est ? Identifie précisément ce que je te montre et explique en quelques phrases.",
+      read: "Lis tout le texte visible sur cette image, mot pour mot.",
+      translate: "Lis le texte de cette image et traduis-le en français (donne aussi la langue d'origine).",
+      solve: "Résous l'exercice ou le problème visible sur cette image, étape par étape, avec la réponse finale.",
+      describe: "Décris cette scène de façon vivante : ce que tu vois, les couleurs, l'ambiance, les détails intéressants.",
+      live: "En une phrase courte : que vois-tu maintenant ?"
+    };
+    const ask = (q: string, spoken = true) => {
+      if (!video.videoWidth) return this.toast("La caméra démarre…", "warn");
+      if ((this.griot as any).busy) return;
+      this.griot.attachImage(snap(), "vision.jpg");
+      ans.innerHTML = "<em>GRIOT regarde…</em>";
+      this.griot.send(q, { spoken });
+    };
+    const off = bus.on("griot:answer", (text: string) => {
+      ans.innerHTML = md(text);
+    });
+    card.onclick = (e) => {
+      const v = (e.target as HTMLElement).closest<HTMLElement>("[data-v]")?.dataset.v;
+      if (!v) return;
+      if (v === "flip") {
+        facing = facing === "environment" ? "user" : "environment";
+        start();
+      } else if (v === "live") {
+        if (live) {
+          clearInterval(live);
+          live = null;
+          this.toast("Mode continu arrêté.");
+        } else {
+          live = setInterval(() => ask(QUESTIONS.live), 9000);
+          ask(QUESTIONS.live);
+          this.toast("⏱ Mode continu : GRIOT décrit ce qu'il voit toutes les 9 secondes.");
+        }
+      } else if (v === "ask") {
+        const q = (card.querySelector("#visQ") as HTMLInputElement).value.trim();
+        ask(q || QUESTIONS.what);
+      } else ask(QUESTIONS[v]);
+    };
+    (card.querySelector("#visQ") as HTMLInputElement).onkeydown = (e) => {
+      if (e.key === "Enter") ask((e.target as HTMLInputElement).value.trim() || QUESTIONS.what);
+    };
+    this.onModalClose = () => {
+      stream?.getTracks().forEach((t) => t.stop());
+      if (live) clearInterval(live);
+      off();
+    };
+    await start();
+  }
+
+  // ---------------------------------------------------------------- atelier royal (décoration)
+  decoPanel() {
+    const d = G.deco;
+    const card = this.openModal(
+      "deco",
+      `<h2 class="mt">🎨 Atelier royal</h2>
+      <p class="hint">Personnalisez votre palais. Les objets se posent juste devant vous, où que vous soyez. Tout est sauvegardé et partagé avec vos amis en multijoueur.</p>
+      <h3>Thème du palais</h3>
+      <div class="row wrap">${Object.entries(THEMES)
+        .map(([id, t]) => `<button class="pill ${d.theme === id ? "on" : ""}" data-th="${id}"><span class="dot" style="background:#${t.marble.toString(16).padStart(6, "0")}"></span> ${t.name}</button>`)
+        .join("")}</div>
+      <h3>Poser un objet</h3>
+      <div class="row wrap">${Object.entries(ITEMS)
+        .map(([id, it]) => `<button class="pill" data-it="${id}">${it.icon} ${it.name}</button>`)
+        .join("")}</div>
+      <h3>Objet le plus proche</h3>
+      <div class="row wrap"><button class="btn" data-d="rotate">↻ Tourner</button><button class="btn" data-d="remove">🗑 Enlever</button><button class="btn ghost" data-d="clear">Tout effacer</button></div>
+      <p class="hint">${d.items.length} objet${d.items.length > 1 ? "s" : ""} posé${d.items.length > 1 ? "s" : ""}. À la voix : « pose une statue », « palais en or », « enlève l'objet ».</p>`,
+      "side"
+    );
+    card.onclick = (e) => {
+      const el = (e.target as HTMLElement).closest<HTMLElement>("[data-th],[data-it],[data-d]");
+      if (!el) return;
+      if (el.dataset.th) d.setTheme(el.dataset.th);
+      if (el.dataset.it) {
+        if (G.mode !== "foot") return this.toast("Descendez du véhicule pour décorer.", "warn");
+        d.place(el.dataset.it as any);
+      }
+      if (el.dataset.d === "rotate" && !d.rotateNearest()) this.toast("Aucun objet décoratif à proximité.", "warn");
+      if (el.dataset.d === "remove" && !d.removeNearest()) this.toast("Aucun objet décoratif à proximité.", "warn");
+      if (el.dataset.d === "clear" && confirm("Retirer toute la décoration ?")) d.clear();
+      this.decoPanel();
+    };
+  }
+
   // ---------------------------------------------------------------- multijoueur
   multi() {
     const net = G.net;
@@ -911,7 +1047,7 @@ export class UI {
       <label>Intensité <input type="range" min="0.3" max="3" step="0.1" value="${st.intensity}" data-in="intensity"></label>
       <h3>Variantes</h3>
       <div class="row wrap">${Object.entries(VARIANTS)
-        .map(([id, v]) => `<button class="pill ${G.missions.state.armors.includes(id) ? "" : "locked"}" data-variant="${id}" title="${v.how}">${G.missions.state.armors.includes(id) ? "" : "🔒 "}${v.name}</button>`)
+        .map(([id, v]) => `<button class="pill ${armorUnlocked(id) ? "" : "locked"}" data-variant="${id}" title="${v.power ?? v.how}">${armorUnlocked(id) ? (v.style.special ? "⭐ " : "") : "🔒 "}${v.name}</button>`)
         .join("")}</div>
       <h3>Capacités (fictives)</h3>
       <ul class="caps"><li><b>1 · Impulsion cinétique</b> — libère l'énergie absorbée en onde de choc.</li><li><b>2 · Bouclier hexagonal</b> — dôme protecteur (requiert le Nano-tissage).</li><li><b>3 · Surcharge</b> — vitesse ×1,7 et saut ×1,9.</li><li><b>4 · Vision tactique</b> — vision nocturne et repérage.</li><li><b>X · Masque rétractable</b></li></ul>`,
@@ -934,7 +1070,7 @@ export class UI {
       if (el.dataset.effect) apply({ effect: el.dataset.effect as any });
       if (el.dataset.variant) {
         const id = el.dataset.variant;
-        if (!G.missions.state.armors.includes(id)) return this.toast(`🔒 ${VARIANTS[id].name} : ${VARIANTS[id].how}`, "warn");
+        if (!armorUnlocked(id)) return this.toast(`🔒 ${VARIANTS[id].name} : ${VARIANTS[id].how}`, "warn");
         apply({ ...VARIANTS[id].style });
       }
     };

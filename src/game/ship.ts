@@ -4,6 +4,7 @@ import { G, bus, clamp, damp, lerp } from "../core";
 import { mat, HoloScreen } from "../world/materials";
 import { buildShipModel, buildSmallShipModel, cloakMaterial, cloakTime } from "./shipmodel";
 import { cyl, glowLine } from "../world/build";
+import { SPACE_Y } from "./space";
 
 export type ShipView = "cockpit" | "chase" | "cinematic";
 
@@ -474,7 +475,7 @@ export class Ship {
           G.mode = "ship";
           this.view = "cockpit";
           this.camPos.copy(G.camera.position);
-          bus.emit("toast", { text: "Aux commandes. R : moteurs · Espace : monter · W/S : poussée · V : vue · I : cabine · F : sortir" });
+          bus.emit("toast", { text: "Aux commandes. R : moteurs · Espace : monter · W/S : poussée · V : vue · I : cabine · O : espace · F : sortir" });
           bus.emit("mode");
           resolve();
         }
@@ -597,6 +598,10 @@ export class Ship {
     if (inp.hit("KeyF")) return this.exit();
     if (inp.hit("KeyH")) this.land();
     if (inp.hit("KeyI") && !this.opts.small && G.cabin) return void G.cabin.enter();
+    if (inp.hit("KeyO") && !this.opts.small) {
+      if (G.space.active) G.space.exit();
+      else G.space.enter();
+    }
 
     const look = inp.consumeMouse();
     const thrIn = inp.axis(["KeyS"], ["KeyW"]) + (inp.down("TouchThrottleUp") ? 1 : 0) - (inp.down("TouchThrottleDown") ? 1 : 0);
@@ -682,10 +687,10 @@ export class Ship {
       p.addScaledVector(vel, dt / steps);
       hit = this.collides();
     }
-    p.y = Math.min(p.y, 2600);
-    if (Math.abs(p.x) > 15500 || Math.abs(p.z) > 15500) {
-      p.x = clamp(p.x, -15500, 15500);
-      p.z = clamp(p.z, -15500, 15500);
+    p.y = Math.min(p.y, G.space?.active ? SPACE_Y + 8000 : 2600);
+    if (Math.abs(p.x) > 31000 || Math.abs(p.z) > 31000) {
+      p.x = clamp(p.x, -31000, 31000);
+      p.z = clamp(p.z, -31000, 31000);
       this.yaw += Math.PI * dt;
     }
     this.bumpCooldown -= dt;
@@ -803,6 +808,11 @@ export class Ship {
       const yawQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.pitch * 0.5, this.yaw, 0, "YXZ"));
       const back = new THREE.Vector3(0, 4.5 * this.S, 19 * this.S + this.speed * 0.08).applyQuaternion(yawQ);
       const want = this.root.position.clone().add(back);
+      // téléportation (espace, rentrée) : la caméra saute directement au bon endroit
+      if (this.camPos.distanceTo(want) > 2000) {
+        this.camPos.copy(want);
+        this.camLook.copy(this.root.position);
+      }
       this.camPos.lerp(want, 1 - Math.exp(-dt * 6));
       const g = G.physics.terrain(this.camPos.x, this.camPos.z);
       if (this.camPos.y < g + 1.5) this.camPos.y = g + 1.5;

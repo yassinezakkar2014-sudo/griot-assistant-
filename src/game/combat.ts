@@ -17,6 +17,7 @@ interface Bolt {
   m: THREE.Mesh;
   v: THREE.Vector3;
   life: number;
+  r: number;
 }
 interface Boom {
   flash: THREE.Mesh;
@@ -50,7 +51,7 @@ export class Combat {
       this.addTarget(new THREE.Vector3(RANGE.x + Math.cos(a) * 30, y + 3 + (k % 3) * 2.5, RANGE.z + Math.sin(a) * 30));
     }
     G.world.markers.push({ id: "range", name: "Champ d'entraînement", pos: RANGE.clone(), icon: "◎", visible: () => true });
-    bus.on("armor:pulse", (p: THREE.Vector3) => this.damageArea(p, 32, true));
+    bus.on("armor:pulse", (d: { p: THREE.Vector3; r: number }) => this.damageArea(d.p, d.r, true));
     G.palace.updaters.push((dt, t) => this.update(dt, t));
   }
 
@@ -83,11 +84,11 @@ export class Combat {
   }
 
   /** Rayon d'énergie tiré depuis la main de l'armure, dans la direction visée. */
-  fire() {
+  fire(o: { from?: THREE.Vector3; scale?: number; radius?: number; color?: string } = {}) {
     const dir = new THREE.Vector3();
     G.camera.getWorldDirection(dir);
     const right = new THREE.Vector3(-dir.z, 0, dir.x).normalize();
-    const from = G.player.position.clone().add(new THREE.Vector3(0, 1.45, 0)).addScaledVector(right, 0.45).addScaledVector(dir, 0.8);
+    const from = o.from ?? G.player.position.clone().add(new THREE.Vector3(0, 1.45, 0)).addScaledVector(right, 0.45).addScaledVector(dir, 0.8);
     // visée assistée : la cible vivante la plus proche de l'axe
     let best: Target | null = null,
       bestDot = 0.985;
@@ -95,7 +96,7 @@ export class Combat {
       if (!t.alive) continue;
       const to = this.tmp.copy(t.g.position).sub(from);
       const d = to.length();
-      if (d > 260) continue;
+      if (d > (o.scale ? 420 : 260)) continue;
       const dot = to.normalize().dot(dir);
       if (dot > bestDot) {
         bestDot = dot;
@@ -103,14 +104,15 @@ export class Combat {
       }
     }
     if (best) dir.copy(best.g.position).sub(from).normalize();
-    const color = new THREE.Color(G.armor.style.glow);
+    const color = new THREE.Color(o.color ?? G.armor.style.glow);
     const m = new THREE.Mesh(this.boltGeo, new THREE.MeshBasicMaterial({ color, blending: THREE.AdditiveBlending, transparent: true }));
     const trail = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.02, 6, 8).rotateX(Math.PI / 2).translate(0, 0, 3), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false }));
     m.add(trail);
     m.position.copy(from);
     m.lookAt(from.clone().sub(dir));
+    m.scale.setScalar(o.scale ?? 1);
     G.scene.add(m);
-    this.bolts.push({ m, v: dir.multiplyScalar(170), life: 2.2 });
+    this.bolts.push({ m, v: dir.multiplyScalar(170), life: 2.6, r: o.radius ?? 7 });
     G.audio.tone(980, 0.18, "sawtooth", 0.08, 220);
     bus.emit("shake", 0.12);
   }
@@ -179,10 +181,10 @@ export class Combat {
       for (let i = 0; i < n && b.life > 0; i++) {
         b.m.position.addScaledVector(step, 1 / n);
         const p = b.m.position;
-        const tg = this.targets.find((x) => x.alive && x.g.position.distanceTo(p) < 2.2);
+        const tg = this.targets.find((x) => x.alive && x.g.position.distanceTo(p) < 2.2 + b.r * 0.15);
         if (tg || G.physics.pointInSolid(p) || p.y < G.physics.terrain(p.x, p.z) + 0.1) {
-          this.explode(p.clone());
-          this.damageArea(p, 7);
+          this.explode(p.clone(), b.r > 10);
+          this.damageArea(p, b.r);
           b.life = 0;
         }
       }

@@ -11,16 +11,26 @@ export interface ArmorStyle {
   pattern: Pattern;
   intensity: number;
   effect: "steady" | "pulse" | "flow";
+  /** pouvoir spécial : or impérial (attaques géantes), spectre (invisibilité), titan (robot géant) */
+  special?: "imperial" | "spectre" | "titan";
 }
 
-export const VARIANTS: Record<string, { name: string; style: ArmorStyle; how: string }> = {
+export const VARIANTS: Record<string, { name: string; style: ArmorStyle; how: string; free?: boolean; power?: string }> = {
   royal: { name: "Armure Royale", style: { primary: "#0b0b12", glow: "#2a8cff", pattern: "lines", intensity: 1.6, effect: "pulse" }, how: "Armure de départ" },
   onyx: { name: "Armure Onyx", style: { primary: "#050507", glow: "#8a5cff", pattern: "hex", intensity: 1.8, effect: "flow" }, how: "Archives royales (niveau 4)" },
   aurora: { name: "Armure Aurora", style: { primary: "#c8ccd6", glow: "#00e5ff", pattern: "chevron", intensity: 1.5, effect: "pulse" }, how: "Coffre du laboratoire (niveau 5)" },
   solar: { name: "Armure Solaire", style: { primary: "#3a2a0a", glow: "#ffb347", pattern: "lines", intensity: 2, effect: "flow" }, how: "Parcours d'anneaux en Royal Talon" },
   tempest: { name: "Armure Tempête", style: { primary: "#1c2030", glow: "#e8f4ff", pattern: "hex", intensity: 1.7, effect: "steady" }, how: "Cache de la base secrète" },
-  ivory: { name: "Armure Ivoire", style: { primary: "#efeae0", glow: "#d8b25a", pattern: "chevron", intensity: 1.4, effect: "steady" }, how: "Explorer les 6 environnements" }
+  ivory: { name: "Armure Ivoire", style: { primary: "#efeae0", glow: "#d8b25a", pattern: "chevron", intensity: 1.4, effect: "steady" }, how: "Explorer les 6 environnements" },
+  imperial: { name: "Armure d'Or impériale", style: { primary: "#b8860b", glow: "#fff0a0", pattern: "chevron", intensity: 2.4, effect: "flow", special: "imperial" }, how: "Disponible", free: true, power: "Rayon et onde de choc géants, en or" },
+  spectre: { name: "Armure Spectre", style: { primary: "#1a2a3a", glow: "#9fe8ff", pattern: "hex", intensity: 1.2, effect: "pulse", special: "spectre" }, how: "Disponible", free: true, power: "Invisibilité (même pour les autres joueurs)" },
+  titan: { name: "Titan — robot géant", style: { primary: "#2a2e38", glow: "#ff7a2a", pattern: "lines", intensity: 2, effect: "steady", special: "titan" }, how: "Disponible", free: true, power: "Robot de 15 m : canon, frappe au sol, réacteurs" }
 };
+
+/** Armure disponible (débloquée par une mission, ou offerte d'office). */
+export function armorUnlocked(id: string): boolean {
+  return !!VARIANTS[id]?.free || G.missions.state.armors.includes(id);
+}
 
 const patterns: Record<Pattern, THREE.Texture> = {} as any;
 function pat(p: Pattern) {
@@ -171,9 +181,9 @@ export class ArmorSystem {
         id: `case-${id}`,
         pos: c.pos.clone().add(new THREE.Vector3(c.pos.x < 0 ? 1.8 : -1.8, 0.6, 0)),
         radius: 2.8,
-        label: () => (G.missions.state.armors.includes(id) ? `Appliquer le style « ${VARIANTS[id].name} »` : `${VARIANTS[id].name} — verrouillée (${VARIANTS[id].how})`),
+        label: () => (armorUnlocked(id) ? `Appliquer le style « ${VARIANTS[id].name} »` : `${VARIANTS[id].name} — verrouillée (${VARIANTS[id].how})`),
         action: () => {
-          if (!G.missions.state.armors.includes(id)) return bus.emit("toast", { text: `🔒 ${VARIANTS[id].name} : ${VARIANTS[id].how}.`, kind: "warn" });
+          if (!armorUnlocked(id)) return bus.emit("toast", { text: `🔒 ${VARIANTS[id].name} : ${VARIANTS[id].how}.`, kind: "warn" });
           this.setStyle({ ...VARIANTS[id].style });
           bus.emit("toast", { text: `Style « ${VARIANTS[id].name} » appliqué à l'Armure Royale.` });
         }
@@ -294,9 +304,15 @@ export class ArmorSystem {
       this.pulses.push({ mesh: m, t: 0 });
       G.audio.pulse();
       bus.emit("shake", 0.5);
-      bus.emit("armor:pulse", new THREE.Vector3(p.x, p.y + 1, p.z));
+      const sp = this.style.special;
+      if (sp === "titan" || sp === "imperial") m.scale.setScalar(2);
+      bus.emit("armor:pulse", { p: new THREE.Vector3(p.x, p.y + 1, p.z), r: sp === "titan" ? 65 : sp === "imperial" ? 55 : 32 });
+      if (sp === "titan") bus.emit("shake", 1.4);
     } else if (name === "blast") {
-      G.combat.fire();
+      const sp = this.style.special;
+      if (sp === "titan") G.combat.fire({ from: G.mecha.muzzle(), scale: 3.5, radius: 18, color: this.style.glow });
+      else if (sp === "imperial") G.combat.fire({ scale: 2, radius: 13, color: "#ffd24a" });
+      else G.combat.fire();
     } else if (name === "shield") {
       this.shieldT = 6;
       G.audio.tone(300, 0.8, "triangle", 0.1, 900);
@@ -309,6 +325,31 @@ export class ArmorSystem {
     } else return false;
     bus.emit("mission", { type: "ability", name });
     return true;
+  }
+
+  // ---------------------------------------------------------------- invisibilité (Spectre)
+  private ghost: THREE.Mesh | null = null;
+  private spectreOn = false;
+  private updateSpectre(on: boolean, t: number) {
+    if (on !== this.spectreOn) {
+      this.spectreOn = on;
+      G.player.hideBody = on;
+      if (on) bus.emit("toast", { text: "👻 Armure Spectre : vous êtes invisible (même pour les autres joueurs)." });
+      if (!this.ghost) {
+        this.ghost = new THREE.Mesh(
+          new THREE.CapsuleGeometry(0.38, 1.1, 6, 16),
+          new THREE.MeshPhysicalMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.08, roughness: 0, metalness: 0, iridescence: 1, depthWrite: false })
+        );
+        G.scene.add(this.ghost);
+      }
+    }
+    if (this.ghost) {
+      this.ghost.visible = on;
+      if (on) {
+        this.ghost.position.set(G.player.position.x, G.player.position.y + 0.95, G.player.position.z);
+        (this.ghost.material as THREE.MeshPhysicalMaterial).opacity = 0.06 + Math.sin(t * 6) * 0.03;
+      }
+    }
   }
 
   // ---------------------------------------------------------------- boucle
@@ -409,13 +450,26 @@ export class ArmorSystem {
       if (map) map.offset.y = (t * 0.25) % 1;
     }
     for (const c of this.cases) {
-      const unlocked = G.missions.state.armors.includes(c.id);
+      const unlocked = armorUnlocked(c.id);
       c.set.plate.emissiveIntensity = unlocked ? 0.9 + 0.3 * Math.sin(t * 2) : 0.03;
       c.set.eyes.emissiveIntensity = unlocked ? 2.5 : 0.1;
       if (!unlocked) c.set.plate.color.setHex(0x0a0a0a);
       else c.set.plate.color.set(VARIANTS[c.id].style.primary);
     }
     this.display.root.rotation.y += dt * (this.displayActive ? 0.6 : 0.15);
+
+    // pouvoirs spéciaux : Titan (robot géant) et Spectre (invisibilité)
+    const sp = this.worn && !this.transform ? this.style.special : undefined;
+    if (sp === "titan" && G.mode === "foot") {
+      G.mecha.setColors(this.style.primary, this.style.glow);
+      G.mecha.enter();
+    } else if (G.mecha.active) G.mecha.exit();
+    this.updateSpectre(sp === "spectre" && G.mode === "foot", t);
+    if (G.mecha.active) {
+      G.mecha.update(dt);
+      if (this.boostT > 0) this.boostT -= dt;
+      return;
+    }
 
     // capacités en cours
     G.player.speedMul = this.boostT > 0 ? 1.7 : 1;

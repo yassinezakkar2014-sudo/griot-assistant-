@@ -22,6 +22,8 @@ export class Environment {
   hour = 17.2; // heure du jour (0..24)
   timeScale = 1 / 40; // heures de jeu par seconde réelle (1 h = 40 s)
   autoTime = true;
+  /** dans l'espace : pas de ciel ni de brouillard, fond noir */
+  space = false;
   nightFactor = 0; // 0 jour, 1 nuit
   /** Pool fixe de lumières ponctuelles : déplacées vers l'étage courant (pas de recompilation de shaders). */
   pointPool: THREE.PointLight[] = [];
@@ -160,6 +162,18 @@ export class Environment {
     else this.scene.background = null;
 
     this.bloom.strength = lerp(0.75, 0.38, day);
+    if (this.space) {
+      this.scene.fog = null;
+      this.sky.visible = false;
+      (this.stars.material as THREE.PointsMaterial).opacity = 0;
+      this.scene.background = new THREE.Color(0x000004);
+      this.sun.intensity = 2.6;
+      this.sun.color.setHex(0xffffff);
+      this.sun.position.copy(focus).addScaledVector(new THREE.Vector3(0.6, 0.5, -0.4).normalize(), 250);
+      this.hemi.intensity = 0.12;
+      this.renderer.toneMappingExposure = 0.8;
+      this.bloom.strength = 0.5;
+    } else if (this.scene.fog !== this.fog) this.scene.fog = this.fog;
   }
 
   render() {

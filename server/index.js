@@ -132,6 +132,8 @@ app.post("/api/chat", async (req, res) => {
 /** Modèles disponibles pour la clé Groq de l'utilisateur (le meilleur, puis un léger), en cache 30 min.
  *  Si la liste échoue, l'erreur remonte : c'est la vraie raison (clé refusée, accès bloqué…). */
 const userModelCache = new Map();
+/** Modèles Groq qui voient les images (vision). */
+const GROQ_VISION = ["meta-llama/llama-4-maverick-17b-128e-instruct", "meta-llama/llama-4-scout-17b-16e-instruct"];
 async function userGroqModels(key, client) {
   const hit = userModelCache.get(key);
   if (hit && Date.now() - hit.at < 1800_000) return hit.models;
@@ -140,8 +142,21 @@ async function userGroqModels(key, client) {
   const best = pickGroqModel(ids);
   const light = ["llama-3.1-8b-instant", "openai/gpt-oss-20b", "meta-llama/llama-4-scout-17b-16e-instruct"].find((m) => ids.includes(m) && m !== best);
   const models = light ? [best, light] : [best];
+  models.vision = GROQ_VISION.find((m) => ids.includes(m)) || GROQ_VISION[1];
   userModelCache.set(key, { at: Date.now(), models });
   return models;
+}
+let serverVisionCache = null;
+async function groqVisionModel() {
+  if (serverVisionCache) return serverVisionCache;
+  try {
+    const ids = [];
+    for await (const m of groq().models.list()) if (m.active !== false) ids.push(m.id);
+    serverVisionCache = GROQ_VISION.find((m) => ids.includes(m)) || GROQ_VISION[1];
+  } catch {
+    return GROQ_VISION[1];
+  }
+  return serverVisionCache;
 }
 
 /** Clé Groq collée par l'utilisateur dans GRIOT (bouton « Clés IA »), envoyée par son navigateur. */
@@ -150,8 +165,18 @@ function userGroqKey(req) {
   return /^gsk_\w{20,}$/.test(k) ? k : "";
 }
 
-function engines(userKey = "") {
+function engines(userKey = "", vision = false) {
   const list = [];
+  // image jointe : modèles qui voient (Groq Llama 4, OpenAI gpt-4o-mini)
+  if (vision) {
+    if (userKey) {
+      const c = () => new OpenAI({ apiKey: userKey, baseURL: process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1" });
+      list.push({ name: "Groq vision (votre clé)", client: c, model: () => userGroqModels(userKey, c).then((m) => m.vision) });
+    }
+    if (hasGroq()) list.push({ name: "Groq vision", client: groq, model: groqVisionModel });
+    if (hasKey()) list.push({ name: "OpenAI", client, model: async () => process.env.OPENAI_MODEL || "gpt-4o-mini" });
+    if (list.length) return list;
+  }
   if (userKey) {
     const c = () => new OpenAI({ apiKey: userKey, baseURL: process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1" });
     list.push({ name: "Groq (votre clé)", client: c, model: () => userGroqModels(userKey, c).then((m) => m[0]) });
@@ -172,7 +197,8 @@ function engines(userKey = "") {
 async function chatWithFallback(payload, userKey, emit) {
   let lastError = null;
   const tried = new Set();
-  for (const eng of engines(userKey)) {
+  const vision = payload.messages.some((m) => Array.isArray(m.content));
+  for (const eng of engines(userKey, vision)) {
     let model;
     try {
       model = await eng.model();

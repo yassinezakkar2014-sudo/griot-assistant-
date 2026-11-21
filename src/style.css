@@ -407,3 +407,8 @@ body:has(#visor:not([hidden])) #crosshair { display: none; }
 body[data-mode="passenger"] #crosshair { display: none; }
 body[data-mode="passenger"] .tbtns:not(.car) { display: none; }
 body[data-mode="passenger"] .tbtns.car { display: grid; }
+
+/* GRIOT voit (caméra) */
+.vision-wrap video { width: 100%; max-height: 46vh; border-radius: 14px; background: #000; object-fit: cover; display: block; margin: 8px 0; }
+.vis-ans { margin-top: 10px; padding: 12px; border-radius: 12px; background: rgba(79, 210, 255, 0.08); min-height: 48px; }
+.pill .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; border: 1px solid rgba(255,255,255,.4); }
