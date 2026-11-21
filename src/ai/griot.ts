@@ -65,7 +65,7 @@ export class Griot {
       const h = await (await fetch("/api/health")).json();
       this.ai = h.ai;
       this.voice.serverTTS = h.tts;
-      this.voice.serverSTT = h.ai;
+      this.voice.serverSTT = h.stt ?? h.ai;
     } catch {
       this.ai = false;
     }
@@ -119,7 +119,7 @@ export class Griot {
       const h = await (await fetch("/api/health")).json();
       this.ai = h.ai;
       this.voice.serverTTS = h.tts;
-      this.voice.serverSTT = h.ai;
+      this.voice.serverSTT = h.stt ?? h.ai;
     } catch {}
     bus.emit("griot:status", this.ai ? "IA OPENAI" : this.sampleFn ? "CLAUDE CONNECTÉ" : "MODE LOCAL");
   }
