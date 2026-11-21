@@ -18,3 +18,22 @@ services:
         sync: false
       - key: GRIOT_PASSWORD
         sync: false
+
+  # OpenJarvis seul : interface web + API compatible OpenAI, moteur Groq via LiteLLM.
+  - type: web
+    name: openjarvis
+    runtime: docker
+    plan: free
+    dockerfilePath: ./openjarvis/Dockerfile
+    dockerContext: ./openjarvis
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: JARVIS_MODEL
+        value: groq/openai/gpt-oss-120b
+      - key: GROQ_API_KEY
+        sync: false
+      # Clé d'accès à OpenJarvis (à saisir dans Settings de l'interface)
+      - key: OPENJARVIS_API_KEY
+        sync: false

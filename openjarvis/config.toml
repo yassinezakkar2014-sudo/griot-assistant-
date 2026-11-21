@@ -1,0 +1,18 @@
+# Configuration OpenJarvis pour Render (moteur cloud Groq via LiteLLM)
+[engine]
+default = "litellm"
+
+[intelligence]
+# Remplacé au démarrage par la variable JARVIS_MODEL (voir Dockerfile)
+default_model = "groq/openai/gpt-oss-120b"
+
+[agent]
+default_agent = "simple"
+
+[server]
+host = "0.0.0.0"
+port = 10000
+
+[analytics]
+enabled = false
+choice_recorded = true
