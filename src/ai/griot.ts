@@ -476,7 +476,7 @@ export class Griot {
         bus.emit("griot:status", "IA OPENAI (NAVIGATEUR)");
         this.busy = false;
         return this.stream(image, spoken, pdf);
-      } else bubble.innerHTML = md(`⚠ ${esc(e.message)}\n\nDites **« diagnostic »** pour que je teste mes moteurs d'IA, ou touchez **🔑 Clé OpenAI** pour me brancher sur votre propre clé. Les commandes du royaume restent disponibles.`);
+      } else bubble.innerHTML = md(`⚠ ${e.message}\n\nDites **« diagnostic »** pour que je teste mes moteurs d'IA, ou touchez **🔑 Clé OpenAI** pour me brancher sur votre propre clé. Les commandes du royaume restent disponibles.`);
       this.history.pop();
     } finally {
       this.busy = false;
