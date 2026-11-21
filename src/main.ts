@@ -76,6 +76,13 @@ async function boot() {
 
   // l'interface GRIOT est utilisable tout de suite ; le module AISAM (le jeu) se charge derrière
   const ui = new UI();
+  // iPad/iPhone : le son ne peut démarrer que pendant un geste. Chaque toucher, clic ou touche
+  // (re)débloque l'audio du jeu et la voix de GRIOT (après une mise en veille, un appel…).
+  const gesture = () => {
+    G.audio.unlock();
+    ui.griot.voice.unlock();
+  };
+  for (const ev of ["touchend", "pointerup", "click", "keydown"]) addEventListener(ev, gesture, { capture: true, passive: true });
   await ui.init();
   Object.assign(window as any, { __G: G, __ui: ui });
   // « active AISAM » avant la fin du chargement : on mémorise la demande

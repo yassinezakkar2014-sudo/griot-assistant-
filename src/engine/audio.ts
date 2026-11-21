@@ -6,9 +6,24 @@ export class AudioFX {
   ambient: { gain: GainNode; nodes: AudioScheduledSourceNode[] } | null = null;
   volume = 0.6;
 
+  private silent: HTMLAudioElement | null = null;
+
+  /** À appeler dans un geste (toucher, clic, touche). Sur iPad/iPhone : force la session audio
+   *  « lecture » pour que le son passe même quand l'interrupteur silencieux est activé. */
   unlock() {
+    try {
+      const nav = navigator as any;
+      if (nav.audioSession && nav.audioSession.type !== "playback") nav.audioSession.type = "playback";
+    } catch {}
+    if (!this.silent) {
+      this.silent = new Audio(silentWav());
+      this.silent.loop = true;
+      this.silent.setAttribute("playsinline", "");
+      this.silent.volume = 0.01;
+    }
+    if (this.silent.paused) this.silent.play().catch(() => {});
     if (this.ctx) {
-      if (this.ctx.state === "suspended") this.ctx.resume();
+      if (this.ctx.state !== "running") this.ctx.resume().catch(() => {});
       return;
     }
     const AC = window.AudioContext || (window as any).webkitAudioContext;
@@ -170,4 +185,30 @@ export class AudioFX {
     this.ambient = { gain, nodes };
     return true;
   }
+}
+
+/** Petit fichier WAV silencieux (0,5 s) encodé en data URI. */
+function silentWav() {
+  const rate = 8000,
+    n = rate / 2;
+  const buf = new ArrayBuffer(44 + n);
+  const v = new DataView(buf);
+  const w = (o: number, t: string) => [...t].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, "RIFF");
+  v.setUint32(4, 36 + n, true);
+  w(8, "WAVE");
+  w(12, "fmt ");
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);
+  v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true);
+  v.setUint32(28, rate, true);
+  v.setUint16(32, 1, true);
+  v.setUint16(34, 8, true);
+  w(36, "data");
+  v.setUint32(40, n, true);
+  for (let i = 0; i < n; i++) v.setUint8(44 + i, 128);
+  let bin = "";
+  new Uint8Array(buf).forEach((b) => (bin += String.fromCharCode(b)));
+  return "data:audio/wav;base64," + btoa(bin);
 }
