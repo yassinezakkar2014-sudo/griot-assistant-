@@ -187,7 +187,7 @@ async function runTool(name, args, ctx) {
 }
 
 // Conversation en streaming avec boucle d'outils.
-export async function chat(client, { messages, mode, lang, game, model }, emit) {
+export async function chat(client, { messages, mode, lang, game, model, maxTokens = 2000 }, emit) {
   const convo = [{ role: "system", content: systemPrompt({ mode, lang, game }) }, ...messages];
   const ctx = { emit, lang };
   for (let step = 0; step < 5; step++) {
@@ -196,7 +196,7 @@ export async function chat(client, { messages, mode, lang, game, model }, emit) 
       messages: convo,
       tools: TOOLS,
       stream: true,
-      max_tokens: 2000,
+      max_tokens: maxTokens,
       temperature: mode === "creative" ? 0.95 : 0.6
     });
     let content = "";

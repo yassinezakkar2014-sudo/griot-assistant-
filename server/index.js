@@ -116,15 +116,97 @@ app.post("/api/chat", async (req, res) => {
     last.content = [{ type: "text", text: last.content }, { type: "image_url", image_url: { url: image } }];
   }
   try {
-    await chat(chatClient(), { messages: clean, mode, lang, game, model: await chatModel() }, (e, d) => {
+    await chatWithFallback({ messages: clean, mode, lang, game }, (e, d) => {
       if (!closed) emit(e, d);
     });
     if (!closed) emit("done", {});
   } catch (error) {
-    console.error("Erreur IA:", error?.message || error);
-    if (!closed) emit("error", { message: "Erreur du moteur IA : " + (error?.message || "inconnue") });
+    console.error("Erreur IA:", error?.status || "", error?.message || error);
+    if (!closed) emit("error", { message: explainAIError(error) });
   }
   res.end();
+});
+
+// ---- Moteurs de secours : si un moteur échoue AVANT d'avoir répondu, on essaie le suivant ----
+function engines() {
+  const list = [];
+  const b = backend();
+  if (b === "openjarvis") list.push({ name: "OpenJarvis", client: chatClient, model: chatModel });
+  if (hasGroq()) {
+    list.push({ name: "Groq", client: groq, model: groqModel });
+    // modèles Groq de secours, aux limites gratuites plus larges
+    for (const m of ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"])
+      list.push({ name: `Groq (${m})`, client: groq, model: async () => m, light: true });
+  }
+  if (hasKey()) list.push({ name: "OpenAI", client, model: async () => process.env.OPENAI_MODEL || "gpt-4o-mini" });
+  return list;
+}
+
+async function chatWithFallback(payload, emit) {
+  let lastError = null;
+  const tried = new Set();
+  for (const eng of engines()) {
+    let model;
+    try {
+      model = await eng.model();
+    } catch {
+      continue;
+    }
+    if (tried.has(eng.name.split(" ")[0] + model)) continue;
+    tried.add(eng.name.split(" ")[0] + model);
+    let answered = false;
+    try {
+      // modèles légers : contexte et réponse plus courts (limites des offres gratuites)
+      const messages = eng.light ? payload.messages.slice(-6) : payload.messages;
+      await chat(eng.client(), { ...payload, messages, model, maxTokens: eng.light ? 900 : 2000 }, (e, d) => {
+        if (e === "token" || e === "action") answered = true;
+        emit(e, d);
+      });
+      if (lastError) console.log(`✅ Réponse obtenue via ${eng.name} après un échec.`);
+      return;
+    } catch (e) {
+      console.error(`Moteur ${eng.name} (${model}) en échec :`, e?.status || "", e?.message || e);
+      if (answered) throw e;
+      lastError = e;
+      if (/decommission|model_not_found|does not exist/i.test(e?.message || "")) groqModelCache = null;
+    }
+  }
+  throw lastError || new Error("Aucun moteur d'IA configuré");
+}
+
+/** Message clair en français, avec la marche à suivre. */
+function explainAIError(e) {
+  const msg = String(e?.message || e || "");
+  const status = e?.status;
+  if (/ECONNREFUSED|ENOTFOUND|fetch failed|Connection error/i.test(msg))
+    return useJarvis()
+      ? "Le serveur OpenJarvis est injoignable. Sur Render, retirez la variable GRIOT_AI_BACKEND (ou corrigez OPENJARVIS_URL) pour utiliser Groq ou OpenAI."
+      : "Le moteur d'IA est injoignable pour le moment (réseau). Réessayez dans un instant.";
+  if (status === 401) return "Clé d'IA refusée (invalide ou révoquée). Vérifiez GROQ_API_KEY ou OPENAI_API_KEY dans Render → Environment.";
+  if (status === 429 && /insufficient_quota|billing|quota/i.test(msg)) return "Le compte OpenAI n'a plus de crédit (Billing). Ajoutez du crédit, ou mettez une clé Groq gratuite (GROQ_API_KEY).";
+  if (status === 429) return "Limite de requêtes atteinte chez le fournisseur d'IA (offre gratuite). Attendez une minute et réessayez.";
+  if (status === 413) return "Demande trop longue pour le modèle gratuit. Effacez la conversation (bouton « Effacer ») puis réessayez.";
+  if (status === 404 || /model/i.test(msg)) return "Modèle d'IA indisponible. Laissez GROQ_MODEL vide sur Render (choix automatique) ou corrigez OPENAI_MODEL.";
+  if (!hasChat()) return "Aucune clé d'IA sur le serveur. Ajoutez GROQ_API_KEY (gratuit) ou OPENAI_API_KEY dans Render → Environment.";
+  return "Erreur du moteur d'IA : " + msg.slice(0, 200);
+}
+
+// ---- Diagnostic : teste chaque moteur avec une mini-question ----
+app.get("/api/diag", async (_req, res) => {
+  const results = [];
+  if (!engines().length) return res.json({ ok: false, results, advice: explainAIError(new Error("none")) });
+  for (const eng of engines()) {
+    const t0 = Date.now();
+    let model = "?";
+    try {
+      model = await eng.model();
+      await eng.client().chat.completions.create({ model, messages: [{ role: "user", content: "Réponds juste OK." }], max_tokens: 5 });
+      results.push({ engine: eng.name, model, ok: true, ms: Date.now() - t0 });
+    } catch (e) {
+      results.push({ engine: eng.name, model, ok: false, status: e?.status ?? null, error: explainAIError(e) });
+    }
+  }
+  res.json({ ok: results.some((r) => r.ok), backend: backend(), results });
 });
 
 // ---- Voix neuronale (TTS) ----

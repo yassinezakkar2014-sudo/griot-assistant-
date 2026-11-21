@@ -196,7 +196,7 @@ const TOOLS = [
   }
 ];
 
-function chatStream(key: string, body: any): Response {
+export function chatStream(key: string, body: any): Response {
   const enc = new TextEncoder();
   const stream = new ReadableStream({
     async start(ctrl) {
