@@ -1,6 +1,6 @@
-// LE PALAIS DE MARIEM & SANDRA — grand palais blanc, rose et or, au cœur de leur cité.
+// LE PALAIS DES PRINCESSES — grand palais blanc, rose et or, au cœur de leur cité.
 // Hall à fontaine, salon avec écran géant, cuisine et salle à manger, deux grandes chambres
-// (Mariem Attia à l'ouest, Sandra El Ayadi à l'est) avec salle de bain et dressing, cinéma,
+// (chambre Améthyste à l'ouest, chambre Turquoise à l'est) avec salle de bain et dressing, cinéma,
 // spa avec jacuzzi et salle de sport, piscine à débordement avec plongeoir, transats et palmiers.
 import * as THREE from "three";
 import { G, bus } from "../core";
@@ -9,7 +9,7 @@ import { wallX, wallZ } from "./build";
 import { COUNTRIES } from "./countryData";
 
 export function buildMSPalace() {
-  const c = COUNTRIES.find((k) => k.id === "mariem-sandra");
+  const c = COUNTRIES.find((k) => k.id === "princesses");
   if (!c) return;
   const cx = c.x,
     cz = c.z;
@@ -106,7 +106,7 @@ export function buildMSPalace() {
       rf.position.set(cx + sx * 70, Y + H + 8 + 4.5, cz + sz);
       root.add(rf);
     }
-  sign("Palais de Mariem & Sandra", 0, H + 3.4, -25.6, Math.PI, 30);
+  sign("Palais des Princesses", 0, H + 3.4, -25.6, Math.PI, 30);
 
   // ---------------------------------------------------------------- murs et pièces
   const D = { w: 4, h: 4.2 }; // passages
@@ -167,9 +167,9 @@ export function buildMSPalace() {
   B(-6, 0, 70, 6, 0.85, 76, wood); // table
   for (let k = -2; k <= 2; k++) for (const sz of [68.5, 77.5]) B(k * 2.4 - 0.4, 0, sz - 0.4, k * 2.4 + 0.4, 0.5, sz + 0.4, rose, false);
   B(14, 0, 62, 18, 2.6, 66, mat.silver); // frigo
-  G.interact.add({ id: "ms-kitchen", pos: new THREE.Vector3(cx, Y + 1, cz + 82), radius: 5, label: () => "Préparer un repas", action: () => bus.emit("toast", { text: "🍽️ Un délicieux repas est servi pour Mariem et Sandra !" }) });
+  G.interact.add({ id: "ms-kitchen", pos: new THREE.Vector3(cx, Y + 1, cz + 82), radius: 5, label: () => "Préparer un repas", action: () => bus.emit("toast", { text: "🍽️ Un délicieux repas est servi pour les princesses !" }) });
 
-  // ---------------------------------------------------------------- CHAMBRES (Mariem à l'ouest, Sandra à l'est)
+  // ---------------------------------------------------------------- CHAMBRES (Améthyste à l'ouest, Turquoise à l'est)
   const bedroom = (sx: number, who: string, theme: THREE.Material, accent: string) => {
     const bx = sx * 45;
     B(bx - 5, 0, 76, bx + 5, 0.7, 88, wood); // lit king size
@@ -197,17 +197,17 @@ export function buildMSPalace() {
     win.position.set(cx + sx * 69.6, Y + 4, cz + 65);
     win.rotation.y = Math.PI / 2;
     root.add(win);
-    sign(`Chambre de ${who}`, bx, 7, 40.7, 0, 12, accent);
+    sign(`Chambre ${who}`, bx, 7, 40.7, 0, 12, accent);
     G.interact.add({
       id: "ms-bed-" + sx,
       pos: new THREE.Vector3(cx + bx, Y + 1, cz + 74),
       radius: 4,
-      label: () => `Dormir (chambre de ${who.split(" ")[0]})`,
+      label: () => `Dormir (chambre ${who})`,
       action: () => {
         bus.emit("fade");
         G.env.setHour(8);
         G.player.sit(new THREE.Vector3(cx + bx, Y + 1.1 + 0.75, cz + 80), Math.PI);
-        bus.emit("toast", { text: `😴 Bonne nuit dans la chambre de ${who}… ☀️ Bonjour !` });
+        bus.emit("toast", { text: `😴 Bonne nuit dans la chambre ${who}… ☀️ Bonjour !` });
       }
     });
     // salle de bain : baignoire + vasque
@@ -217,14 +217,14 @@ export function buildMSPalace() {
     bath.position.set(cx + bx, Y + 1.02, cz + 21);
     root.add(bath);
     B(bx + sx * 18 - 1.5, 0, 34, bx + sx * 18 + 1.5, 1, 39, marble);
-    sign(`Salle de bain — ${who.split(" ")[0]}`, bx, 7, 15.3, 0, 10, accent);
+    sign(`Salle de bain — ${who}`, bx, 7, 15.3, 0, 10, accent);
   };
-  bedroom(-1, "Mariem Attia", violet, "#8a4ab8");
-  bedroom(1, "Sandra El Ayadi", turq, "#1f9a94");
+  bedroom(-1, "Améthyste", violet, "#8a4ab8");
+  bedroom(1, "Turquoise", turq, "#1f9a94");
 
   // ---------------------------------------------------------------- CINÉMA (aile ouest)
   B(-68, 1, -19.4, -22, 8, -19, dark, false);
-  const film = new THREE.Mesh(new THREE.PlaneGeometry(40, 6), new THREE.MeshBasicMaterial({ map: welcomeTex("🎬 Cinéma de Mariem & Sandra") }));
+  const film = new THREE.Mesh(new THREE.PlaneGeometry(40, 6), new THREE.MeshBasicMaterial({ map: welcomeTex("🎬 Cinéma des Princesses") }));
   film.position.set(cx - 45, Y + 4.5, cz - 18.9);
   root.add(film);
   for (let r = 0; r < 3; r++) for (let k = 0; k < 6; k++) B(-60 + k * 6.5, r * 0.4, -6 + r * 6, -55.5 + k * 6.5, 0.9 + r * 0.4, -3 + r * 6, new THREE.MeshStandardMaterial({ color: 0x8a1f2a, roughness: 0.9 }), false);
@@ -280,7 +280,7 @@ export function buildMSPalace() {
     top.position.set(cx + x, Y + 10.2, cz + z);
     root.add(trunk, top);
   }
-  sign("Piscine de Mariem & Sandra", 0, 4, 141.5, Math.PI, 16, "#1f9ad8");
+  sign("Piscine des Princesses", 0, 4, 141.5, Math.PI, 16, "#1f9ad8");
   G.interact.add({
     id: "ms-pool",
     pos: new THREE.Vector3(cx - 36, Y + 1, cz + 99),
@@ -324,10 +324,10 @@ export function buildMSPalace() {
     root.visible = G.camera.position.distanceTo(centre) < 4500;
     if (root.visible) statue.rotation.y = t * 0.4;
   });
-  G.world.markers.push({ id: "ms-palace", name: "Palais de Mariem & Sandra", pos: centre.clone(), icon: "♥", visible: () => true });
+  G.world.markers.push({ id: "ms-palace", name: "Palais des Princesses", pos: centre.clone(), icon: "♥", visible: () => true });
 }
 
-function welcomeTex(text = "Bienvenue chez Mariem & Sandra ♥") {
+function welcomeTex(text = "Bienvenue au Palais des Princesses ♥") {
   const cv = document.createElement("canvas");
   cv.width = 1024;
   cv.height = 240;
