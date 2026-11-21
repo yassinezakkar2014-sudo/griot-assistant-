@@ -27,7 +27,9 @@ import { Space, STATION, MOON_BASE } from "./game/space";
 import { Deco } from "./game/deco";
 import { Mecha } from "./game/mecha";
 import { Train } from "./game/train";
+import { Airports } from "./game/airport";
 import { buildMSPalace } from "./world/msPalace";
+import { buildMall, MALL } from "./world/mall";
 import { buildCountries } from "./world/countries";
 import { buildPalaceCrown, buildHyperTowers, buildMetropolis } from "./world/giant";
 import { PLACES } from "./ai/actions";
@@ -79,6 +81,7 @@ async function boot() {
   G.missions = new Missions();
   G.missions.init();
   G.player = new Player();
+  G.player.loadLook();
   G.player.init();
   G.net = new Multiplayer();
   G.passenger = new Passenger();
@@ -122,6 +125,7 @@ async function boot() {
   buildPalaceCrown();
   buildHyperTowers();
   buildMetropolis();
+  buildMall();
   progress(0.96, "Pays de Zuria");
   const zuria = buildZuria(G.palace);
   G.palace.spots.zuria = { pos: zuria.front, yaw: 0, label: "zuria" };
@@ -133,6 +137,9 @@ async function boot() {
     PLACES.push({ id: "country:" + ci.def.id, name: ci.def.name, pos: () => ci.front.clone(), fly: () => ci.pad.clone(), outdoor: true });
   PLACES.push({ id: "station", name: "la Station orbitale royale", pos: () => STATION.clone().add(new THREE.Vector3(30, 0.2, 60)), fly: () => STATION.clone(), outdoor: true, space: true });
   PLACES.push({ id: "moon", name: "la Lune", pos: () => MOON_BASE.clone().add(new THREE.Vector3(10, 0.2, 10)), fly: () => MOON_BASE.clone().add(new THREE.Vector3(50, 0, 50)), outdoor: true, space: true });
+  PLACES.push({ id: "mall", name: "le Royal Mall", pos: () => new THREE.Vector3(MALL.x, 1.5, MALL.z + MALL.d / 2 + 8), outdoor: true });
+  PLACES.push({ id: "airport", name: "l'Aéroport Royal", pos: () => new THREE.Vector3(2050, 6.3, -2750 + 535), outdoor: true });
+  PLACES.push({ id: "airport-princesses", name: "l'aéroport de la Cité des Princesses", pos: () => new THREE.Vector3(6800, 8.3, -13900 - 535), outdoor: true });
   PLACES.push({ id: "metro", name: "la Nouvelle Métropole", pos: () => new THREE.Vector3(3020, G.physics.terrain(3020, 0) + 0.5, 0), outdoor: true });
   G.palace.spots.garage = { pos: wings.garageSpot, yaw: -Math.PI / 2, label: "garage" };
   G.palace.spots.gallery = { pos: wings.gallerySpot, yaw: Math.PI / 2, label: "gallery" };
@@ -176,6 +183,8 @@ async function boot() {
   G.mecha.build();
   G.train = new Train();
   G.train.build();
+  G.airports = new Airports();
+  G.airports.build();
   G.armor = new ArmorSystem();
   G.armor.build();
   const companion = buildCompanion();

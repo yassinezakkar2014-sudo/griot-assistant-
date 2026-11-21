@@ -435,7 +435,7 @@ export class ArmorSystem {
     this.playerSet.helmet.scale.set(0.6 + 0.4 * this.maskT, Math.max(0.01, this.maskT), 0.6 + 0.4 * this.maskT);
     this.playerSet.helmet.position.y = 0.14 - (1 - this.maskT) * 0.12;
     this.playerSet.helmet.visible = this.worn && this.maskT > 0.03;
-    if (this.worn) body.skin.color.setHex(0x6b4630);
+    if (this.worn) body.skin.color.setHex(body.look.skin);
 
     // luminescence (effet choisi)
     const st = this.style;

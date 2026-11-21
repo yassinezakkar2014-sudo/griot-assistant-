@@ -610,7 +610,8 @@ export class Ship {
 
     const look = inp.consumeMouse();
     const thrIn = inp.axis(["KeyS"], ["KeyW"]) + (inp.down("TouchThrottleUp") ? 1 : 0) - (inp.down("TouchThrottleDown") ? 1 : 0);
-    const yawIn = inp.axis(["KeyD"], ["KeyA"]) - inp.touchMove.x;
+    // PC : la souris fait tourner le vaisseau (gauche/droite) et le cabre (haut/bas)
+    const yawIn = clamp(inp.axis(["KeyD"], ["KeyA"]) - inp.touchMove.x - look.x * 14, -1.6, 1.6);
     const rollIn = inp.axis(["KeyE"], ["KeyQ"]);
     const pitchIn = inp.axis(["ArrowDown"], ["ArrowUp"]) - look.y * 18 + -inp.touchMove.y * 0.8;
     const liftIn = inp.axis(["KeyC", "ControlLeft", "TouchDown"], ["Space", "TouchUp"]);

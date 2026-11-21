@@ -54,3 +54,34 @@ export function countryAt(x: number, z: number, margin = 1): CountryDef | null {
   for (const c of COUNTRIES) if (Math.hypot(x - c.x, z - c.z) < c.r * margin) return c;
   return null;
 }
+
+/** Aéroports : piste est-ouest, aérogare du côté `side` (+1 = nord, −1 = sud). Zones aplanies par le terrain. */
+export interface AirportDef {
+  id: string;
+  name: string;
+  short: string;
+  x: number; // centre de la piste
+  z: number;
+  h: number; // altitude du terrain aplani
+  len: number; // longueur de piste
+  side: 1 | -1;
+  big: boolean;
+}
+export const AIRPORTS: AirportDef[] = [
+  { id: "royal", name: "Aéroport Royal International", short: "Aéroport Royal", x: 2050, z: -2750, h: 6, len: 2500, side: 1, big: true },
+  { id: "princesses", name: "Aéroport de la Cité des Princesses", short: "Cité des Princesses", x: 6800, z: -13900, h: 8, len: 1600, side: -1, big: false }
+];
+/** Emprise (rectangle monde) d'un aéroport, marges comprises. */
+export function airportRect(a: AirportDef, margin = 0) {
+  const half = a.len / 2 + 320 + margin;
+  const z1 = a.side > 0 ? a.z - 60 - margin : a.z - 660 - margin;
+  const z2 = a.side > 0 ? a.z + 660 + margin : a.z + 60 + margin;
+  return { x1: a.x - half, x2: a.x + half, z1, z2 };
+}
+export function inAirport(x: number, z: number, margin = 40) {
+  for (const a of AIRPORTS) {
+    const r = airportRect(a, margin);
+    if (x > r.x1 && x < r.x2 && z > r.z1 && z < r.z2) return a;
+  }
+  return null;
+}

@@ -1,6 +1,6 @@
 // Terrain procédural : plateau du palais, ville (est), jungle (sud), montagnes (nord), océan (ouest).
 import * as THREE from "three";
-import { COUNTRIES, EARTH, countryAt } from "./countryData";
+import { COUNTRIES, EARTH, countryAt, AIRPORTS, airportRect } from "./countryData";
 
 export const WORLD = 8000; // côté de la carte en mètres
 export const SEA = -2;
@@ -106,6 +106,12 @@ export function rawHeight(x: number, z: number) {
   // GRAND MONDE : au-delà du royaume, l'océan et les continents des autres pays
   const dd = Math.max(Math.abs(x), Math.abs(z));
   if (dd > 3300) h = mix(h, worldHeight(x, z), smooth(3300, 4700, dd));
+  // aéroports : grande plaine parfaitement plate
+  for (const a of AIRPORTS) {
+    const r = airportRect(a);
+    const w = Math.min(smooth(r.x1 - 300, r.x1, x), 1 - smooth(r.x2, r.x2 + 300, x), smooth(r.z1 - 300, r.z1, z), 1 - smooth(r.z2, r.z2 + 300, z));
+    if (w > 0) h = mix(h, a.h, w);
+  }
   return h;
 }
 

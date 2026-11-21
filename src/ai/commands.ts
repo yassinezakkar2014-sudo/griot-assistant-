@@ -41,6 +41,9 @@ function clause(raw: string): Intent | null {
     if (/\b(dors|dormir|sommeil|coucher|lit)\b/.test(t)) return { action: "cabin", target: "sleep" };
     return { action: "cabin", target: "enter" };
   }
+  if (/\b(telephone|portable|smartphone|mon phone|royal phone)\b/.test(t) && !/\b(boutique|magasin|achete|va|emmene)\b/.test(t)) return { action: "phone" };
+  if (/\b(avion|vol|aeroport|decoller en avion)\b/.test(t) && /\b(prends|prendre|monte|embarque|reserve|vole|vol pour|vol vers|avion pour|avion vers|en avion|billet)\b/.test(t)) return { action: "flight", target: t };
+  if (/\b(avatar|personnage|apparence|coiffure|tenue|habits?|vetements?)\b/.test(t) && /\b(change|modifie|personnalis\w*|choisis|ouvre|nouveau|nouvelle)\b/.test(t)) return { action: "avatar" };
   if (/\b(appel video|appelle.moi|on s appelle|facetime|mode appel|appel avec griot|passe.moi un appel)\b/.test(t)) return { action: "call" };
   if (/\b(prends|prendre|monte dans|je prends) (le )?train\b|\btrain (pour|vers|jusqu)/.test(t)) return { action: "train", target: t };
   // --- espace ---

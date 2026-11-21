@@ -1,0 +1,372 @@
+// LE ROYAL PHONE — smartphone du jeu : messages (salon de tous les joueurs + messages privés),
+// appels vidéo entre joueurs (WebRTC, signalisation par le relais multijoueur), appel avec GRIOT,
+// et raccourcis (carte, avatar, vision, multijoueur). Gratuit.
+import { G, bus } from "../core";
+
+interface Msg {
+  from: string;
+  text: string;
+  me: boolean;
+  at: number;
+}
+
+const ICE: RTCConfiguration = { iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }] };
+
+export class Phone {
+  el: HTMLElement;
+  private screen: HTMLElement;
+  private threads = new Map<string, Msg[]>(); // "all" ou id du joueur
+  private unread = new Map<string, number>();
+  private view: { app: string; arg?: string } = { app: "home" };
+  private color = "#1b3f8f";
+  // appel vidéo
+  private pc: RTCPeerConnection | null = null;
+  private local: MediaStream | null = null;
+  private peer: string | null = null;
+  private pendingIce: RTCIceCandidateInit[] = [];
+  private incoming: { from: string; name: string; sdp: RTCSessionDescriptionInit } | null = null;
+  private callStart = 0;
+
+  constructor() {
+    this.el = document.createElement("div");
+    this.el.className = "phone";
+    this.el.hidden = true;
+    this.el.innerHTML = `<div class="phone-notch"></div><div class="phone-screen"></div><button class="phone-home" title="Accueil"></button>`;
+    document.body.appendChild(this.el);
+    this.screen = this.el.querySelector(".phone-screen")!;
+    this.el.querySelector(".phone-home")!.addEventListener("click", () => (this.view.app === "home" ? this.close() : this.go("home")));
+    this.el.addEventListener("click", (e) => this.onClick(e));
+    this.el.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+      if (e.key === "Enter" && (e.target as HTMLElement).classList.contains("ph-input")) this.sendCurrent();
+    });
+    this.el.addEventListener("focusin", () => (G.uiFocus = true));
+    this.el.addEventListener("focusout", () => (G.uiFocus = false));
+    try {
+      this.color = localStorage.getItem("griot-phone-color") || this.color;
+    } catch {}
+    this.el.style.setProperty("--phc", this.color);
+    // messages du salon (tous) et privés
+    bus.on("mp:chat", (d: { name: string; text: string }) => {
+      if (d.name.endsWith("(vous)")) return;
+      this.push("all", { from: d.name, text: d.text, me: false, at: Date.now() });
+    });
+    bus.on("mp:signal", (s: { from: string; name: string; d: any }) => this.onSignal(s));
+    bus.on("mp:peers", () => this.view.app !== "chat" && this.render());
+  }
+
+  open(gift = false) {
+    if (gift) {
+      const colors = ["#1b3f8f", "#d8b25a", "#8a2a6a", "#1a1a1a", "#2ab8b0", "#c0392b"];
+      this.color = colors[(colors.indexOf(this.color) + 1) % colors.length];
+      try {
+        localStorage.setItem("griot-phone-color", this.color);
+      } catch {}
+      this.el.style.setProperty("--phc", this.color);
+      bus.emit("toast", { text: "📱 Nouveau Royal Phone offert ! (Reprenez-en un pour changer de couleur.)" });
+    }
+    this.el.hidden = false;
+    this.go(this.incoming ? "incoming" : "home");
+  }
+  close() {
+    if (this.pc) return this.go("call"); // on ne ferme pas pendant un appel
+    this.el.hidden = true;
+    G.uiFocus = false;
+  }
+  toggle() {
+    if (this.el.hidden) this.open();
+    else this.close();
+  }
+
+  private go(app: string, arg?: string) {
+    this.view = { app, arg };
+    if (app === "chat" && arg) this.unread.delete(arg);
+    this.render();
+  }
+
+  private push(thread: string, m: Msg) {
+    const list = this.threads.get(thread) ?? [];
+    list.push(m);
+    if (list.length > 80) list.shift();
+    this.threads.set(thread, list);
+    const viewing = !this.el.hidden && this.view.app === "chat" && this.view.arg === thread;
+    if (!m.me && !viewing) {
+      this.unread.set(thread, (this.unread.get(thread) ?? 0) + 1);
+      if (thread !== "all") bus.emit("toast", { text: `📱 ${m.from} : ${m.text.slice(0, 80)}` });
+    }
+    if (!this.el.hidden) this.render();
+  }
+
+  private players() {
+    return [...G.net.peers.entries()].filter(([, r]) => r.state).map(([id, r]) => ({ id, name: r.state!.n }));
+  }
+
+  private esc(s: string) {
+    return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+  }
+
+  // ---------------------------------------------------------------- écrans
+  private render() {
+    const v = this.view;
+    const time = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    const bar = `<div class="ph-bar"><span>${time}</span><span>📶 ${G.net.status === "on" ? "Royal 5G" : "Hors ligne"} 🔋</span></div>`;
+    const online = G.net.status === "on";
+    const total = [...this.unread.values()].reduce((a, b) => a + b, 0);
+    let body = "";
+    if (v.app === "home") {
+      const apps = [
+        ["msg", "💬", "Messages", total ? `<i>${total}</i>` : ""],
+        ["video", "📹", "Appels vidéo", ""],
+        ["griot", "🤖", "GRIOT", ""],
+        ["players", "👥", "Joueurs", ""],
+        ["map", "🗺️", "Carte", ""],
+        ["avatar", "👤", "Avatar", ""],
+        ["vision", "👁️", "Caméra", ""],
+        ["flight", "✈️", "Vols", ""],
+        ["mp", "🌐", "Multijoueur", ""]
+      ];
+      body = `<div class="ph-wall"><div class="ph-clock">${time}</div><div class="ph-date">${new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</div></div>
+        <div class="ph-grid">${apps.map(([id, ic, n, badge]) => `<button data-app="${id}"><span class="ic">${ic}${badge}</span><span>${n}</span></button>`).join("")}</div>`;
+    } else if (v.app === "msg") {
+      const ps = this.players();
+      const row = (id: string, name: string, sub: string) => {
+        const last = this.threads.get(id)?.slice(-1)[0];
+        const u = this.unread.get(id);
+        return `<button class="ph-row" data-chat="${id}"><b>${this.esc(name)}</b><small>${this.esc(last ? `${last.me ? "Vous" : last.from} : ${last.text}` : sub)}</small>${u ? `<i>${u}</i>` : ""}</button>`;
+      };
+      body = `<div class="ph-title">💬 Messages</div>${online ? "" : `<p class="ph-hint">Connectez-vous au multijoueur (🌐) pour discuter avec vos amis.</p>`}
+        ${row("all", "🌍 Salon du royaume", "Tous les joueurs connectés")}${ps.map((p) => row(p.id, p.name, "Message privé")).join("")}`;
+    } else if (v.app === "chat") {
+      const id = v.arg!;
+      const name = id === "all" ? "🌍 Salon du royaume" : this.players().find((p) => p.id === id)?.name ?? "Joueur";
+      const list = this.threads.get(id) ?? [];
+      body = `<div class="ph-title"><button data-app="msg">‹</button> ${this.esc(name)} ${id !== "all" ? `<button data-call="${id}" title="Appel vidéo">📹</button>` : ""}</div>
+        <div class="ph-thread">${list.map((m) => `<div class="ph-bubble ${m.me ? "me" : ""}">${m.me || id !== "all" ? "" : `<b>${this.esc(m.from)}</b>`}${this.esc(m.text)}</div>`).join("") || `<p class="ph-hint">Aucun message. Dites bonjour 👋</p>`}</div>
+        <div class="ph-send"><input class="ph-input" placeholder="Message…" maxlength="200"><button data-send="1">➤</button></div>`;
+    } else if (v.app === "video" || v.app === "players") {
+      const ps = this.players();
+      body = `<div class="ph-title">${v.app === "video" ? "📹 Appels vidéo" : "👥 Joueurs connectés"}</div>
+        ${online ? "" : `<p class="ph-hint">Connectez-vous au multijoueur (🌐) : vos amis doivent être dans la même salle.</p>`}
+        ${ps.length ? ps.map((p) => `<div class="ph-row"><b>${this.esc(p.name)}</b><span class="ph-actions"><button data-chat="${p.id}">💬</button><button data-call="${p.id}">📹</button></span></div>`).join("") : online ? `<p class="ph-hint">Personne d'autre n'est connecté dans la salle « ${this.esc(G.net.room)} » pour l'instant.</p>` : ""}`;
+    } else if (v.app === "incoming" && this.incoming) {
+      body = `<div class="ph-incall"><div class="ph-avatar">📹</div><div class="ph-who">${this.esc(this.incoming.name)}</div><div class="ph-sub">Appel vidéo entrant…</div>
+        <div class="ph-callbtns"><button class="no" data-decline="1">✕</button><button class="yes" data-accept="1">📹</button></div></div>`;
+    } else if (v.app === "call") {
+      const name = this.players().find((p) => p.id === this.peer)?.name ?? "Joueur";
+      const s = Math.floor((Date.now() - this.callStart) / 1000);
+      body = `<div class="ph-video"><video class="ph-remote" playsinline autoplay></video><video class="ph-local" playsinline autoplay muted></video>
+        <div class="ph-callinfo">${this.esc(name)} · ${this.callStart ? `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}` : "Appel en cours…"}</div>
+        <div class="ph-callbtns"><button data-mute="1">🎙️</button><button data-cam="1">📷</button><button class="no" data-hang="1">✕</button></div></div>`;
+    }
+    this.screen.innerHTML = bar + body;
+    if (v.app === "chat") {
+      const t = this.screen.querySelector(".ph-thread");
+      if (t) t.scrollTop = t.scrollHeight;
+      (this.screen.querySelector(".ph-input") as HTMLInputElement)?.focus();
+    }
+    if (v.app === "call") {
+      const lv = this.screen.querySelector(".ph-local") as HTMLVideoElement;
+      if (this.local) lv.srcObject = this.local;
+      const rv = this.screen.querySelector(".ph-remote") as HTMLVideoElement;
+      const rs = this.pc?.getReceivers().map((r) => r.track).filter(Boolean) as MediaStreamTrack[] | undefined;
+      if (rs?.length) rv.srcObject = new MediaStream(rs);
+    }
+  }
+
+  private onClick(e: Event) {
+    const t = (e.target as HTMLElement).closest<HTMLElement>("button");
+    if (!t) return;
+    const d = t.dataset;
+    if (d.app) {
+      if (d.app === "griot") return this.close(), bus.emit("ui:call");
+      if (d.app === "map") return this.close(), bus.emit("ui:map");
+      if (d.app === "avatar") return this.close(), bus.emit("ui:avatar");
+      if (d.app === "vision") return this.close(), bus.emit("ui:vision");
+      if (d.app === "mp") return this.close(), bus.emit("ui:multi");
+      if (d.app === "flight") {
+        this.close();
+        const p = G.player.position;
+        const near = G.airports.ports.reduce((a, b) => (a.hall.distanceTo(p) < b.hall.distanceTo(p) ? a : b));
+        return bus.emit("ui:flight", near.def.id);
+      }
+      return this.go(d.app);
+    }
+    if (d.chat) return this.go("chat", d.chat);
+    if (d.send) return this.sendCurrent();
+    if (d.call) return this.call(d.call);
+    if (d.accept) return this.accept();
+    if (d.decline) return this.decline();
+    if (d.hang) return this.hangup(true);
+    if (d.mute && this.local) {
+      const tr = this.local.getAudioTracks()[0];
+      if (tr) tr.enabled = !tr.enabled;
+      t.style.opacity = tr?.enabled ? "1" : "0.4";
+    }
+    if (d.cam && this.local) {
+      const tr = this.local.getVideoTracks()[0];
+      if (tr) tr.enabled = !tr.enabled;
+      t.style.opacity = tr?.enabled ? "1" : "0.4";
+    }
+  }
+
+  private sendCurrent() {
+    const inp = this.screen.querySelector(".ph-input") as HTMLInputElement | null;
+    const text = inp?.value.trim();
+    if (!text || this.view.app !== "chat") return;
+    const id = this.view.arg!;
+    if (G.net.status !== "on") return bus.emit("toast", { text: "Connectez-vous d'abord au multijoueur (🌐).", kind: "warn" });
+    if (id === "all") G.net.say(text);
+    else if (!G.net.signal(id, { t: "dm", text })) return bus.emit("toast", { text: "Messages privés indisponibles sur ce relais.", kind: "warn" });
+    this.push(id, { from: G.net.name, text, me: true, at: Date.now() });
+  }
+
+  // ---------------------------------------------------------------- appels vidéo (WebRTC)
+  private async media() {
+    if (!this.local) this.local = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 } }, audio: true });
+    return this.local;
+  }
+
+  private newPC(peer: string) {
+    const pc = new RTCPeerConnection(ICE);
+    pc.onicecandidate = (e) => e.candidate && G.net.signal(peer, { t: "ice", c: e.candidate.toJSON() });
+    pc.ontrack = () => this.view.app === "call" && this.render();
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "connected" && !this.callStart) {
+        this.callStart = Date.now();
+        this.tick();
+      }
+      if (pc.connectionState === "failed") {
+        bus.emit("toast", { text: "Connexion vidéo impossible (réseau trop restrictif). Essayez en Wi-Fi.", kind: "warn" });
+        this.hangup(true);
+      }
+    };
+    this.pc = pc;
+    this.peer = peer;
+    return pc;
+  }
+
+  private tick() {
+    if (!this.pc) return;
+    if (!this.el.hidden && this.view.app === "call") {
+      const info = this.screen.querySelector(".ph-callinfo");
+      const s = Math.floor((Date.now() - this.callStart) / 1000);
+      const name = this.players().find((p) => p.id === this.peer)?.name ?? "Joueur";
+      if (info) info.textContent = `${name} · ${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+    }
+    setTimeout(() => this.tick(), 1000);
+  }
+
+  async call(peer: string) {
+    if (this.pc) return;
+    if (G.net.status !== "on") return bus.emit("toast", { text: "Connectez-vous d'abord au multijoueur (🌐).", kind: "warn" });
+    try {
+      const stream = await this.media();
+      const pc = this.newPC(peer);
+      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      if (!G.net.signal(peer, { t: "offer", sdp: offer })) throw new Error("relais");
+      this.callStart = 0;
+      this.go("call");
+      bus.emit("toast", { text: "📹 Appel en cours…" });
+    } catch (e: any) {
+      this.cleanup();
+      bus.emit("toast", { text: e?.message === "relais" ? "Appels vidéo disponibles via le relais public (site web)." : "Caméra ou micro refusés.", kind: "warn" });
+    }
+  }
+
+  private async accept() {
+    const inc = this.incoming;
+    if (!inc) return;
+    this.incoming = null;
+    try {
+      const stream = await this.media();
+      const pc = this.newPC(inc.from);
+      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+      await pc.setRemoteDescription(inc.sdp);
+      for (const c of this.pendingIce.splice(0)) await pc.addIceCandidate(c).catch(() => {});
+      const ans = await pc.createAnswer();
+      await pc.setLocalDescription(ans);
+      G.net.signal(inc.from, { t: "answer", sdp: ans });
+      this.go("call");
+    } catch {
+      G.net.signal(inc.from, { t: "bye" });
+      this.cleanup();
+      bus.emit("toast", { text: "Caméra ou micro refusés.", kind: "warn" });
+    }
+  }
+
+  private decline() {
+    if (this.incoming) G.net.signal(this.incoming.from, { t: "decline" });
+    this.incoming = null;
+    this.go("home");
+  }
+
+  hangup(notify: boolean) {
+    if (notify && this.peer) G.net.signal(this.peer, { t: "bye" });
+    this.cleanup();
+    if (!this.el.hidden) this.go("home");
+  }
+
+  private cleanup() {
+    this.pc?.close();
+    this.pc = null;
+    this.peer = null;
+    this.callStart = 0;
+    this.pendingIce = [];
+    this.local?.getTracks().forEach((t) => t.stop());
+    this.local = null;
+  }
+
+  private async onSignal(s: { from: string; name: string; d: any }) {
+    const d = s.d ?? {};
+    switch (d.t) {
+      case "dm":
+        this.push(s.from, { from: s.name, text: String(d.text ?? "").slice(0, 200), me: false, at: Date.now() });
+        break;
+      case "offer":
+        if (this.pc || this.incoming) return void G.net.signal(s.from, { t: "busy" });
+        this.incoming = { from: s.from, name: s.name, sdp: d.sdp };
+        this.el.hidden = false;
+        this.go("incoming");
+        bus.emit("toast", { text: `📹 ${s.name} vous appelle en vidéo !` });
+        this.ring();
+        break;
+      case "answer":
+        if (this.pc && s.from === this.peer) {
+          await this.pc.setRemoteDescription(d.sdp);
+          for (const c of this.pendingIce.splice(0)) await this.pc.addIceCandidate(c).catch(() => {});
+        }
+        break;
+      case "ice":
+        if (this.pc && this.pc.remoteDescription && s.from === this.peer) await this.pc.addIceCandidate(d.c).catch(() => {});
+        else this.pendingIce.push(d.c);
+        break;
+      case "decline":
+      case "busy":
+        if (s.from === this.peer) {
+          bus.emit("toast", { text: d.t === "busy" ? `${s.name} est déjà en ligne.` : `${s.name} a refusé l'appel.` });
+          this.hangup(false);
+        }
+        break;
+      case "bye":
+        if (s.from === this.peer || this.incoming?.from === s.from) {
+          this.incoming = null;
+          bus.emit("toast", { text: `📹 Appel terminé avec ${s.name}.` });
+          this.hangup(false);
+        }
+        break;
+    }
+  }
+
+  private ring() {
+    let n = 0;
+    const r = () => {
+      if (!this.incoming || n++ > 8) return;
+      G.audio.tone(880, 0.15, "sine", 0.12);
+      setTimeout(() => G.audio.tone(1100, 0.15, "sine", 0.12), 180);
+      setTimeout(r, 1500);
+    };
+    r();
+  }
+}
