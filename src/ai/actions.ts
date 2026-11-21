@@ -151,6 +151,11 @@ export async function runAction(action: string, target?: string | null): Promise
   // à pied : on utilise le vaisseau le plus proche (Royal Talon ou Faucon de Zuria)
   if (G.mode !== "ship" && G.ships && /ship|engines|takeoff|fly_to|stealth|supersonic/.test(action)) {
     G.ship = [...G.ships].sort((a, b) => a.root.position.distanceTo(G.player.position) - b.root.position.distanceTo(G.player.position))[0];
+    // vaisseau nommé (« monte dans l'Améthyste », « prépare le Turquoise »…)
+    const tn = normalize(String(target ?? ""));
+    const KEYS = ["talon", "faucon", "amethyste", "turquoise"];
+    const named = G.ships.find((s) => normalize(s.name).split(" ").some((w) => KEYS.includes(w) && new RegExp(`\\b${w}\\b`).test(tn)));
+    if (named) G.ship = named;
   }
   const ship = G.ship;
   const armor = G.armor;

@@ -13,7 +13,7 @@ const V = {
   close: /\b(ferm\w*|close|cierra|cerrar|verrouill\w*)\b/,
   go: /\b(va|vais|aller|allons|amene|emmene|conduis|monte|descends|go|take|bring|show|montre|affiche|ve|lleva|muestra|direction|rends|rejoins|teleport\w*)\b/,
   fly: /\b(emmene|amene|conduis|take me|fly|vole|volons|pilote|lleva|explor\w*|survol\w*|balade|voyag\w*|travel)\b/,
-  ship: /\b(vaisseau|talon|ship|jet|avion|nave|chasseur|fighter|appareil)\b/,
+  ship: /\b(vaisseau|talon|ship|jet|avion|nave|chasseur|fighter|appareil|faucon)\b/,
   armor: /\b(armure|armor|armour|suit|combinaison|armadura|tenue de combat)\b/
 };
 
@@ -54,6 +54,8 @@ function clause(raw: string): Intent | null {
   if (/\b(enleve|retire|supprime)\b.*\b(objet|meuble|deco\w*|ca)\b/.test(t)) return { action: "deco", target: "remove" };
   if (/\b(tourne|pivote)\b.*\b(objet|meuble)\b/.test(t)) return { action: "deco", target: "rotate" };
   if (/\b(pose|mets|ajoute|installe|place|construis)\b/.test(t) && /\b(canape|sofa|trone|statue|fontaine|plante|fleur|lampe|piano|aquarium|bibliotheque|tele|ecran|tapis|colonne|pilier|arbre|drapeau|lit|table)\b/.test(t)) return { action: "deco", target: t };
+  // petits vaisseaux du Palais des Princesses
+  if (/\b(amethyste|turquoise)\b/.test(t) && !/\b(chambre|salle)\b/.test(t) && /\b(monte|entre|embarque|pilote|prends|prepare|vole)\w*\b/.test(t)) return { action: /prepare/.test(t) ? "prepare_ship" : "board_ship", target: t };
   // --- vaisseau ---
   if (/\b(anti.?aerien\w*|defense aerienne|dca|tourelles?|radar)\b/.test(t)) {
     if (/\b(test\w*|tir\w*|demonstration|demo|feu|spectacle)\b/.test(t)) return { action: "antiair", target: "test" };
@@ -69,11 +71,11 @@ function clause(raw: string): Intent | null {
   if (/\b(furtif|furtivite|camouflage|stealth|cloak)\b/.test(t) || (/\binvisible\b/.test(t) && V.ship.test(t))) return { action: "toggle_stealth", target: /\b(desactiv\w*|coupe|arrete|enleve|visible|off)\b/.test(t) ? "off" : "on" };
   if (/\b(decoll\w*|take ?off|despeg\w*|leve|en l air)\b/.test(t)) return { action: "takeoff" };
   if (/\b(atterri\w*|land|landing|aterriz\w*|pose.toi|pose le vaisseau)\b/.test(t)) return { action: "land" };
-  if (/\b(prepar\w*|ready|apresta|prepara)\b/.test(t) && V.ship.test(t)) return { action: "prepare_ship" };
+  if (/\b(prepar\w*|ready|apresta|prepara)\b/.test(t) && V.ship.test(t)) return { action: "prepare_ship", target: t };
   if (/\b(moteur|engine|motor|reacteur)s?\b/.test(t)) return /\b(coupe|eteins|arrete|stop|apaga|off)\b/.test(t) ? { action: "stop_engines" } : { action: "start_engines" };
   if (/\b(lumiere|feux|lights?|luces|eclairage)s?\b/.test(t) && (V.ship.test(t) || /\b(vaisseau|systeme)/.test(t))) return { action: "toggle_ship_lights" };
   if (/\b(sors|sortir|descends|exit|get out|quitte|salir)\b/.test(t) && (V.ship.test(t) || /cockpit|vehicule/.test(t))) return { action: "exit_vehicle" };
-  if (/\b(monte|entre|embarque|board|get in|sube|installe)\w*\b/.test(t) && (V.ship.test(t) || /cockpit/.test(t))) return { action: "board_ship" };
+  if (/\b(monte|entre|embarque|board|get in|sube|installe)\w*\b/.test(t) && (V.ship.test(t) || /cockpit/.test(t))) return { action: "board_ship", target: t };
   if (/\b(monte|entre|conduis|conduire|prends|drive|installe|essaye|essayer)\w*\b/.test(t) && /\b(voiture|auto|adamas|car|bolide|berline|suv|coupe)\b/.test(t)) return { action: "board_car", target: t };
   if (/\b(sors|sortir|descends|exit|quitte)\b/.test(t) && /\b(voiture|auto|car)\b/.test(t)) return { action: "exit_vehicle" };
 
