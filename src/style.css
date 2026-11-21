@@ -492,3 +492,5 @@ html.touch .keys-help { display: none; }
 .ph-local { position: absolute; right: 10px; top: 36px; width: 80px; height: 110px; object-fit: cover; border-radius: 12px; border: 2px solid rgba(255,255,255,.6); transform: scaleX(-1); }
 .ph-callinfo { position: relative; background: rgba(0,0,0,.45); padding: 4px 10px; border-radius: 10px; font-size: 13px; }
 .ph-video .ph-callbtns { position: relative; }
+.ph-status { position: relative; background: rgba(0,0,0,.45); padding: 3px 10px; border-radius: 10px; font-size: 12px; margin-bottom: 6px; }
+.ph-status:empty { display: none; }
