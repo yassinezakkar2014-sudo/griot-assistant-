@@ -5,6 +5,8 @@ import { FLOORS } from "../world/palace";
 import { fmtHour } from "../world/floors";
 import { VARIANTS, armorUnlocked, type Pattern } from "../game/armor";
 import { THEMES, ITEMS } from "../game/deco";
+import { PRESETS, type Hair, type Top } from "../game/humanoid";
+import { Phone } from "./phone";
 import { runAction, PLACES } from "../ai/actions";
 import { Griot, MODE_LABELS, type GriotMode, md, HELP } from "../ai/griot";
 import { LANGS } from "../ai/voice";
@@ -61,8 +63,16 @@ export class UI {
     $("keyBtn").onclick = () => this.keyPanel();
     $("visBtn").onclick = () => this.vision();
     $("callBtn").onclick = () => this.call();
+    $("avatarBtn").onclick = () => this.avatarPanel();
+    this.phone = new Phone();
+    $("phoneBtn").onclick = () => this.phone.toggle();
+    bus.on("ui:phone", (o?: { gift?: boolean }) => this.phone.open(!!o?.gift));
+    bus.on("ui:vision", () => this.vision());
+    bus.on("ui:multi", () => this.multi());
+    bus.on("ui:avatar", () => this.avatarPanel());
     bus.on("ui:call", () => this.call());
     bus.on("ui:train", (from: string) => this.trainPanel(from));
+    bus.on("ui:flight", (from: string) => this.flightPanel(from));
     if ((window as any).claude) document.documentElement.classList.add("in-claude");
     document.querySelectorAll<HTMLElement>("[data-say]").forEach((b) => (b.onclick = () => this.griot.send(b.dataset.say!)));
     $("vActivate").onclick = () => this.griot.send("active AISAM");
@@ -750,6 +760,80 @@ export class UI {
     };
   }
 
+  // ---------------------------------------------------------------- avatar
+  avatarPanel() {
+    const l = { ...G.player.body.look, acc: [...G.player.body.look.acc] };
+    const hex = (n: number) => "#" + n.toString(16).padStart(6, "0");
+    const SKINS = [0xf3d2b8, 0xe8b89a, 0xd8a888, 0xc8946a, 0xa8754e, 0x8a5a3a, 0x7a5038, 0x6b4630, 0x5a3a26, 0x4a2e1e, 0x3a2418, 0x2a1a10];
+    const HAIRS: [Hair, string][] = [["degrade", "Dégradé"], ["court", "Court"], ["rase", "Rasé"], ["afro", "Afro"], ["boucle", "Bouclé"], ["tresses", "Tresses"], ["locks", "Locks"], ["long", "Longs"], ["chignon", "Chignon"], ["queue", "Queue de cheval"]];
+    const HAIRC = [0x0d0d0d, 0x2a1a10, 0x5a3a20, 0x8a5a2a, 0xc8a050, 0xe8d8a0, 0xa83a2a, 0x7a3aa8, 0x2a7ad8, 0xf0f0f0];
+    const TOPS: [Top, string][] = [["tshirt", "T-shirt"], ["sweat", "Sweat"], ["veste", "Veste"], ["costume", "Costume"], ["maillot", "Maillot"], ["robe", "Robe"], ["boubou", "Boubou royal"]];
+    const CLOTH = [0xf0f0f0, 0x111111, 0x1e4fd8, 0x3fa8ff, 0x1f8a4a, 0xd8a12a, 0xc0392b, 0x8a1f2a, 0xb46bff, 0xf2c8d6, 0x5a6a3a, 0x2a2e3a];
+    const EYES = [0x2a1a10, 0x3a2414, 0x2a5a8a, 0x2a7a4a, 0x8a6a2a, 0x5a5a6a];
+    const ACC: [string, string][] = [["couronne", "👑 Couronne"], ["lunettes", "🕶 Lunettes"], ["casquette", "🧢 Casquette"], ["boucles", "💍 Boucles d'oreilles"], ["collier", "📿 Collier"], ["montre", "⌚ Montre"], ["barbe", "🧔 Barbe"]];
+    const sw = (key: string, list: number[], cur: number) => `<div class="row wrap">${list.map((c) => `<button class="swatch ${c === cur ? "on" : ""}" style="--c:${hex(c)}" data-k="${key}" data-v="${c}"></button>`).join("")}</div>`;
+    const pills = (key: string, list: [string, string][], cur: string | string[]) =>
+      `<div class="row wrap">${list.map(([id, name]) => `<button class="pill ${(Array.isArray(cur) ? cur.includes(id) : cur === id) ? "on" : ""}" data-k="${key}" data-v="${id}">${name}</button>`).join("")}</div>`;
+    const card = this.openModal(
+      "avatar",
+      `<h2 class="mt">👤 Mon avatar</h2>
+      <p class="hint">Gratuit, sauvegardé sur cet appareil et visible par les autres joueurs.</p>
+      <h3>Avatars prêts</h3>
+      <div class="row wrap">${PRESETS.map((p, i) => `<button class="pill" data-preset="${i}">${p.name}</button>`).join("")}</div>
+      <h3>Peau</h3>${sw("skin", SKINS, l.skin)}
+      <h3>Coiffure</h3>${pills("hair", HAIRS, l.hair)}${sw("hairColor", HAIRC, l.hairColor)}
+      <h3>Yeux</h3>${sw("eyes", EYES, l.eyes)}
+      <h3>Haut</h3>${pills("top", TOPS, l.top)}${sw("topColor", CLOTH, l.topColor)}
+      <h3>Pantalon</h3>${sw("pants", CLOTH, l.pants)}
+      <h3>Chaussures</h3>${sw("shoes", CLOTH, l.shoes)}
+      <h3>Accessoires</h3>${pills("acc", ACC, l.acc)}
+      <h3>Silhouette</h3>${pills("build", [["fin", "Fine"], ["normal", "Normale"], ["costaud", "Costaude"]], l.build)}
+      <label>Taille <input type="range" min="0.88" max="1.12" step="0.01" value="${l.height}" data-k="height"></label>`,
+      "side"
+    );
+    const apply = (nl: typeof l) => {
+      G.player.setLook(nl);
+      G.player.view = "third";
+      this.avatarPanel();
+    };
+    card.onclick = (e) => {
+      const el = (e.target as HTMLElement).closest<HTMLElement>("[data-k],[data-preset]");
+      if (!el) return;
+      if (el.dataset.preset) return apply({ ...PRESETS[+el.dataset.preset].look, acc: [...PRESETS[+el.dataset.preset].look.acc] });
+      const k = el.dataset.k!,
+        v = el.dataset.v!;
+      if (k === "acc") l.acc = l.acc.includes(v) ? l.acc.filter((a) => a !== v) : [...l.acc, v];
+      else if (["skin", "hairColor", "eyes", "topColor", "pants", "shoes"].includes(k)) (l as any)[k] = +v;
+      else if (k !== "height") (l as any)[k] = v;
+      else return;
+      apply(l);
+    };
+    card.oninput = (e) => {
+      const el = e.target as HTMLInputElement;
+      if (el.dataset.k === "height") G.player.setLook({ ...G.player.body.look, height: +el.value });
+    };
+  }
+
+  // ---------------------------------------------------------------- vols
+  flightPanel(from: string) {
+    const ap = G.airports;
+    const here = ap.ports.find((p) => p.def.id === from)!;
+    const others = ap.ports.filter((p) => p !== here);
+    const card = this.openModal(
+      "flight",
+      `<h2 class="mt">✈ ${here.def.name}</h2>
+      <p class="hint">Billets gratuits. Avion de ligne Royal Airways : repoussage, roulage, décollage, croisière, atterrissage. Pendant le vol, 🎥 change la vue (extérieur, hublot, cockpit, cinéma).</p>
+      <div class="row wrap">${others.map((p) => `<button class="btn primary" data-to="${p.def.id}">🛫 Vol vers ${p.def.short}</button>`).join("")}
+      <button class="btn" data-to="${here.def.id}">🌅 Vol panoramique</button></div>`
+    );
+    card.onclick = (e) => {
+      const to = (e.target as HTMLElement).closest<HTMLElement>("[data-to]")?.dataset.to;
+      if (!to) return;
+      this.closeModal();
+      this.toast(ap.fly(from, to));
+    };
+  }
+
   // ---------------------------------------------------------------- train royal
   trainPanel(from: string) {
     const list = G.train.stations.filter((s) => s.id !== from);
@@ -768,6 +852,7 @@ export class UI {
 
   // ---------------------------------------------------------------- appel vidéo avec GRIOT
   private inCall = false;
+  phone!: Phone;
   async call() {
     if (this.inCall) return;
     this.inCall = true;
@@ -1362,7 +1447,27 @@ export class UI {
     this.drawAvatar(t);
   }
 
+  /** Menu des touches (PC) sous la mini-carte, selon ce que l'on fait. */
+  private keysMode = "";
+  private updateKeysHelp() {
+    if (G.mobile) return;
+    const mode = G.mode === "foot" ? (G.mecha?.active ? "titan" : G.armor.worn ? "armor" : "foot") : G.mode;
+    if (mode === this.keysMode) return;
+    this.keysMode = mode;
+    const K = (k: string, t: string) => `<div><kbd>${k}</kbd><span>${t}</span></div>`;
+    const common = K("M", "Carte") + K("Entrée", "Parler à GRIOT") + K("T", "Micro") + K("P", "Menu") + K("J", "Missions");
+    const lists: Record<string, string> = {
+      foot: K("ZQSD / WASD", "Marcher") + K("Souris", "Regarder") + K("Maj", "Courir") + K("Espace ×2", "Double saut") + K("E", "Interagir") + K("V", "Vue 1re / 3e pers.") + common,
+      armor: K("ZQSD", "Marcher") + K("Espace ×2", "Double saut") + K("1", "Onde de choc") + K("2", "Bouclier") + K("3", "Surcharge") + K("4", "Vision") + K("5 / G", "Rayon") + K("X", "Masque") + K("E", "Interagir") + common,
+      titan: K("ZQSD", "Marcher (Titan)") + K("Espace", "Réacteurs") + K("5 / G", "Canon") + K("1", "Frappe au sol") + common,
+      ship: K("Souris", "Tourner / cabrer") + K("W / S", "Poussée") + K("A / D", "Tourner") + K("Q / E", "Inclinaison") + K("Espace / C", "Monter / descendre") + K("Maj", "Post-combustion") + K("R", "Moteurs") + K("H", "Atterrir") + K("B", "Supersonique") + K("K", "Furtif") + K("I", "Cabine") + K("O", "Espace") + K("V", "Vue") + K("F", "Sortir"),
+      car: K("W / S", "Accélérer / freiner") + K("A / D", "Tourner") + K("V", "Vue") + K("F", "Sortir") + common
+    };
+    $("keysHelp").innerHTML = `<div class="kh-title">⌨ Touches</div>${lists[mode] ?? common}`;
+  }
+
   private drawMinimap(p: THREE.Vector3, yaw: number) {
+    this.updateKeysHelp();
     const c = this.mini;
     const S = 180;
     c.clearRect(0, 0, S, S);

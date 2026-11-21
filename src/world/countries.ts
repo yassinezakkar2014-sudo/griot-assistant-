@@ -4,7 +4,7 @@
 import * as THREE from "three";
 import { G } from "../core";
 import { mat } from "./materials";
-import { COUNTRIES, type CountryDef } from "./countryData";
+import { COUNTRIES, inAirport, type CountryDef } from "./countryData";
 
 interface Pal {
   wall: number[];
@@ -314,6 +314,7 @@ function buildCountry(c: CountryDef): CountryInfo {
     if (Math.abs(x - cx) < 14 || Math.abs(z - cz) < 14) continue; // avenues
     if (Math.hypot(x - plaza.x, z - plaza.z) < 40) continue;
     if (Math.hypot(x - (cx + 120), z - (cz + 120)) < 55) continue; // aire d'atterrissage
+    if (inAirport(x, z)) continue;
     const big = c.style === "crystal" ? rnd() < 0.35 : rnd() < 0.06;
     const w = big ? 14 + rnd() * 10 : 7 + rnd() * 8,
       d = big ? 14 + rnd() * 10 : 7 + rnd() * 8;
@@ -386,6 +387,7 @@ function buildCountry(c: CountryDef): CountryInfo {
       z = cz + Math.sin(a) * r;
     if (Math.abs(x - cx) < 12 || Math.abs(z - cz) < 12) continue;
     if (c.clear && r < c.clear) continue;
+    if (inAirport(x, z, 60)) continue;
     const y = ground(x, z);
     if (y < 1 || y > 360) continue;
     if (houses.some((h) => Math.abs(h.x - x) < h.w / 2 + 3 && Math.abs(h.z - z) < h.d / 2 + 3)) continue;

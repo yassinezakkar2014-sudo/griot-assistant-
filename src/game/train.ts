@@ -1,5 +1,5 @@
 // LE TRAIN ROYAL — train à grande vitesse sur viaduc (jusqu'à 340 km/h) : Zuria ⇄ pont ⇄ palais ⇄
-// ville futuriste. Gares avec quai, verrière et ascenseur ; on monte
+// ville futuriste ⇄ Aéroport Royal. Gares avec quai, verrière et ascenseur ; on monte
 // à bord depuis la gare (ou à la voix : « prends le train pour Zuria »), caméra de voyage, arrivée en gare.
 import * as THREE from "three";
 import { G, bus, clamp, normalize } from "../core";
@@ -27,7 +27,11 @@ const ROUTE: [number, number, string?][] = [
   [150, -440],
   [500, -390],
   [760, -220],
-  [850, 70, "Ville futuriste"]
+  [850, 70, "Ville futuriste"],
+  [800, -500],
+  [880, -1050],
+  [1250, -1650],
+  [1600, -2050, "Aéroport"]
 ];
 const ABOVE = 30; // hauteur de la voie au-dessus du sol / de la mer
 const CAR = 26;

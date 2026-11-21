@@ -1,7 +1,7 @@
 // Contrôleur du personnage : WASD, course, saut, collisions, vue 1re / 3e personne, s'asseoir.
 import * as THREE from "three";
 import { G, bus, clamp, damp } from "../core";
-import { Humanoid } from "./humanoid";
+import { Humanoid, DEFAULT_LOOK, type Look } from "./humanoid";
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -16,6 +16,9 @@ export class Player {
   camDist = 4.2;
   /** gravité (Lune : 0,17) */
   gravityMul = 1;
+  /** sauts restants en l'air (double saut) */
+  airJumps = 1;
+  private flip = 0;
   /** hauteur supplémentaire de la caméra (robot géant) */
   camLift = 0;
   /** corps masqué (pilotage du robot géant, invisibilité) */
@@ -37,6 +40,25 @@ export class Player {
 
   setOutfit(color: number) {
     this.body.outfit.color.setHex(color);
+    this.body.look.topColor = color;
+    this.saveLook();
+  }
+
+  /** Change l'avatar complet (sauvegardé sur l'appareil, visible des autres joueurs). */
+  setLook(look: Look) {
+    this.body.applyLook(look);
+    this.saveLook();
+  }
+  saveLook() {
+    try {
+      localStorage.setItem("griot-avatar", JSON.stringify(this.body.look));
+    } catch {}
+  }
+  loadLook() {
+    try {
+      const l = JSON.parse(localStorage.getItem("griot-avatar") || "null");
+      if (l && typeof l === "object") this.body.applyLook({ ...DEFAULT_LOOK, ...l });
+    } catch {}
   }
 
   teleport(pos: THREE.Vector3, yaw?: number) {
@@ -107,10 +129,23 @@ export class Player {
     this.velocity.x = damp(this.velocity.x, wish.x * maxSpeed, accel, dt);
     this.velocity.z = damp(this.velocity.z, wish.z * maxSpeed, accel, dt);
 
-    if (this.onGround && inp.hit("Space", "TouchJump")) {
-      this.velocity.y = 8 * this.jumpMul;
-      this.onGround = false;
+    if (this.onGround) this.airJumps = 1;
+    if (inp.hit("Space", "TouchJump")) {
+      if (this.onGround) {
+        this.velocity.y = 8 * this.jumpMul;
+        this.onGround = false;
+      } else if (this.airJumps > 0) {
+        // double saut : une deuxième impulsion en plein vol, avec une petite pirouette
+        this.airJumps--;
+        this.velocity.y = 8.5 * this.jumpMul;
+        this.flip = 1;
+        G.audio.whoosh(0.3, 500, 1400, 0.08);
+      }
     }
+    if (this.flip > 0) {
+      this.flip = Math.max(0, this.flip - dt * 2.2);
+      this.body.root.rotation.x = (1 - this.flip) * Math.PI * 2 * (this.flip > 0 ? 1 : 0);
+    } else this.body.root.rotation.x = 0;
     this.velocity.y -= 24 * dt * this.gravityMul;
     if (this.velocity.y < -60) this.velocity.y = -60;
 

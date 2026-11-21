@@ -3,7 +3,7 @@
 // sinon relais public MQTT sur WebSocket sécurisé (site web, iPad compris).
 import * as THREE from "three";
 import { G, bus } from "../core";
-import { Humanoid } from "../game/humanoid";
+import { Humanoid, DEFAULT_LOOK, type Look } from "../game/humanoid";
 import { buildShipModel, buildSmallShipModel, cloakMaterial } from "../game/shipmodel";
 import { ArmorSet, type ArmorStyle } from "../game/armor";
 import { SHIP_SCALE } from "../game/ship";
@@ -27,6 +27,8 @@ export interface NetState {
   r?: string;
   /** portes et barrières partagées : id → [ouverte, horodatage] */
   d?: Record<string, [number, number]>;
+  /** apparence de l'avatar */
+  lk?: Look;
   /** pouvoir d'armure spécial : "spectre" (invisible) ou "titan" (robot géant) */
   sp?: string;
   /** décoration du palais (envoyée régulièrement ; la plus récente gagne) */
@@ -90,13 +92,20 @@ class Remote {
     tex.needsUpdate = true;
   }
 
+  private lookKey = "";
   apply(st: NetState) {
     if (!this.state || this.state.n !== st.n) this.setName(st.n);
     this.state = st;
     this.last = performance.now();
     this.target.fromArray(st.p);
     this.yaw = st.y;
-    this.body.outfit.color.setHex(st.o);
+    if (st.lk && typeof st.lk === "object") {
+      const key = JSON.stringify(st.lk);
+      if (key !== this.lookKey) {
+        this.lookKey = key;
+        this.body.applyLook({ ...DEFAULT_LOOK, ...st.lk, acc: Array.isArray(st.lk.acc) ? st.lk.acc.slice(0, 8).map(String) : [] });
+      }
+    } else this.body.outfit.color.setHex(st.o);
     this.body.outfit.emissive.setHex(0);
     // armure complète, avec ses couleurs, son motif et le masque
     if (st.ar) {
@@ -280,6 +289,13 @@ export class Multiplayer {
             from = parts[4];
           if (!from || from === this.id) return;
           if (kind === "bye") return this.drop(from);
+          if (kind === "sig") {
+            try {
+              const m = JSON.parse(new TextDecoder().decode(payload));
+              if (m && m.to === this.id) bus.emit("mp:signal", { from, name: this.peers.get(from)?.state?.n ?? "Joueur", d: m.d });
+            } catch {}
+            return;
+          }
           if (kind === "s") {
             try {
               this.receive(from, JSON.parse(new TextDecoder().decode(payload)));
@@ -318,6 +334,13 @@ export class Multiplayer {
       this.setStatus("off");
       bus.emit("toast", { text: "Multijoueur déconnecté." });
     }
+  }
+
+  /** Message direct à un joueur (messagerie privée, appels vidéo). Relais MQTT uniquement. */
+  signal(to: string, d: unknown) {
+    if (this.status !== "on" || !this.client?.connected) return false;
+    this.client.publish(`${TOPIC}/${this.room}/sig/${this.id}`, JSON.stringify({ to, d }));
+    return true;
   }
 
   say(text: string) {
@@ -405,6 +428,7 @@ export class Multiplayer {
       p: [r2(pl.position.x), r2(pl.position.y), r2(pl.position.z)],
       y: r2(pl.body.root.rotation.y),
       o: pl.body.outfit.color.getHex(),
+      ...(performance.now() - this.lookSent > 2000 ? ((this.lookSent = performance.now()), { lk: pl.body.look }) : {}),
       a: G.armor.worn ? G.armor.style.glow : 0,
       ...(G.armor.worn ? { ar: [G.armor.style.primary, G.armor.style.glow, G.armor.style.pattern, G.armor.maskUp ? 1 : 0] as [string, string, string, number] } : {}),
       ...((G.mode as string) === "car" && G.cars.active
@@ -421,6 +445,7 @@ export class Multiplayer {
   }
 
   private decoSent = 0;
+  private lookSent = 0;
 
   private sharedDoors() {
     const out: Record<string, [number, number]> = {};

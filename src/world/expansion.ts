@@ -18,7 +18,9 @@ export function buildHighway(): Highway {
   const routes: [number, number][][] = [
     [[0, -275], [0, -430], [280, -700], [900, -1250], [1700, -1310], [2550, -1250], [2860, -800], [2920, 0], [2900, 700], [2960, 1050]],
     // branche ouest → GRAND PONT ROYAL au-dessus de l'océan, jusqu'au marché de Zuria
-    [[-275, 0], [-480, -40], [-760, -160], [-980, -240], [-1300, -210], [-1800, -70], [-2200, 50], [-2460, 135], [-2700, 178], [-2872, 185]]
+    [[-275, 0], [-480, -40], [-760, -160], [-980, -240], [-1300, -210], [-1800, -70], [-2200, 50], [-2460, 135], [-2700, 178], [-2872, 185]],
+    // route spéciale de l'Aéroport Royal (et de sa gare), depuis l'autoroute
+    [[1700, -1310], [1750, -1600], [1820, -1900], [1850, -2108]]
   ];
   const BRIDGE_ROUTE = 1;
   const DECK = 34; // hauteur du tablier au-dessus de l'océan (les navires passent dessous)
@@ -75,7 +77,7 @@ export function buildHighway(): Highway {
       if (i) v += pts[i].distanceTo(pts[i - 1]) / 12;
       pos.push(p.x + nx * HALF_W, y, p.z + nz * HALF_W, p.x - nx * HALF_W, y, p.z - nz * HALF_W);
       uv.push(0, v, 1, v);
-      for (const s of [1, -1]) rail.push(p.x + nx * HALF_W * s, y + 0.25, p.z + nz * HALF_W * s, p.x + nx * HALF_W * s, y + 1.0, p.z + nz * HALF_W * s);
+      for (const s of [1, -1]) rail.push(p.x + nx * HALF_W * s, y + 0.1, p.z + nz * HALF_W * s, p.x + nx * HALF_W * s, y + 1.25, p.z + nz * HALF_W * s);
       if (i) {
         const a = (i - 1) * 2;
         idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
@@ -96,6 +98,22 @@ export function buildHighway(): Highway {
       }
       if (i % 10 === 0) lamps.push(new THREE.Vector3(p.x + nx * (HALF_W + 0.6) * (i % 20 ? 1 : -1), y, p.z + nz * (HALF_W + 0.6) * (i % 20 ? 1 : -1)));
       if (i % 5 === 0 && y - raw[i] > 2.5) pillars.push({ p: new THREE.Vector3(p.x, y, p.z), h: y - raw[i] + 2 });
+      // garde-corps solides sur les parties en hauteur (ponts, viaducs) : on ne tombe plus
+      if (i && (y - raw[i] > 1.5 || ys[i - 1] - raw[i - 1] > 1.5)) {
+        const a = pts[i - 1],
+          ay = ys[i - 1];
+        for (let k = 0; k < 6; k++) {
+          const u = k / 6;
+          const x = a.x + (p.x - a.x) * u,
+            z = a.z + (p.z - a.z) * u,
+            yy = ay + (y - ay) * u;
+          for (const sd of [1, -1]) {
+            const rx = x + nx * (HALF_W + 0.25) * sd,
+              rz = z + nz * (HALF_W + 0.25) * sd;
+            G.physics.addBox({ x: rx - 0.3, y: yy - 0.5, z: rz - 0.3 }, { x: rx + 0.3, y: yy + 1.3, z: rz + 0.3 }, "rail");
+          }
+        }
+      }
       if (bridge && i % 55 === 27 && y > DECK - 1 && raw[i] <= SEA + 2.6) {
         bridgeTowers.push(new THREE.Vector3(p.x, y, p.z));
         bridgeDirs.push(new THREE.Vector3(nx, 0, nz));
@@ -157,7 +175,7 @@ export function buildHighway(): Highway {
   c.font = "bold 64px Arial";
   c.fillText("A1  AUTOROUTE ROYALE", 40, 82);
   c.font = "36px Arial";
-  c.fillText("Ville futuriste  ·  Montagnes  ·  Pont royal → Zuria ↰", 40, 132);
+  c.fillText("Ville  ·  Montagnes  ·  ✈ Aéroport  ·  Pont → Zuria ↰", 40, 132);
   const st = new THREE.CanvasTexture(sign);
   st.colorSpace = THREE.SRGBColorSpace;
   const gy = G.physics.terrain(0, -360) + 0.1;

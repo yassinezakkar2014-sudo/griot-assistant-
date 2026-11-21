@@ -6,7 +6,8 @@ import { mat, tex } from "./materials";
 import { block, cyl, span, glowLine } from "./build";
 import { Terrain, ZONES, SEA, WORLD, fbm } from "./terrain";
 import { HYPER } from "./giant";
-import { EARTH, countryAt } from "./countryData";
+import { MALL } from "./mall";
+import { EARTH, countryAt, inAirport } from "./countryData";
 
 export interface Marker {
   id: string;
@@ -238,6 +239,7 @@ export class World {
       for (let z = c.z1 + 45; z < c.z2 - 40; z += 90) {
         if (Math.hypot(x - 1625, z) < 55) continue; // tour centrale
         if (HYPER.some((h) => Math.hypot(x - h.x, z - h.z) < 75)) continue; // hyper-tours
+        if (Math.abs(x - MALL.x) < MALL.w / 2 + 35 && Math.abs(z - MALL.z) < MALL.d / 2 + 35) continue; // Royal Mall
         const distC = Math.hypot(x - 1625, z) / 900;
         for (let k = 0; k < 2; k++) {
           if (Math.random() < 0.15) continue;
@@ -334,6 +336,7 @@ export class World {
     for (let tries = 0; tries < N * 4 && c < N; tries++) {
       const x = -1100 + Math.random() * 2600;
       const z = -650 - Math.random() * 3000;
+      if (inAirport(x, z, 80)) continue;
       const h = this.terrain.height(x, z);
       if (h < SEA + 2 || h > 240) continue;
       if (fbm(x * 0.004, z * 0.004) < 0.42) continue;
@@ -620,6 +623,9 @@ export class World {
     const c = ZONES.city;
     if (G.cabin?.inside && p.distanceTo(G.player.position) < 1) return "Royal Talon — Cabine";
     if (G.space?.active && p.y > 20000) return G.space.zone(p);
+    if (Math.abs(p.x - MALL.x) < MALL.w / 2 && Math.abs(p.z - MALL.z) < MALL.d / 2) return "Royal Mall";
+    const ap = inAirport(p.x, p.z, 0);
+    if (ap) return ap.name;
     const kc = countryAt(p.x, p.z, 1.05);
     if (kc) return Math.hypot(p.x - kc.x, p.z - kc.z) < kc.r * 0.45 ? `${kc.name} — capitale` : `Pays de ${kc.name}`;
     if (Math.max(Math.abs(p.x), Math.abs(p.z)) > WORLD / 2) return "Grand océan";

@@ -87,6 +87,8 @@ export function placeFromText(t: string): Place | null {
   const n = normalize(t);
   // pays du grand monde (noms exacts)
   for (const p of PLACES) if (p.id.startsWith("country:") && new RegExp(`\\b${normalize(p.name)}\\b`).test(n)) return p;
+  if (/\bmall\b|centre commercial|boutique|magasin|shopping/.test(n)) return PLACES.find((p) => p.id === "mall") ?? null;
+  if (/aeroport/.test(n)) return PLACES.find((p) => p.id === (/princesse/.test(n) ? "airport-princesses" : "airport")) ?? null;
   if (/princesse/.test(n)) return PLACES.find((p) => p.id === "country:princesses") ?? null;
   if (/metropole|nouvelle ville/.test(n)) return PLACES.find((p) => p.id === "metro") ?? null;
   if (/\blune\b|moon|base lunaire/.test(n)) return PLACES.find((p) => p.id === "moon") ?? null;
@@ -383,6 +385,26 @@ export async function runAction(action: string, target?: string | null): Promise
       armor.setStyle({ ...armor.style, glow: col });
       return "Couleur des circuits mise à jour.";
     }
+    case "flight": {
+      const n = normalize(String(target ?? ""));
+      const ap = G.airports;
+      const p = G.player.position;
+      const near = ap.ports.reduce((a, b) => (a.W(0, 0, 450).distanceTo(p) < b.W(0, 0, 450).distanceTo(p) ? a : b));
+      const dest = /princesse|ile|fille/.test(n) ? "princesses" : /royal|palais|royaume|maison/.test(n) ? "royal" : near.def.id === "royal" ? "princesses" : "royal";
+      const from = /panoram/.test(n) ? near.def.id : dest === "princesses" ? "royal" : "princesses";
+      if (near.W(0, 0, 450).distanceTo(p) > 1500) {
+        // on emmène d'abord le joueur à l'aérogare de départ
+        const fp = ap.ports.find((x) => x.def.id === from)!;
+        G.player.teleport(fp.hall.clone());
+      }
+      return ap.fly(from, /panoram/.test(n) ? from : dest);
+    }
+    case "phone":
+      bus.emit("ui:phone");
+      return "Voici votre Royal Phone : messages et appels vidéo avec vos amis.";
+    case "avatar":
+      bus.emit("ui:avatar");
+      return "Voici votre garde-robe royale : choisissez votre avatar.";
     case "call":
       bus.emit("ui:call");
       return "Je vous appelle, Majesté.";
