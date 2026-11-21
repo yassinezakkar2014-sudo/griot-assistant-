@@ -10,7 +10,14 @@ interface Msg {
   at: number;
 }
 
-const ICE: RTCConfiguration = { iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }] };
+// STUN (trouver son adresse publique) + TURN public gratuit (relais vidéo quand les box/4G bloquent la connexion directe)
+const ICE: RTCConfiguration = {
+  iceServers: [
+    { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302", "stun:stun.cloudflare.com:3478"] },
+    { urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443", "turn:openrelay.metered.ca:443?transport=tcp", "turns:openrelay.metered.ca:443"], username: "openrelayproject", credential: "openrelayproject" }
+  ],
+  iceCandidatePoolSize: 4
+};
 
 export class Phone {
   el: HTMLElement;
@@ -26,6 +33,8 @@ export class Phone {
   private pendingIce: RTCIceCandidateInit[] = [];
   private incoming: { from: string; name: string; sdp: RTCSessionDescriptionInit } | null = null;
   private callStart = 0;
+  private remote: MediaStream | null = null;
+  private ringTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.el = document.createElement("div");
@@ -52,7 +61,7 @@ export class Phone {
       this.push("all", { from: d.name, text: d.text, me: false, at: Date.now() });
     });
     bus.on("mp:signal", (s: { from: string; name: string; d: any }) => this.onSignal(s));
-    bus.on("mp:peers", () => this.view.app !== "chat" && this.render());
+    bus.on("mp:peers", () => !this.el.hidden && !["chat", "call", "incoming"].includes(this.view.app) && this.render());
   }
 
   open(gift = false) {
@@ -66,6 +75,11 @@ export class Phone {
       bus.emit("toast", { text: "📱 Nouveau Royal Phone offert ! (Reprenez-en un pour changer de couleur.)" });
     }
     this.el.hidden = false;
+    // connexion automatique à la salle multijoueur (nécessaire pour les messages et les appels)
+    if (G.net.status === "off" || G.net.status === "error") {
+      G.net.connect(G.net.name, G.net.room);
+      bus.emit("toast", { text: `🌐 Connexion à la salle « ${G.net.room} »… Vos amis doivent choisir la même salle.` });
+    }
     this.go(this.incoming ? "incoming" : "home");
   }
   close() {
@@ -146,7 +160,7 @@ export class Phone {
     } else if (v.app === "video" || v.app === "players") {
       const ps = this.players();
       body = `<div class="ph-title">${v.app === "video" ? "📹 Appels vidéo" : "👥 Joueurs connectés"}</div>
-        ${online ? "" : `<p class="ph-hint">Connectez-vous au multijoueur (🌐) : vos amis doivent être dans la même salle.</p>`}
+        ${online ? `<p class="ph-hint">Salle : <b>${this.esc(G.net.room)}</b> — vos amis doivent ouvrir GRIOT et rejoindre cette même salle.</p>` : `<p class="ph-hint">Connexion au multijoueur… (ou touchez 🌐 Multijoueur pour choisir la salle).</p>`}
         ${ps.length ? ps.map((p) => `<div class="ph-row"><b>${this.esc(p.name)}</b><span class="ph-actions"><button data-chat="${p.id}">💬</button><button data-call="${p.id}">📹</button></span></div>`).join("") : online ? `<p class="ph-hint">Personne d'autre n'est connecté dans la salle « ${this.esc(G.net.room)} » pour l'instant.</p>` : ""}`;
     } else if (v.app === "incoming" && this.incoming) {
       body = `<div class="ph-incall"><div class="ph-avatar">📹</div><div class="ph-who">${this.esc(this.incoming.name)}</div><div class="ph-sub">Appel vidéo entrant…</div>
@@ -155,6 +169,7 @@ export class Phone {
       const name = this.players().find((p) => p.id === this.peer)?.name ?? "Joueur";
       const s = Math.floor((Date.now() - this.callStart) / 1000);
       body = `<div class="ph-video"><video class="ph-remote" playsinline autoplay></video><video class="ph-local" playsinline autoplay muted></video>
+        <div class="ph-status">${this.callStart ? "" : "Ça sonne chez votre ami…"}</div>
         <div class="ph-callinfo">${this.esc(name)} · ${this.callStart ? `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}` : "Appel en cours…"}</div>
         <div class="ph-callbtns"><button data-mute="1">🎙️</button><button data-cam="1">📷</button><button class="no" data-hang="1">✕</button></div></div>`;
     }
@@ -167,9 +182,7 @@ export class Phone {
     if (v.app === "call") {
       const lv = this.screen.querySelector(".ph-local") as HTMLVideoElement;
       if (this.local) lv.srcObject = this.local;
-      const rv = this.screen.querySelector(".ph-remote") as HTMLVideoElement;
-      const rs = this.pc?.getReceivers().map((r) => r.track).filter(Boolean) as MediaStreamTrack[] | undefined;
-      if (rs?.length) rv.srcObject = new MediaStream(rs);
+      this.showRemote();
     }
   }
 
@@ -221,28 +234,77 @@ export class Phone {
   }
 
   // ---------------------------------------------------------------- appels vidéo (WebRTC)
+  /** Caméra + micro ; sinon micro seul ; sinon rien (on voit et on entend quand même l'autre). */
   private async media() {
-    if (!this.local) this.local = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 } }, audio: true });
+    if (this.local) return this.local;
+    const tries: MediaStreamConstraints[] = [{ video: { facingMode: "user", width: { ideal: 640 } }, audio: { echoCancellation: true, noiseSuppression: true } }, { audio: true }, { video: true }];
+    for (const c of tries) {
+      try {
+        this.local = await navigator.mediaDevices.getUserMedia(c);
+        if (!c.video) bus.emit("toast", { text: "📹 Pas de caméra trouvée : appel en audio (vous voyez quand même votre ami).", kind: "warn" });
+        return this.local;
+      } catch {}
+    }
+    bus.emit("toast", { text: "Caméra et micro indisponibles : vous verrez et entendrez votre ami, sans être vu.", kind: "warn" });
+    this.local = new MediaStream();
     return this.local;
+  }
+
+  /** Ajoute nos pistes, et demande toujours à recevoir l'audio et la vidéo de l'autre. */
+  private attach(pc: RTCPeerConnection, stream: MediaStream) {
+    const kinds = new Set<string>();
+    stream.getTracks().forEach((t) => {
+      pc.addTrack(t, stream);
+      kinds.add(t.kind);
+    });
+    for (const k of ["audio", "video"]) if (!kinds.has(k)) pc.addTransceiver(k, { direction: "recvonly" });
   }
 
   private newPC(peer: string) {
     const pc = new RTCPeerConnection(ICE);
     pc.onicecandidate = (e) => e.candidate && G.net.signal(peer, { t: "ice", c: e.candidate.toJSON() });
-    pc.ontrack = () => this.view.app === "call" && this.render();
+    pc.ontrack = (e) => {
+      this.remote ??= new MediaStream();
+      if (!this.remote.getTracks().includes(e.track)) this.remote.addTrack(e.track);
+      this.showRemote();
+    };
+    pc.oniceconnectionstatechange = () => this.setStatus(({ checking: "Connexion…", disconnected: "Connexion instable…", failed: "Échec de connexion" } as Record<string, string>)[pc.iceConnectionState] ?? "");
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === "connected" && !this.callStart) {
         this.callStart = Date.now();
+        this.setStatus("");
         this.tick();
       }
       if (pc.connectionState === "failed") {
-        bus.emit("toast", { text: "Connexion vidéo impossible (réseau trop restrictif). Essayez en Wi-Fi.", kind: "warn" });
+        bus.emit("toast", { text: "Connexion vidéo impossible : le réseau bloque la vidéo. Essayez tous les deux en Wi-Fi (pas le Wi-Fi de l'école).", kind: "warn" });
         this.hangup(true);
       }
     };
     this.pc = pc;
     this.peer = peer;
     return pc;
+  }
+
+  private showRemote() {
+    const rv = this.screen.querySelector(".ph-remote") as HTMLVideoElement | null;
+    if (!rv || !this.remote) return;
+    if (rv.srcObject !== this.remote) rv.srcObject = this.remote;
+    // iPad/iPhone : la lecture avec le son doit être relancée explicitement
+    rv.play().catch(() => {
+      rv.muted = true;
+      rv.play().catch(() => {});
+      this.setStatus("Touchez la vidéo pour activer le son");
+      rv.onclick = () => {
+        rv.muted = false;
+        rv.play().catch(() => {});
+        this.setStatus("");
+      };
+    });
+  }
+
+  private setStatus(text: string) {
+    const el = this.screen.querySelector(".ph-status") as HTMLElement | null;
+    if (el) el.textContent = text;
   }
 
   private tick() {
@@ -262,13 +324,19 @@ export class Phone {
     try {
       const stream = await this.media();
       const pc = this.newPC(peer);
-      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+      this.attach(pc, stream);
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       if (!G.net.signal(peer, { t: "offer", sdp: offer })) throw new Error("relais");
       this.callStart = 0;
       this.go("call");
       bus.emit("toast", { text: "📹 Appel en cours…" });
+      this.ringTimer = setTimeout(() => {
+        if (this.pc && !this.callStart && this.pc.connectionState !== "connected") {
+          bus.emit("toast", { text: "📹 Pas de réponse. Vérifiez que votre ami a ouvert GRIOT et rejoint la même salle.", kind: "warn" });
+          this.hangup(true);
+        }
+      }, 45000);
     } catch (e: any) {
       this.cleanup();
       bus.emit("toast", { text: e?.message === "relais" ? "Appels vidéo disponibles via le relais public (site web)." : "Caméra ou micro refusés.", kind: "warn" });
@@ -282,8 +350,8 @@ export class Phone {
     try {
       const stream = await this.media();
       const pc = this.newPC(inc.from);
-      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
       await pc.setRemoteDescription(inc.sdp);
+      this.attach(pc, stream);
       for (const c of this.pendingIce.splice(0)) await pc.addIceCandidate(c).catch(() => {});
       const ans = await pc.createAnswer();
       await pc.setLocalDescription(ans);
@@ -309,6 +377,9 @@ export class Phone {
   }
 
   private cleanup() {
+    if (this.ringTimer) clearTimeout(this.ringTimer);
+    this.ringTimer = null;
+    this.remote = null;
     this.pc?.close();
     this.pc = null;
     this.peer = null;

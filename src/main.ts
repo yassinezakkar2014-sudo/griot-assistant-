@@ -324,7 +324,11 @@ async function boot() {
   const loop = () => {
     requestAnimationFrame(loop);
     const raw = clock.getDelta();
-    if (!active) return; // AISAM en veille : aucun calcul ni rendu 3D
+    if (!active) {
+      // AISAM en veille : pas de 3D, mais on reste visible en multijoueur (messages, appels vidéo)
+      if (G.net) G.net.update(Math.min(raw, 0.1));
+      return;
+    }
     (window as any).__fps = Math.round(0.9 * ((window as any).__fps ?? 60) + 0.1 / Math.max(raw, 1e-3));
     const dt = Math.min(raw, 0.05);
     G.time += dt;
