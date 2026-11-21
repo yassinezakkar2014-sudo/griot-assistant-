@@ -53,6 +53,17 @@ Inspection orbitale, activation, transformation animée (le nano-alliage se mat�
 ### Missions & progression
 9 missions facultatives (explorer une zone secrète, découvrir une technologie, tester un véhicule, débloquer une pièce, découvrir de nouvelles armures…), XP, niveaux, rangs, récompenses. **Sauvegarde automatique** (navigateur + serveur).
 
+## Mettre GRIOT en ligne (Render, faisable depuis un iPad)
+
+1. Créez un compte sur [render.com](https://render.com) (connexion avec GitHub).
+2. **New → Blueprint**, choisissez le dépôt `griot-assistant-` : Render lit `render.yaml`.
+3. Renseignez les deux secrets demandés :
+   - `OPENAI_API_KEY` : votre clé OpenAI ;
+   - `GRIOT_PASSWORD` : le mot de passe d'accès au site (obligatoire en pratique, sinon n'importe qui consomme votre clé).
+4. **Apply**. Après quelques minutes, ouvrez l'adresse `https://griot-….onrender.com` dans Safari ; identifiant : ce que vous voulez, mot de passe : `GRIOT_PASSWORD`.
+
+Notes : l'offre gratuite se met en veille après ~15 min d'inactivité (premier chargement lent). Son disque n'est pas permanent : la sauvegarde côté serveur (`data/`) est perdue à chaque redéploiement, la sauvegarde du navigateur reste. Micro et caméra fonctionnent, car Render fournit HTTPS.
+
 ## Moteur IA : OpenJarvis (optionnel)
 
 GRIOT peut faire passer la conversation par [OpenJarvis](https://github.com/open-jarvis/OpenJarvis), un framework d'IA personnelle « local d'abord » qui expose une API compatible OpenAI (modèles locaux via Ollama, ou cloud).

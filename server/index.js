@@ -4,6 +4,7 @@ import OpenAI, { toFile } from "openai";
 import multer from "multer";
 import path from "node:path";
 import fs from "node:fs";
+import crypto from "node:crypto";
 import { chat, generatedDocs, memoryFacts, projects, upsertProject, MODES } from "./griot.js";
 import { extractText } from "./documents.js";
 import { webSearch } from "./search.js";
@@ -12,6 +13,21 @@ import { load, save, update } from "./store.js";
 dotenv.config();
 const DEV = process.argv.includes("--dev");
 const app = express();
+// Mot de passe d'accès (recommandé dès que GRIOT est en ligne) : définissez GRIOT_PASSWORD.
+// Le navigateur affiche sa fenêtre de connexion ; l'identifiant peut être n'importe quoi.
+const sameSecret = (a, b) => {
+  const ha = crypto.createHash("sha256").update(a).digest();
+  const hb = crypto.createHash("sha256").update(b).digest();
+  return crypto.timingSafeEqual(ha, hb);
+};
+app.use((req, res, next) => {
+  const password = process.env.GRIOT_PASSWORD;
+  if (!password || req.path === "/api/health") return next();
+  const [scheme, encoded] = (req.headers.authorization || "").split(" ");
+  const given = scheme === "Basic" && encoded ? Buffer.from(encoded, "base64").toString().split(":").slice(1).join(":") : "";
+  if (given && sameSecret(given, password)) return next();
+  res.set("WWW-Authenticate", 'Basic realm="GRIOT", charset="UTF-8"').status(401).send("Accès réservé.");
+});
 app.use(express.json({ limit: "15mb" }));
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 const port = Number(process.env.PORT) || 3000;
