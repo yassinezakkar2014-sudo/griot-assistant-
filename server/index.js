@@ -102,7 +102,8 @@ app.get("/api/health", (_req, res) => {
 app.post("/api/chat", async (req, res) => {
   const { messages, mode = "personal", lang = "fr", game, image } = req.body || {};
   if (!Array.isArray(messages) || !messages.length) return res.status(400).json({ error: "messages manquants" });
-  if (!hasChat()) return res.status(503).json({ error: "OPENAI_API_KEY manquante" });
+  const userKey = userGroqKey(req);
+  if (!hasChat() && !userKey) return res.status(503).json({ error: "Aucune clé d'IA : touchez 🔑 Clés IA et collez une clé Groq gratuite." });
 
   res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
   const emit = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
@@ -116,7 +117,7 @@ app.post("/api/chat", async (req, res) => {
     last.content = [{ type: "text", text: last.content }, { type: "image_url", image_url: { url: image } }];
   }
   try {
-    await chatWithFallback({ messages: clean, mode, lang, game }, (e, d) => {
+    await chatWithFallback({ messages: clean, mode, lang, game }, userKey, (e, d) => {
       if (!closed) emit(e, d);
     });
     if (!closed) emit("done", {});
@@ -128,8 +129,19 @@ app.post("/api/chat", async (req, res) => {
 });
 
 // ---- Moteurs de secours : si un moteur échoue AVANT d'avoir répondu, on essaie le suivant ----
-function engines() {
+/** Clé Groq collée par l'utilisateur dans GRIOT (bouton « Clés IA »), envoyée par son navigateur. */
+function userGroqKey(req) {
+  const k = String(req?.get?.("x-groq-key") || "").trim();
+  return /^gsk_\w{20,}$/.test(k) ? k : "";
+}
+
+function engines(userKey = "") {
   const list = [];
+  if (userKey) {
+    const c = () => new OpenAI({ apiKey: userKey, baseURL: process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1" });
+    list.push({ name: "Groq (votre clé)", client: c, model: async () => "llama-3.3-70b-versatile" });
+    list.push({ name: "Groq (votre clé, léger)", client: c, model: async () => "llama-3.1-8b-instant", light: true });
+  }
   const b = backend();
   if (b === "openjarvis") list.push({ name: "OpenJarvis", client: chatClient, model: chatModel });
   if (hasGroq()) {
@@ -142,18 +154,19 @@ function engines() {
   return list;
 }
 
-async function chatWithFallback(payload, emit) {
+async function chatWithFallback(payload, userKey, emit) {
   let lastError = null;
   const tried = new Set();
-  for (const eng of engines()) {
+  for (const eng of engines(userKey)) {
     let model;
     try {
       model = await eng.model();
     } catch {
       continue;
     }
-    if (tried.has(eng.name.split(" ")[0] + model)) continue;
-    tried.add(eng.name.split(" ")[0] + model);
+    const id = eng.name.split(" (")[0] + (eng.name.includes("votre clé") ? "*" : "") + model;
+    if (tried.has(id)) continue;
+    tried.add(id);
     let answered = false;
     try {
       // modèles légers : contexte et réponse plus courts (limites des offres gratuites)
@@ -183,19 +196,20 @@ function explainAIError(e) {
       ? "Le serveur OpenJarvis est injoignable. Sur Render, retirez la variable GRIOT_AI_BACKEND (ou corrigez OPENJARVIS_URL) pour utiliser Groq ou OpenAI."
       : "Le moteur d'IA est injoignable pour le moment (réseau). Réessayez dans un instant.";
   if (status === 401) return "Clé d'IA refusée (invalide ou révoquée). Vérifiez GROQ_API_KEY ou OPENAI_API_KEY dans Render → Environment.";
-  if (status === 429 && /insufficient_quota|billing|quota/i.test(msg)) return "Le compte OpenAI n'a plus de crédit (Billing). Ajoutez du crédit, ou mettez une clé Groq gratuite (GROQ_API_KEY).";
+  if (status === 429 && /insufficient_quota|billing|quota/i.test(msg)) return "Le compte OpenAI n'a plus de crédit (Billing). Touchez 🔑 Clés IA et collez une clé Groq gratuite (console.groq.com/keys).";
   if (status === 429) return "Limite de requêtes atteinte chez le fournisseur d'IA (offre gratuite). Attendez une minute et réessayez.";
   if (status === 413) return "Demande trop longue pour le modèle gratuit. Effacez la conversation (bouton « Effacer ») puis réessayez.";
   if (status === 404 || /model/i.test(msg)) return "Modèle d'IA indisponible. Laissez GROQ_MODEL vide sur Render (choix automatique) ou corrigez OPENAI_MODEL.";
-  if (!hasChat()) return "Aucune clé d'IA sur le serveur. Ajoutez GROQ_API_KEY (gratuit) ou OPENAI_API_KEY dans Render → Environment.";
+  if (!hasChat()) return "Aucune clé d'IA : touchez 🔑 Clés IA dans GRIOT et collez une clé Groq gratuite (ou ajoutez GROQ_API_KEY dans Render → Environment).";
   return "Erreur du moteur d'IA : " + msg.slice(0, 200);
 }
 
 // ---- Diagnostic : teste chaque moteur avec une mini-question ----
-app.get("/api/diag", async (_req, res) => {
+app.get("/api/diag", async (req, res) => {
   const results = [];
-  if (!engines().length) return res.json({ ok: false, results, advice: explainAIError(new Error("none")) });
-  for (const eng of engines()) {
+  const list = engines(userGroqKey(req)).filter((e) => !e.light || e.name.startsWith("Groq ("));
+  if (!list.length) return res.json({ ok: false, results, advice: explainAIError(new Error("none")) });
+  for (const eng of list) {
     const t0 = Date.now();
     let model = "?";
     try {

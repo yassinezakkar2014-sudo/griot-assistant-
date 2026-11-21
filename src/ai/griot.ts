@@ -3,7 +3,7 @@ import { G, bus } from "../core";
 import { parseCommands, type Intent } from "./commands";
 import { runAction, gameSummary } from "./actions";
 import { GAME_ACTIONS, MODE_RULES, PERSONA } from "./persona";
-import { chatStream, getOpenAIKey } from "./localapi";
+import { aiHeaders, browserAIKey, chatStream, getGroqKey, getOpenAIKey } from "./localapi";
 import { Voice } from "./voice";
 
 export type GriotMode = "personal" | "business" | "research" | "creative" | "coder";
@@ -75,10 +75,11 @@ export class Griot {
       this.ai = false;
     }
     // sans moteur côté serveur mais avec une clé OpenAI enregistrée : on l'utilise directement
-    if (!this.ai && getOpenAIKey() && !document.documentElement.classList.contains("serverless")) {
+    // le serveur n'a pas de moteur, mais l'utilisateur a collé une clé : on s'en sert
+    if (!this.ai && browserAIKey() && !document.documentElement.classList.contains("serverless")) {
       this.ai = true;
-      this.useBrowserKey = true;
-      this.backendName = "openai (navigateur)";
+      this.backendName = getGroqKey() ? "groq (votre clé)" : "openai (navigateur)";
+      if (!getGroqKey()) this.useBrowserKey = true;
     }
     try {
       const saved = JSON.parse(localStorage.getItem("griot-chat") || "null");
@@ -129,10 +130,17 @@ export class Griot {
     try {
       const h = await (await fetch("/api/health")).json();
       this.ai = h.ai;
+      this.backendName = h.backend && h.backend !== "none" ? h.backend : h.openai ? "openai" : "";
       this.voice.serverTTS = h.tts;
       this.voice.serverSTT = h.stt ?? h.ai;
     } catch {}
-    bus.emit("griot:status", this.ai ? "IA OPENAI" : this.sampleFn ? "CLAUDE CONNECTÉ" : "MODE LOCAL");
+    this.useBrowserKey = false;
+    if (!this.ai && browserAIKey() && !document.documentElement.classList.contains("serverless")) {
+      this.ai = true;
+      if (!getGroqKey()) this.useBrowserKey = true;
+    }
+    if (getGroqKey()) this.backendName = "groq";
+    bus.emit("griot:status", this.ai ? `IA ${(this.backendName || "openai").split(" ")[0].toUpperCase()}` : this.sampleFn ? "CLAUDE CONNECTÉ" : "MODE LOCAL");
   }
 
   setMode(m: GriotMode) {
@@ -415,8 +423,8 @@ export class Griot {
     try {
       const payload = { messages: this.history.slice(-20), mode: this.mode, lang: this.voice.settings.lang.slice(0, 2), game: gameSummary(), image, pdf: pdf?.data, pdfName: pdf?.name };
       const res = this.useBrowserKey
-        ? chatStream(getOpenAIKey(), payload)
-        : await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: this.abort.signal });
+        ? chatStream(browserAIKey(), payload)
+        : await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json", ...aiHeaders() }, body: JSON.stringify(payload), signal: this.abort.signal });
       if (!res.ok || !res.body) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
       const reader = res.body.getReader();
       const dec = new TextDecoder();
@@ -468,15 +476,16 @@ export class Griot {
     } catch (e: any) {
       bubble.classList.remove("typing");
       if (e.name === "AbortError") bubble.innerHTML = md(full + "\n\n*(interrompu)*");
-      else if (!full && !this.useBrowserKey && getOpenAIKey()) {
-        // secours : la clé OpenAI enregistrée dans ce navigateur
+      else if (!full && !this.useBrowserKey && browserAIKey()) {
+        // secours : la clé enregistrée dans ce navigateur, appelée directement
         this.useBrowserKey = true;
         bubble.closest(".msg")?.remove();
-        bus.emit("toast", { text: "Serveur d'IA indisponible : je passe par votre clé OpenAI." });
-        bus.emit("griot:status", "IA OPENAI (NAVIGATEUR)");
+        const who = getGroqKey() ? "Groq" : "OpenAI";
+        bus.emit("toast", { text: `Serveur d'IA indisponible : je passe directement par votre clé ${who}.` });
+        bus.emit("griot:status", `IA ${who.toUpperCase()} (NAVIGATEUR)`);
         this.busy = false;
         return this.stream(image, spoken, pdf);
-      } else bubble.innerHTML = md(`⚠ ${e.message}\n\nDites **« diagnostic »** pour que je teste mes moteurs d'IA, ou touchez **🔑 Clé OpenAI** pour me brancher sur votre propre clé. Les commandes du royaume restent disponibles.`);
+      } else bubble.innerHTML = md(`⚠ ${e.message}\n\nDites **« diagnostic »** pour que je teste mes moteurs d'IA, ou touchez **🔑 Clés IA** et collez une clé **Groq gratuite** (console.groq.com/keys). Les commandes du royaume restent disponibles.`);
       this.history.pop();
     } finally {
       this.busy = false;
@@ -489,7 +498,7 @@ export class Griot {
   async diagnostic(): Promise<string> {
     const lines: string[] = [];
     try {
-      const r = await fetch("/api/diag");
+      const r = await fetch("/api/diag", { headers: aiHeaders() });
       if (r.status === 401) return "Le serveur demande le mot de passe GRIOT : rechargez la page et saisissez-le.";
       const d = await r.json();
       if (d.results?.length)
@@ -499,8 +508,8 @@ export class Griot {
     } catch {
       lines.push("❌ Le serveur ne répond pas (il se réveille peut-être : sur l'offre gratuite de Render, comptez jusqu'à une minute).");
     }
-    const key = getOpenAIKey();
-    lines.push(key ? "🔑 Une clé OpenAI est enregistrée dans ce navigateur : elle sert de secours." : "🔑 Aucune clé OpenAI dans ce navigateur (bouton « Clé OpenAI » pour en ajouter une en secours).");
+    lines.push(getGroqKey() ? "🔑 Votre clé Groq est enregistrée dans ce navigateur : elle est utilisée en premier." : "🔑 Pas de clé Groq dans ce navigateur (bouton « 🔑 Clés IA » pour en coller une, c'est gratuit).");
+    if (getOpenAIKey()) lines.push("🔑 Une clé OpenAI est aussi enregistrée dans ce navigateur (secours).");
     return "Diagnostic de mes moteurs d'IA :\n" + lines.map((l) => "- " + l).join("\n");
   }
 
