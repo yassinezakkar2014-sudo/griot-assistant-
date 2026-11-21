@@ -41,6 +41,8 @@ function clause(raw: string): Intent | null {
     if (/\b(dors|dormir|sommeil|coucher|lit)\b/.test(t)) return { action: "cabin", target: "sleep" };
     return { action: "cabin", target: "enter" };
   }
+  if (/\b(appel video|appelle.moi|on s appelle|facetime|mode appel|appel avec griot|passe.moi un appel)\b/.test(t)) return { action: "call" };
+  if (/\b(prends|prendre|monte dans|je prends) (le )?train\b|\btrain (pour|vers|jusqu)/.test(t)) return { action: "train", target: t };
   // --- espace ---
   if (/\b(retourne sur terre|rentre sur terre|redescends sur terre|quitte l espace|rentree atmospherique)\b/.test(t)) return { action: "space", target: "exit" };
   const goWord = V.go.test(t) || V.fly.test(t) || /\b(decolle|part|partons|direction|envoie|vise|cap sur)\b/.test(t);

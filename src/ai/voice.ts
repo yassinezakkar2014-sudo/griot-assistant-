@@ -23,6 +23,8 @@ export interface VoiceSettings {
   rate: number;
   continuous: boolean;
   wakeWord: boolean;
+  /** voix du navigateur choisie (nom), sinon la plus réaliste disponible */
+  browserVoice?: string;
 }
 
 type SR = any;
@@ -393,13 +395,27 @@ export class Voice {
     });
   }
 
-  private pickVoice(lang: string) {
-    const voices = speechSynthesis.getVoices();
+  /** Voix du navigateur pour une langue, de la plus réaliste à la moins réaliste. */
+  voicesFor(lang: string) {
+    if (!("speechSynthesis" in window)) return [];
     const base = lang.slice(0, 2);
-    const cands = voices.filter((v) => v.lang.replace("_", "-").startsWith(base));
+    const cands = speechSynthesis.getVoices().filter((v) => v.lang.replace("_", "-").startsWith(base));
+    // les voix « Premium / Améliorée / Naturelle / Neural » sont de vraies voix humaines de synthèse
     const score = (v: SpeechSynthesisVoice) =>
-      (v.lang.replace("_", "-") === lang ? 4 : 0) + (/natural|neural|online/i.test(v.name) ? 6 : 0) + (/premium|enhanced|google/i.test(v.name) ? 3 : 0) + (/thomas|henri|paul|daniel|male|homme|guy|ryan/i.test(v.name) ? 1 : 0);
-    return cands.sort((a, b) => score(b) - score(a))[0];
+      (v.lang.replace("_", "-") === lang ? 4 : 0) +
+      (/premium/i.test(v.name) ? 14 : 0) +
+      (/enhanced|am[ée]lior/i.test(v.name) ? 11 : 0) +
+      (/natural|neural|online|siri/i.test(v.name) ? 10 : 0) +
+      (/google/i.test(v.name) ? 3 : 0) +
+      (v.localService ? 0 : 1) +
+      (/thomas|henri|paul|daniel|guy|denise|amelie|amélie|audrey|aurelie|aurélie/i.test(v.name) ? 1 : 0) -
+      (/compact|eloquence|grandma|grandpa|rocko|shelley|flo|reed|sandy/i.test(v.name) ? 8 : 0);
+    return cands.sort((a, b) => score(b) - score(a));
+  }
+
+  private pickVoice(lang: string) {
+    const list = this.voicesFor(lang);
+    return list.find((v) => v.name === this.settings.browserVoice) ?? list[0];
   }
 
   private speakBrowser(text: string, gen: number) {
@@ -410,8 +426,9 @@ export class Voice {
       const v = this.pickVoice(this.settings.lang);
       if (v) u.voice = v;
       // intonation expressive selon la ponctuation
-      u.rate = 1.02 * this.settings.rate;
-      u.pitch = /!/.test(text) ? 1.08 : /\?/.test(text) ? 1.04 : 0.96;
+      // débit et hauteur naturels (les voix premium sont déjà expressives)
+      u.rate = this.settings.rate;
+      u.pitch = 1;
       let level = 0;
       u.onboundary = () => {
         level = 0.9;

@@ -412,3 +412,26 @@ body[data-mode="passenger"] .tbtns.car { display: grid; }
 .vision-wrap video { width: 100%; max-height: 46vh; border-radius: 14px; background: #000; object-fit: cover; display: block; margin: 8px 0; }
 .vis-ans { margin-top: 10px; padding: 12px; border-radius: 12px; background: rgba(79, 210, 255, 0.08); min-height: 48px; }
 .pill .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; border: 1px solid rgba(255,255,255,.4); }
+
+/* appel vidéo avec GRIOT */
+.call-pill { background: linear-gradient(135deg, #1fbf6a, #128a4a) !important; color: #fff !important; }
+.call-screen { position: fixed; inset: 0; z-index: 9999; background: radial-gradient(circle at 50% 35%, #0d2a4a, #02060e 70%); color: #eaf6ff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); font-family: Manrope, system-ui, sans-serif; }
+.call-top { position: absolute; top: max(18px, env(safe-area-inset-top)); left: 0; right: 0; text-align: center; font-size: 15px; opacity: .85; }
+.call-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #3fff9a; box-shadow: 0 0 10px #3fff9a; }
+.call-face { width: min(62vw, 46vh); height: min(62vw, 46vh); }
+.call-state { font-size: 20px; letter-spacing: .04em; color: #9fe8ff; min-height: 28px; }
+.call-screen[data-state="listening"] .call-state { color: #3fff9a; }
+.call-screen[data-state="thinking"] .call-state { color: #ffc861; }
+.call-sub { max-width: 720px; text-align: center; font-size: 17px; line-height: 1.4; min-height: 24px; }
+.call-sub.you { opacity: .7; font-style: italic; }
+.call-self { position: absolute; right: 16px; top: 60px; width: min(30vw, 200px); border-radius: 14px; border: 2px solid rgba(79,210,255,.6); background: #000; transform: scaleX(-1); }
+.call-self[hidden] { display: none; }
+.call-bar { position: absolute; bottom: max(26px, env(safe-area-inset-bottom)); display: flex; gap: 18px; }
+.call-bar button { width: 64px; height: 64px; border-radius: 50%; border: 0; font-size: 26px; background: rgba(255,255,255,.12); color: #fff; cursor: pointer; }
+.call-bar button.off { opacity: .45; }
+.call-bar button.end { background: #e0383e; transform: rotate(135deg); }
+
+/* train royal */
+.train-hud { position: fixed; left: 50%; top: max(16px, env(safe-area-inset-top)); transform: translateX(-50%); z-index: 50; padding: 10px 18px; border-radius: 999px; background: rgba(6,14,28,.78); color: #eaf6ff; font: 600 15px Manrope, system-ui, sans-serif; border: 1px solid rgba(79,210,255,.4); }
+.train-hud small { opacity: .7; margin-left: 6px; }
+.train-hud[hidden] { display: none; }

@@ -21,6 +21,7 @@ import type { Combat } from "./game/combat";
 import type { Space } from "./game/space";
 import type { Deco } from "./game/deco";
 import type { Mecha } from "./game/mecha";
+import type { Train } from "./game/train";
 
 export type Mode = "foot" | "ship" | "inspect" | "cinematic" | "car" | "passenger";
 
@@ -49,6 +50,7 @@ export interface GameContext {
   space: Space;
   deco: Deco;
   mecha: Mecha;
+  train: Train;
   mode: Mode;
   time: number; // secondes écoulées
   uiFocus: boolean; // vrai quand un champ texte / menu a le focus

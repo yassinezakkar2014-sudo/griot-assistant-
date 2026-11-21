@@ -26,6 +26,8 @@ import { Combat } from "./game/combat";
 import { Space, STATION, MOON_BASE } from "./game/space";
 import { Deco } from "./game/deco";
 import { Mecha } from "./game/mecha";
+import { Train } from "./game/train";
+import { buildMSPalace } from "./world/msPalace";
 import { buildCountries } from "./world/countries";
 import { buildPalaceCrown, buildHyperTowers, buildMetropolis } from "./world/giant";
 import { PLACES } from "./ai/actions";
@@ -125,7 +127,9 @@ async function boot() {
   G.palace.spots.zuria = { pos: zuria.front, yaw: 0, label: "zuria" };
   progress(0.965, "Les pays du grand monde");
   await new Promise((r) => setTimeout(r, 0));
-  for (const ci of buildCountries())
+  const countryList = buildCountries();
+  buildMSPalace();
+  for (const ci of countryList)
     PLACES.push({ id: "country:" + ci.def.id, name: ci.def.name, pos: () => ci.front.clone(), fly: () => ci.pad.clone(), outdoor: true });
   PLACES.push({ id: "station", name: "la Station orbitale royale", pos: () => STATION.clone().add(new THREE.Vector3(30, 0.2, 60)), fly: () => STATION.clone(), outdoor: true, space: true });
   PLACES.push({ id: "moon", name: "la Lune", pos: () => MOON_BASE.clone().add(new THREE.Vector3(10, 0.2, 10)), fly: () => MOON_BASE.clone().add(new THREE.Vector3(50, 0, 50)), outdoor: true, space: true });
@@ -149,6 +153,8 @@ async function boot() {
   G.deco.build();
   G.mecha = new Mecha();
   G.mecha.build();
+  G.train = new Train();
+  G.train.build();
   G.armor = new ArmorSystem();
   G.armor.build();
   const companion = buildCompanion();
@@ -238,6 +244,7 @@ async function boot() {
           await fetch("/api/save", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ save: null }) }).catch(() => {});
         }
       }
+      G.missions.unlockAll(); // tout est gratuit et débloqué
       G.input.keys.clear();
       G.input.pressed.clear();
       $("loader").classList.add("gone");
