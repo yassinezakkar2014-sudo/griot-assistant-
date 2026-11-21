@@ -64,6 +64,16 @@ Inspection orbitale, activation, transformation animée (le nano-alliage se mat�
 
 Notes : l'offre gratuite se met en veille après ~15 min d'inactivité (premier chargement lent). Son disque n'est pas permanent : la sauvegarde côté serveur (`data/`) est perdue à chaque redéploiement, la sauvegarde du navigateur reste. Micro et caméra fonctionnent, car Render fournit HTTPS.
 
+## OpenJarvis seul en ligne (Render + Groq)
+
+Le Blueprint `render.yaml` crée aussi un service **openjarvis** : l'interface web d'[OpenJarvis](https://github.com/open-jarvis/OpenJarvis) et son API compatible OpenAI, avec Groq comme moteur (via LiteLLM). Fichiers : `openjarvis/Dockerfile`, `openjarvis/config.toml`.
+
+- Secrets demandés par Render : `GROQ_API_KEY` **ou** `OPENAI_API_KEY` (laissez l'autre vide), et `OPENJARVIS_API_KEY` (un mot de passe que vous inventez ; OpenJarvis refuse de démarrer en ligne sans lui).
+- Ouvrez `https://openjarvis-….onrender.com`, puis **Settings → API key** : saisissez la même valeur que `OPENJARVIS_API_KEY`.
+- Modèle : variable `JARVIS_MODEL`. Avec Groq : `groq/openai/gpt-oss-120b` (défaut), toujours préfixé par `groq/`. Avec OpenAI : `gpt-4o-mini`.
+- Offre gratuite : mise en veille après ~15 min, disque non permanent (historique et mémoire perdus au redéploiement).
+- Pour que GRIOT l'utilise : `GRIOT_AI_BACKEND=openjarvis`, `OPENJARVIS_URL=https://openjarvis-….onrender.com/v1`, `OPENJARVIS_API_KEY=` la même clé.
+
 ## Moteur IA : OpenJarvis (optionnel)
 
 GRIOT peut faire passer la conversation par [OpenJarvis](https://github.com/open-jarvis/OpenJarvis), un framework d'IA personnelle « local d'abord » qui expose une API compatible OpenAI (modèles locaux via Ollama, ou cloud).
