@@ -68,6 +68,13 @@ export class UI {
     $("phoneBtn").onclick = () => this.phone.toggle();
     bus.on("ui:phone", (o?: { gift?: boolean }) => this.phone.open(!!o?.gift));
     bus.on("ui:vision", () => this.vision());
+    // pendant un appel entre joueurs, GRIOT se tait et libère le micro
+    bus.on("call:active", (on: boolean) => {
+      if (!on) return;
+      this.griot.voice.interrupt();
+      if (this.griot.voice.listening) this.griot.voice.stopListening();
+      if (this.griot.voice.settings.continuous) this.griot.voice.setContinuous(false);
+    });
     bus.on("ui:multi", () => this.multi());
     bus.on("ui:avatar", () => this.avatarPanel());
     bus.on("ui:call", () => this.call());

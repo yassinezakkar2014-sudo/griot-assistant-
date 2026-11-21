@@ -7,13 +7,28 @@ export class AudioFX {
   volume = 0.6;
 
   private silent: HTMLAudioElement | null = null;
+  /** appel vidéo en cours (session audio lecture + micro) */
+  inCall = false;
+
+  /** Passe la session audio en mode appel (micro + haut-parleur) ou la rétablit. */
+  setCallMode(on: boolean) {
+    this.inCall = on;
+    try {
+      const nav = navigator as any;
+      if (nav.audioSession) nav.audioSession.type = on ? "play-and-record" : "playback";
+    } catch {}
+    if (on && this.silent) this.silent.pause();
+    else if (!on) this.unlock();
+  }
 
   /** À appeler dans un geste (toucher, clic, touche). Sur iPad/iPhone : force la session audio
    *  « lecture » pour que le son passe même quand l'interrupteur silencieux est activé. */
   unlock() {
     try {
       const nav = navigator as any;
-      if (nav.audioSession && nav.audioSession.type !== "playback") nav.audioSession.type = "playback";
+      // pendant un appel vidéo il faut « lecture + enregistrement », sinon iOS coupe le micro
+      const want = this.inCall ? "play-and-record" : "playback";
+      if (nav.audioSession && nav.audioSession.type !== want) nav.audioSession.type = want;
     } catch {}
     if (!this.silent) {
       this.silent = new Audio(silentWav());
@@ -21,7 +36,7 @@ export class AudioFX {
       this.silent.setAttribute("playsinline", "");
       this.silent.volume = 0.01;
     }
-    if (this.silent.paused) this.silent.play().catch(() => {});
+    if (this.silent.paused && !this.inCall) this.silent.play().catch(() => {});
     if (this.ctx) {
       if (this.ctx.state !== "running") this.ctx.resume().catch(() => {});
       return;

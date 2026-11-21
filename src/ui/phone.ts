@@ -168,10 +168,11 @@ export class Phone {
     } else if (v.app === "call") {
       const name = this.players().find((p) => p.id === this.peer)?.name ?? "Joueur";
       const s = Math.floor((Date.now() - this.callStart) / 1000);
-      body = `<div class="ph-video"><video class="ph-remote" playsinline autoplay></video><video class="ph-local" playsinline autoplay muted></video>
+      body = `<div class="ph-video"><video class="ph-remote" playsinline autoplay muted></video><video class="ph-local" playsinline autoplay muted></video>
         <div class="ph-status">${this.callStart ? "" : "Ça sonne chez votre ami…"}</div>
         <div class="ph-callinfo">${this.esc(name)} · ${this.callStart ? `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}` : "Appel en cours…"}</div>
-        <div class="ph-callbtns"><button data-mute="1">🎙️</button><button data-cam="1">📷</button><button class="no" data-hang="1">✕</button></div></div>`;
+        <div class="ph-level"><span>🔊</span><i></i></div>
+        <div class="ph-callbtns"><button data-mute="1" title="Couper mon micro">🎙️</button><button data-speaker="1" title="Relancer le son">🔊</button><button data-cam="1" title="Ma caméra">📷</button><button class="no" data-hang="1">✕</button></div></div>`;
     }
     this.screen.innerHTML = bar + body;
     if (v.app === "chat") {
@@ -210,6 +211,14 @@ export class Phone {
     if (d.accept) return this.accept();
     if (d.decline) return this.decline();
     if (d.hang) return this.hangup(true);
+    if (d.speaker) {
+      this.audioEl.muted = false;
+      this.audioEl.volume = 1;
+      this.audioEl.play().then(() => this.setStatus("")).catch(() => {});
+      this.meter?.ctx.resume().catch(() => {});
+      G.audio.setCallMode(true);
+      bus.emit("toast", { text: "🔊 Son relancé. Montez le volume de l'appareil si besoin." });
+    }
     if (d.mute && this.local) {
       const tr = this.local.getAudioTracks()[0];
       if (tr) tr.enabled = !tr.enabled;
@@ -237,7 +246,7 @@ export class Phone {
   /** Caméra + micro ; sinon micro seul ; sinon rien (on voit et on entend quand même l'autre). */
   private async media() {
     if (this.local) return this.local;
-    const tries: MediaStreamConstraints[] = [{ video: { facingMode: "user", width: { ideal: 640 } }, audio: { echoCancellation: true, noiseSuppression: true } }, { audio: true }, { video: true }];
+    const tries: MediaStreamConstraints[] = [{ video: { facingMode: "user", width: { ideal: 640 } }, audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }, { audio: true }, { video: true }];
     for (const c of tries) {
       try {
         this.local = await navigator.mediaDevices.getUserMedia(c);
@@ -285,21 +294,54 @@ export class Phone {
     return pc;
   }
 
+  /** Lecteur audio dédié à la voix de l'ami (plus fiable que le son de la vidéo sur iPad/iPhone). */
+  private audioEl: HTMLAudioElement = Object.assign(document.createElement("audio"), { autoplay: true });
+  private meter: { ctx: AudioContext; an: AnalyserNode; raf: number } | null = null;
+
+  /** À appeler pendant un toucher (appeler / décrocher) : débloque la lecture du son. */
+  private unlockAudio() {
+    this.audioEl.setAttribute("playsinline", "");
+    if (!this.audioEl.isConnected) document.body.appendChild(this.audioEl);
+    this.audioEl.muted = false;
+    this.audioEl.volume = 1;
+    this.audioEl.play().catch(() => {});
+    G.audio.setCallMode(true);
+    bus.emit("call:active", true);
+  }
+
   private showRemote() {
+    if (!this.remote) return;
+    if (this.audioEl.srcObject !== this.remote) this.audioEl.srcObject = this.remote;
+    this.audioEl.play().catch(() => this.setStatus("🔊 Touchez le bouton 🔊 pour entendre votre ami"));
     const rv = this.screen.querySelector(".ph-remote") as HTMLVideoElement | null;
-    if (!rv || !this.remote) return;
-    if (rv.srcObject !== this.remote) rv.srcObject = this.remote;
-    // iPad/iPhone : la lecture avec le son doit être relancée explicitement
-    rv.play().catch(() => {
+    if (rv) {
+      if (rv.srcObject !== this.remote) rv.srcObject = this.remote;
       rv.muted = true;
       rv.play().catch(() => {});
-      this.setStatus("Touchez la vidéo pour activer le son");
-      rv.onclick = () => {
-        rv.muted = false;
-        rv.play().catch(() => {});
-        this.setStatus("");
+    }
+    this.startMeter();
+  }
+
+  /** Indicateur du son reçu : on voit si la voix de l'ami arrive. */
+  private startMeter() {
+    if (this.meter || !this.remote || !this.remote.getAudioTracks().length) return;
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const an = ctx.createAnalyser();
+      an.fftSize = 256;
+      ctx.createMediaStreamSource(this.remote).connect(an);
+      const buf = new Uint8Array(an.frequencyBinCount);
+      const loop = () => {
+        if (!this.meter) return;
+        an.getByteFrequencyData(buf);
+        const lvl = buf.reduce((a, b) => a + b, 0) / buf.length / 255;
+        const bar = this.screen.querySelector(".ph-level i") as HTMLElement | null;
+        if (bar) bar.style.width = `${Math.min(100, lvl * 400)}%`;
+        this.meter.raf = requestAnimationFrame(loop);
       };
-    });
+      this.meter = { ctx, an, raf: requestAnimationFrame(loop) };
+      ctx.resume().catch(() => {});
+    } catch {}
   }
 
   private setStatus(text: string) {
@@ -321,6 +363,7 @@ export class Phone {
   async call(peer: string) {
     if (this.pc) return;
     if (G.net.status !== "on") return bus.emit("toast", { text: "Connectez-vous d'abord au multijoueur (🌐).", kind: "warn" });
+    this.unlockAudio();
     try {
       const stream = await this.media();
       const pc = this.newPC(peer);
@@ -347,6 +390,7 @@ export class Phone {
     const inc = this.incoming;
     if (!inc) return;
     this.incoming = null;
+    this.unlockAudio();
     try {
       const stream = await this.media();
       const pc = this.newPC(inc.from);
@@ -380,6 +424,14 @@ export class Phone {
     if (this.ringTimer) clearTimeout(this.ringTimer);
     this.ringTimer = null;
     this.remote = null;
+    if (this.meter) {
+      cancelAnimationFrame(this.meter.raf);
+      this.meter.ctx.close().catch(() => {});
+      this.meter = null;
+    }
+    this.audioEl.srcObject = null;
+    G.audio.setCallMode(false);
+    bus.emit("call:active", false);
     this.pc?.close();
     this.pc = null;
     this.peer = null;

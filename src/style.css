@@ -494,3 +494,5 @@ html.touch .keys-help { display: none; }
 .ph-video .ph-callbtns { position: relative; }
 .ph-status { position: relative; background: rgba(0,0,0,.45); padding: 3px 10px; border-radius: 10px; font-size: 12px; margin-bottom: 6px; }
 .ph-status:empty { display: none; }
+.ph-level { position: relative; display: flex; align-items: center; gap: 6px; width: 70%; margin-bottom: 6px; font-size: 12px; }
+.ph-level i { display: block; height: 6px; width: 0; border-radius: 3px; background: #30c85a; transition: width .08s; }
