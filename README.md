@@ -68,9 +68,9 @@ Notes : l'offre gratuite se met en veille après ~15 min d'inactivité (premier 
 
 Le Blueprint `render.yaml` crée aussi un service **openjarvis** : l'interface web d'[OpenJarvis](https://github.com/open-jarvis/OpenJarvis) et son API compatible OpenAI, avec Groq comme moteur (via LiteLLM). Fichiers : `openjarvis/Dockerfile`, `openjarvis/config.toml`.
 
-- Secrets demandés par Render : `GROQ_API_KEY` et `OPENJARVIS_API_KEY` (un mot de passe que vous inventez ; OpenJarvis refuse de démarrer en ligne sans lui).
+- Secrets demandés par Render : `GROQ_API_KEY` **ou** `OPENAI_API_KEY` (laissez l'autre vide), et `OPENJARVIS_API_KEY` (un mot de passe que vous inventez ; OpenJarvis refuse de démarrer en ligne sans lui).
 - Ouvrez `https://openjarvis-….onrender.com`, puis **Settings → API key** : saisissez la même valeur que `OPENJARVIS_API_KEY`.
-- Modèle : variable `JARVIS_MODEL` (défaut `groq/openai/gpt-oss-120b`, toujours préfixé par `groq/`).
+- Modèle : variable `JARVIS_MODEL`. Avec Groq : `groq/openai/gpt-oss-120b` (défaut), toujours préfixé par `groq/`. Avec OpenAI : `gpt-4o-mini`.
 - Offre gratuite : mise en veille après ~15 min, disque non permanent (historique et mémoire perdus au redéploiement).
 - Pour que GRIOT l'utilise : `GRIOT_AI_BACKEND=openjarvis`, `OPENJARVIS_URL=https://openjarvis-….onrender.com/v1`, `OPENJARVIS_API_KEY=` la même clé.
 

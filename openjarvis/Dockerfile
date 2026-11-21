@@ -25,6 +25,8 @@ ENV HOME=/home/openjarvis OPENJARVIS_HOME=/home/openjarvis/.openjarvis
 COPY --chown=openjarvis:openjarvis config.toml /home/openjarvis/.openjarvis/config.toml
 USER openjarvis
 EXPOSE 10000
-# JARVIS_MODEL permet de changer de modèle Groq depuis Render sans reconstruire.
+# JARVIS_MODEL choisit le fournisseur sans reconstruire l'image :
+#   "groq/<modèle>"            → Groq via LiteLLM (GROQ_API_KEY)
+#   "gpt-4o-mini" ou autre     → moteur cloud intégré (OPENAI_API_KEY, ANTHROPIC_API_KEY…)
 ENV JARVIS_MODEL=groq/openai/gpt-oss-120b
-ENTRYPOINT ["sh", "-c", "sed -i \"s|^default_model = .*|default_model = \\\"$JARVIS_MODEL\\\"|\" \"$OPENJARVIS_HOME/config.toml\" && exec jarvis serve --host 0.0.0.0 --port \"${PORT:-10000}\" --engine litellm --model \"$JARVIS_MODEL\""]
+ENTRYPOINT ["sh", "-c", "case \"$JARVIS_MODEL\" in groq/*) engine=litellm ;; *) engine=cloud ;; esac; sed -i \"s|^default = .*|default = \\\"$engine\\\"|; s|^default_model = .*|default_model = \\\"$JARVIS_MODEL\\\"|\" \"$OPENJARVIS_HOME/config.toml\" && exec jarvis serve --host 0.0.0.0 --port \"${PORT:-10000}\" --engine \"$engine\" --model \"$JARVIS_MODEL\""]

@@ -1,5 +1,6 @@
 # Configuration OpenJarvis pour Render (moteur cloud Groq via LiteLLM)
 [engine]
+# Remplacé au démarrage selon JARVIS_MODEL (litellm pour groq/…, sinon cloud)
 default = "litellm"
 
 [intelligence]
