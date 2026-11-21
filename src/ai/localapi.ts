@@ -17,6 +17,32 @@ export function setOpenAIKey(k: string) {
     else localStorage.removeItem(OPENAI_KEY);
   } catch {}
 }
+const GROQ_KEY = "griot-groq-key";
+/** Clé Groq (gratuite) enregistrée dans ce navigateur. */
+export function getGroqKey(): string {
+  try {
+    return localStorage.getItem(GROQ_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+export function setGroqKey(k: string) {
+  try {
+    if (k) localStorage.setItem(GROQ_KEY, k.trim());
+    else localStorage.removeItem(GROQ_KEY);
+  } catch {}
+}
+/** Meilleure clé d'IA du navigateur : Groq (gratuite) d'abord, sinon OpenAI. */
+export function browserAIKey(): string {
+  return getGroqKey() || getOpenAIKey();
+}
+/** En-têtes à joindre aux appels du serveur GRIOT (la clé Groq de l'utilisateur, si présente). */
+export function aiHeaders(): Record<string, string> {
+  const g = getGroqKey();
+  return g ? { "X-Groq-Key": g } : {};
+}
+const GROQ = "https://api.groq.com/openai/v1";
+const GROQ_MODEL = "llama-3.3-70b-versatile";
 let realFetch: typeof fetch = (...a) => fetch(...a);
 const OA = "https://api.openai.com/v1";
 
@@ -57,10 +83,11 @@ function upsert(db: DB, b: any) {
 async function handle(path: string, method: string, body: any, raw?: BodyInit | null): Promise<Response> {
   const db = read();
   const key = getOpenAIKey();
-  if (path === "/api/health") return json({ ok: true, ai: !!key, tts: !!key, local: true, openai: !!key });
+  const chatKey = browserAIKey();
+  if (path === "/api/health") return json({ ok: true, ai: !!chatKey, tts: !!key, local: true, openai: !!key, backend: getGroqKey() ? "groq" : key ? "openai" : "none" });
   if (path === "/api/chat" && method === "POST") {
-    if (!key) return json({ error: "Clé OpenAI manquante" }, 503);
-    return chatStream(key, body || {});
+    if (!chatKey) return json({ error: "Aucune clé d'IA : touchez 🔑 Clés IA et collez une clé Groq (gratuite) ou OpenAI." }, 503);
+    return chatStream(chatKey, body || {});
   }
   if (path === "/api/tts" && method === "POST") {
     if (!key) return json({ error: "Clé OpenAI manquante" }, 503);
@@ -197,6 +224,9 @@ const TOOLS = [
 ];
 
 export function chatStream(key: string, body: any): Response {
+  const groq = key.startsWith("gsk_");
+  const base = groq ? GROQ : OA;
+  const who = groq ? "Groq" : "OpenAI";
   const enc = new TextEncoder();
   const stream = new ReadableStream({
     async start(ctrl) {
@@ -219,16 +249,23 @@ export function chatStream(key: string, body: any): Response {
         const parts: any[] = [];
         if (typeof body.image === "string" && body.image.startsWith("data:image/")) parts.push({ type: "image_url", image_url: { url: body.image } });
         if (typeof body.pdf === "string" && body.pdf.startsWith("data:application/pdf")) parts.push({ type: "file", file: { filename: body.pdfName || "document.pdf", file_data: body.pdf } });
-        if (parts.length && last) last.content = [{ type: "text", text: String(last.content) }, ...parts];
+        if (parts.length && last && !groq) last.content = [{ type: "text", text: String(last.content) }, ...parts];
         for (let step = 0; step < 5; step++) {
-          const r = await realFetch(`${OA}/chat/completions`, {
+          const r = await realFetch(`${base}/chat/completions`, {
             method: "POST",
             headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ model: localStorage.getItem("griot-openai-model") || "gpt-4o-mini", messages: msgs, tools: TOOLS, stream: true, max_tokens: 2000, temperature: body.mode === "creative" ? 0.95 : 0.6 })
+            body: JSON.stringify({ model: groq ? GROQ_MODEL : localStorage.getItem("griot-openai-model") || "gpt-4o-mini", messages: groq ? msgs.slice(0, 1).concat(msgs.slice(-12)) : msgs, tools: TOOLS, stream: true, max_tokens: 2000, temperature: body.mode === "creative" ? 0.95 : 0.6 })
           });
           if (!r.ok || !r.body) {
             const err = await r.json().catch(() => ({}));
-            const msg = r.status === 401 ? "Clé OpenAI invalide." : r.status === 429 ? "Quota OpenAI dépassé ou trop de demandes (vérifiez la facturation de votre compte OpenAI)." : err?.error?.message || `Erreur OpenAI ${r.status}`;
+            const msg =
+              r.status === 401
+                ? `Clé ${who} invalide.`
+                : r.status === 429
+                  ? groq
+                    ? "Limite gratuite Groq atteinte : attendez une minute et réessayez."
+                    : "Le compte OpenAI n'a plus de crédit ou reçoit trop de demandes. Mettez plutôt une clé Groq gratuite (🔑 Clés IA)."
+                  : err?.error?.message || `Erreur ${who} ${r.status}`;
             emit("error", { message: msg });
             break;
           }

@@ -8,7 +8,7 @@ import { runAction, PLACES } from "../ai/actions";
 import { Griot, MODE_LABELS, type GriotMode, md, HELP } from "../ai/griot";
 import { LANGS } from "../ai/voice";
 import { WORLD } from "../world/terrain";
-import { getOpenAIKey, setOpenAIKey } from "../ai/localapi";
+import { getGroqKey, getOpenAIKey, setGroqKey, setOpenAIKey } from "../ai/localapi";
 import { Visor } from "./visor";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -669,9 +669,10 @@ export class UI {
     card.querySelectorAll<HTMLElement>("[data-mt]").forEach((b) => (b.onclick = () => this.map(b.dataset.mt as any)));
   }
 
-  // ---------------------------------------------------------------- clé OpenAI (site web)
+  // ---------------------------------------------------------------- clés d'IA (Groq gratuite, OpenAI)
   keyPanel() {
-    const has = !!getOpenAIKey();
+    const hasG = !!getGroqKey();
+    const hasO = !!getOpenAIKey();
     const model = (() => {
       try {
         return localStorage.getItem("griot-openai-model") || "gpt-4o-mini";
@@ -681,18 +682,24 @@ export class UI {
     })();
     const card = this.openModal(
       "key",
-      `<h2 class="mt">Clé OpenAI</h2>
-      <p class="hint">Collez votre clé (elle commence par <code>sk-</code>). Elle reste uniquement dans ce navigateur, sur cet appareil : GRIOT l'utilise pour discuter, lire vos PDF et images, et parler avec une voix naturelle. Les appels sont facturés sur votre compte OpenAI.</p>
+      `<h2 class="mt">Clés IA</h2>
+      <p class="hint">Collez une clé et GRIOT réfléchit tout de suite. Les clés restent uniquement dans ce navigateur, sur cet appareil.</p>
+      <h3>⚡ Groq — gratuit (recommandé)</h3>
+      <p class="hint">1. Ouvrez <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a> et connectez-vous (Google ou e-mail).<br>2. Touchez <b>Create API Key</b>, puis copiez la clé (elle commence par <code>gsk_</code>).<br>3. Collez-la ici et touchez <b>Enregistrer</b>.</p>
       <div class="form">
-        <label>Clé <input id="oaKey" type="password" autocomplete="off" placeholder="${has ? "•••••••• (enregistrée)" : "sk-…"}"></label>
+        <label>Clé Groq <input id="gqKey" type="password" autocomplete="off" placeholder="${hasG ? "•••••••• (enregistrée)" : "gsk_…"}"></label>
+      </div>
+      <h3>OpenAI — payant (voix naturelle « onyx », images, PDF)</h3>
+      <div class="form">
+        <label>Clé OpenAI <input id="oaKey" type="password" autocomplete="off" placeholder="${hasO ? "•••••••• (enregistrée)" : "sk-…"}"></label>
         <label>Modèle <select id="oaModel"><option value="gpt-4o-mini">gpt-4o-mini (rapide, économique)</option><option value="gpt-4o">gpt-4o (plus intelligent)</option></select></label>
       </div>
       <div class="row wrap">
         <button class="btn primary" data-k="save">Enregistrer</button>
-        ${has ? `<button class="btn ghost" data-k="del">Retirer la clé</button>` : ""}
-        <span class="chip-state">${has ? "CLÉ ACTIVE" : "AUCUNE CLÉ"}</span>
-      </div>
-      <p class="hint">Créer une clé : <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com/api-keys</a> (compte OpenAI avec crédit).</p>`
+        ${hasG ? `<button class="btn ghost" data-k="delg">Retirer la clé Groq</button>` : ""}
+        ${hasO ? `<button class="btn ghost" data-k="delo">Retirer la clé OpenAI</button>` : ""}
+        <span class="chip-state">${hasG ? "GROQ ACTIF" : hasO ? "OPENAI ACTIF" : "AUCUNE CLÉ"}</span>
+      </div>`
     );
     (card.querySelector("#oaModel") as HTMLSelectElement).value = model;
     card.onclick = async (e) => {
@@ -703,14 +710,18 @@ export class UI {
         localStorage.setItem("griot-openai-model", m);
       } catch {}
       if (k === "save") {
+        const g = (card.querySelector("#gqKey") as HTMLInputElement).value.trim();
         const v = (card.querySelector("#oaKey") as HTMLInputElement).value.trim();
+        if (g && !/^gsk_\w{20,}$/.test(g)) return this.toast("Cette clé ne ressemble pas à une clé Groq (gsk_…).", "warn");
         if (v && !/^sk-[\w-]{10,}$/.test(v)) return this.toast("Cette clé ne ressemble pas à une clé OpenAI (sk-…).", "warn");
+        if (g) setGroqKey(g);
         if (v) setOpenAIKey(v);
       }
-      if (k === "del") setOpenAIKey("");
+      if (k === "delg") setGroqKey("");
+      if (k === "delo") setOpenAIKey("");
       await this.griot.refreshAI();
       this.closeModal();
-      this.toast(getOpenAIKey() ? "🔑 Clé OpenAI enregistrée : GRIOT est connecté." : "Clé retirée.");
+      this.toast(getGroqKey() ? "⚡ Clé Groq enregistrée : GRIOT réfléchit avec Groq (gratuit)." : getOpenAIKey() ? "🔑 Clé OpenAI enregistrée : GRIOT est connecté." : "Clés retirées.");
     };
   }
 
