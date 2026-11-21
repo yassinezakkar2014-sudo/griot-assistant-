@@ -49,6 +49,8 @@ export interface Place {
   pos: () => THREE.Vector3;
   outdoor: boolean;
   hour?: number;
+  /** point de vol (aire d'atterrissage) si différent */
+  fly?: () => THREE.Vector3;
 }
 
 function ground(x: number, z: number) {
@@ -80,6 +82,9 @@ export const PLACES: Place[] = [
 
 export function placeFromText(t: string): Place | null {
   const n = normalize(t);
+  // pays du grand monde (noms exacts)
+  for (const p of PLACES) if (p.id.startsWith("country:") && new RegExp(`\\b${normalize(p.name)}\\b`).test(n)) return p;
+  if (/metropole|nouvelle ville/.test(n)) return PLACES.find((p) => p.id === "metro") ?? null;
   const map: [RegExp, string][] = [
     [/ville|city|ciudad|cite|downtown/, "city"],
     [/jungle|foret tropicale|selva|temple/, "jungle"],
@@ -184,7 +189,7 @@ export async function runAction(action: string, target?: string | null): Promise
       if (!pl) {
         const f = floorFromText(String(target ?? ""));
         if (f >= 0) return runAction("go_to_floor", String(f + 1));
-        return "Destination inconnue. Je connais : ville, jungle, montagnes, océan, base secrète, vallée nocturne, jardins, palais.";
+        return `Destination inconnue. Je connais : ville, métropole, jungle, montagnes, océan, base secrète, vallée nocturne, jardins, palais, Zuria, et les pays ${PLACES.filter((p) => p.id.startsWith("country:")).map((p) => p.name).join(", ")}.`;
       }
       if (pl.hour !== undefined) G.env.setHour(pl.hour);
       if (G.mode === "inspect") armor.endInspect();
@@ -193,8 +198,12 @@ export async function runAction(action: string, target?: string | null): Promise
           if (!ship.ready) ship.prepare();
           await ship.board();
         }
-        ship.flyTo(pl.pos(), `Vol vers ${pl.name}`);
-        if (sup && !ship.opts.small) {
+        const dest = (pl.fly ?? pl.pos)();
+        ship.flyTo(dest, `Vol vers ${pl.name}`);
+        const far = dest.distanceTo(ship.root.position) > 5000;
+        if ((sup || far) && !ship.opts.small) {
+          ship.supersonic = true;
+          if (!sup) return `Cap sur ${pl.name}, à ${(dest.distanceTo(ship.root.position) / 1000).toFixed(1)} km : mode supersonique engagé pour traverser l'océan.`;
           ship.supersonic = true;
           return `Cap sur ${pl.name} en mode supersonique. Accrochez-vous, Majesté.`;
         }
@@ -202,7 +211,7 @@ export async function runAction(action: string, target?: string | null): Promise
       }
       if (G.mode === "ship") {
         if (pl.outdoor) {
-          ship.flyTo(pl.pos(), `Vol vers ${pl.name}`);
+          ship.flyTo((pl.fly ?? pl.pos)(), `Vol vers ${pl.name}`);
           return `Cap sur ${pl.name}.`;
         }
         ship.flyTo(new THREE.Vector3(0, BASE[6] + 3.5, -48), "Retour au palais");
@@ -349,9 +358,14 @@ export async function runAction(action: string, target?: string | null): Promise
     }
     case "armor_ability": {
       const n = normalize(String(target ?? ""));
-      const name = /bouclier|shield/.test(n) ? "shield" : /boost|surcharge|turbo|vitesse/.test(n) ? "boost" : /vision|nocturne|tactique/.test(n) ? "vision" : "pulse";
+      if (/training|entrainement|cible/.test(n)) {
+        G.combat.spawnAround();
+        return armor.worn ? "Cibles déployées. Touche 5 (ou « tire ») pour le rayon, 1 pour l'onde de choc." : "Cibles déployées. Activez l'armure (« active l'armure »), puis 5 pour tirer et 1 pour l'onde de choc.";
+      }
+      const name = /blast|rayon|tir|laser|attaque|feu/.test(n) ? "blast" : /bouclier|shield/.test(n) ? "shield" : /boost|surcharge|turbo|vitesse/.test(n) ? "boost" : /vision|nocturne|tactique/.test(n) ? "vision" : "pulse";
+      if (!armor.worn) return "Activez d'abord l'Armure Royale (« active l'armure »), puis je déclenche l'attaque.";
       const ok = armor.ability(name);
-      return ok ? { pulse: "Impulsion cinétique libérée !", shield: "Bouclier déployé.", boost: "Surcharge : vitesse et saut augmentés.", vision: armor.vision ? "Vision tactique activée." : "Vision tactique désactivée." }[name]! : "Capacité indisponible pour le moment.";
+      return ok ? { pulse: "Onde de choc libérée !", shield: "Bouclier déployé.", boost: "Surcharge : vitesse et saut augmentés.", vision: armor.vision ? "Vision tactique activée." : "Vision tactique désactivée.", blast: "Rayon d'énergie !" }[name]! : "Capacité indisponible pour le moment.";
     }
     case "set_time": {
       const n = normalize(String(target ?? ""));

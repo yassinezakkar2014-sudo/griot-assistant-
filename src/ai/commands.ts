@@ -73,6 +73,8 @@ function clause(raw: string): Intent | null {
     return { action: "equip_armor" };
   }
   if (/\b(masque|mask|casque|helmet|mascara)\b/.test(t)) return { action: "toggle_mask" };
+  if (/\b(entrainement|cibles?|champ de tir|target practice)\b/.test(t) && !/\bmission/.test(t)) return { action: "armor_ability", target: "training" };
+  if (/\b(tire|tirer|feu|rayon|blast|laser|attaque|attaquer|repulseur|fire|shoot)\b/.test(t) && !/\b(feux|lumiere)\b/.test(t)) return { action: "armor_ability", target: "blast" };
   if (/\b(impulsion|pulse|onde de choc|shockwave)\b/.test(t)) return { action: "armor_ability", target: "pulse" };
   if (/\b(bouclier|shield|escudo)\b/.test(t)) return { action: "armor_ability", target: "shield" };
   if (/\b(surcharge|boost|turbo)\b/.test(t)) return { action: "armor_ability", target: "boost" };

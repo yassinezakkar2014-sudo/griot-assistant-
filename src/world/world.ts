@@ -5,6 +5,8 @@ import { G, bus, nextFrame } from "../core";
 import { mat, tex } from "./materials";
 import { block, cyl, span, glowLine } from "./build";
 import { Terrain, ZONES, SEA, WORLD, fbm } from "./terrain";
+import { HYPER } from "./giant";
+import { EARTH, countryAt } from "./countryData";
 
 export interface Marker {
   id: string;
@@ -235,6 +237,7 @@ export class World {
     for (let x = c.x1 + 45; x < c.x2 - 40; x += 90)
       for (let z = c.z1 + 45; z < c.z2 - 40; z += 90) {
         if (Math.hypot(x - 1625, z) < 55) continue; // tour centrale
+        if (HYPER.some((h) => Math.hypot(x - h.x, z - h.z) < 75)) continue; // hyper-tours
         const distC = Math.hypot(x - 1625, z) / 900;
         for (let k = 0; k < 2; k++) {
           if (Math.random() < 0.15) continue;
@@ -574,6 +577,38 @@ export class World {
     c.fillStyle = "#ffd27a";
     c.fillRect(S / 2 - 3, S / 2 - 3, 6, 6);
     this.mapCanvas = cv;
+    // carte du grand monde (tous les pays)
+    const W = 720;
+    const wc = document.createElement("canvas");
+    wc.width = wc.height = W;
+    const w2 = wc.getContext("2d")!;
+    const wimg = w2.createImageData(W, W);
+    for (let j = 0; j < W; j++)
+      for (let i = 0; i < W; i++) {
+        const x = -EARTH / 2 + (i / W) * EARTH;
+        const z = -EARTH / 2 + (j / W) * EARTH;
+        const h = this.terrain.height(x, z);
+        if (h < SEA) col.setRGB(0.05, 0.2, 0.42).lerp(new THREE.Color(0.02, 0.08, 0.2), Math.min(1, (SEA - h) / 60));
+        else this.terrain.colorAt(x, z, h, col);
+        const shade = 0.75 + Math.min(0.35, h / 1600);
+        const o = ((W - 1 - j) * W + i) * 4;
+        wimg.data[o] = col.r * 255 * shade;
+        wimg.data[o + 1] = col.g * 255 * shade;
+        wimg.data[o + 2] = col.b * 255 * shade;
+        wimg.data[o + 3] = 255;
+      }
+    w2.putImageData(wimg, 0, 0);
+    w2.strokeStyle = "rgba(255,210,122,0.6)";
+    w2.lineWidth = 1;
+    const k0 = ((EARTH / 2 - WORLD / 2) / EARTH) * W;
+    w2.strokeRect(k0, k0, (WORLD / EARTH) * W, (WORLD / EARTH) * W);
+    this.worldCanvas = wc;
+  }
+
+  worldCanvas!: HTMLCanvasElement;
+  /** Coordonnées monde → pixels de la carte du grand monde. */
+  toWorldMap(x: number, z: number, size: number): [number, number] {
+    return [((x + EARTH / 2) / EARTH) * size, (1 - (z + EARTH / 2) / EARTH) * size];
   }
 
   /** Coordonnées monde → pixels carte (nord en haut). */
@@ -584,6 +619,11 @@ export class World {
   zoneName(p: THREE.Vector3): string {
     const c = ZONES.city;
     if (G.cabin?.inside && p.distanceTo(G.player.position) < 1) return "Royal Talon — Cabine";
+    const kc = countryAt(p.x, p.z, 1.05);
+    if (kc) return Math.hypot(p.x - kc.x, p.z - kc.z) < kc.r * 0.45 ? `${kc.name} — capitale` : `Pays de ${kc.name}`;
+    if (Math.max(Math.abs(p.x), Math.abs(p.z)) > WORLD / 2) return "Grand océan";
+    const mz = ZONES.metro;
+    if (p.x > mz.x1 && p.x < mz.x2 && p.z > mz.z1 && p.z < mz.z2) return "Nouvelle Métropole";
     if (p.x < -1000 && p.x > -2450 && (this as any).highway?.onRoad(p.x, p.z)) return "Pont royal de Zuria";
     if (G.palace.inside(p)) {
       const f = G.palace.floorAt(p);
