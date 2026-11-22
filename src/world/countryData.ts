@@ -28,7 +28,7 @@ export const EARTH = 64000;
 export const COUNTRIES: CountryDef[] = [
   { id: "solaria", name: "Solaria", x: 9000, z: -6000, r: 2600, style: "desert", base: 8, hills: 60, ground: [0.82, 0.66, 0.4], desc: "désert doré, palais à dômes de grès" },
   { id: "nordhaven", name: "Nordhaven", x: -1500, z: 10800, r: 2400, style: "snow", base: 10, hills: 260, ground: [0.9, 0.92, 0.96], desc: "pays des neiges, maisons de bois aux toits pointus" },
-  { id: "jadea", name: "Jadéa", x: 9800, z: 6800, r: 2500, style: "jade", base: 8, hills: 120, ground: [0.2, 0.46, 0.28], desc: "collines de jade, tours à toits étagés" },
+  { id: "jadea", name: "Jadéa", x: 11500, z: 8200, r: 2500, style: "jade", base: 8, hills: 120, ground: [0.2, 0.46, 0.28], desc: "collines de jade, tours à toits étagés" },
   { id: "oceane", name: "Océane", x: -9800, z: -8500, r: 2100, style: "ocean", base: 5, hills: 30, ground: [0.62, 0.7, 0.42], desc: "archipel aux maisons blanches et toits bleus" },
   { id: "vulkara", name: "Vulkara", x: -10500, z: 5200, r: 2200, style: "volcano", base: 9, hills: 90, ground: [0.17, 0.14, 0.14], desc: "terre de basalte, volcan et rivières de lave" },
   { id: "sylvanie", name: "Sylvanie", x: 2500, z: -11000, r: 2600, style: "forest", base: 8, hills: 110, ground: [0.1, 0.34, 0.12], desc: "forêt d'arbres géants et cabanes perchées" },
@@ -84,4 +84,10 @@ export function inAirport(x: number, z: number, margin = 40) {
     if (x > r.x1 && x < r.x2 && z > r.z1 && z < r.z2) return a;
   }
   return null;
+}
+
+/** La MONTAGNE ROYALE : île-montagne au nord-est du royaume ; le Palais Impérial couvre son plateau sommital. */
+export const MOUNTAIN = { x: 5600, z: 6000, r: 2500, plateau: 1450, top: 600 };
+export function onMountain(x: number, z: number, margin = 1) {
+  return Math.hypot(x - MOUNTAIN.x, z - MOUNTAIN.z) < MOUNTAIN.r * margin;
 }

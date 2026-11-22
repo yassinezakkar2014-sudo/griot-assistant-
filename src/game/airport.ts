@@ -23,6 +23,21 @@ interface Port {
 }
 
 type Phase = "board" | "push" | "taxi" | "line" | "roll" | "climb" | "cruise" | "approach" | "flare" | "rollout" | "taxiin" | "done";
+export const PHASES: Phase[] = ["board", "push", "taxi", "line", "roll", "climb", "cruise", "approach", "flare", "rollout", "taxiin", "done"];
+const PHASE_LABEL: Record<Phase, string> = {
+  board: "Embarquement…",
+  push: "Repoussage",
+  taxi: "Roulage vers la piste",
+  line: "Alignement sur la piste",
+  roll: "Décollage !",
+  climb: "Montée",
+  cruise: "Croisière",
+  approach: "Approche finale",
+  flare: "Arrondi",
+  rollout: "Atterrissage",
+  taxiin: "Roulage vers la porte",
+  done: "Arrivée"
+};
 
 interface Flight {
   plane: Airliner;
@@ -68,9 +83,16 @@ export class Airports {
     document.body.appendChild(this.hud);
     this.hud.onclick = (e) => {
       const b = (e.target as HTMLElement).closest<HTMLElement>("[data-f]")?.dataset.f;
+      if (b === "outside") this.setOutside(!this.outside);
       if (b === "view") this.camMode = (this.camMode + 1) % 4;
       if (b === "skip" && this.flight) this.finish(this.flight, true);
+      if (b === "leave") this.leaveAircraft();
     };
+    bus.on("aircabin:leave", () => this.leaveAircraft());
+    bus.on("aircabin:view", (mode: number) => {
+      this.camMode = mode;
+      this.setOutside(true);
+    });
     G.palace.updaters.push((dt, t) => this.update(dt, t));
   }
 
@@ -463,13 +485,13 @@ export class Airports {
     this.parkAt(this.plane, from, from.gateStand);
     const f = this.makeFlight(this.plane, from, to, true);
     this.flight = f;
-    G.mode = "cinematic";
-    G.player.hideBody = true;
+    this.arrival = null;
+    this.outside = false;
     this.hud.hidden = false;
     this.camPos.copy(G.camera.position);
-    bus.emit("mode");
     bus.emit("fade");
-    bus.emit("toast", { text: `✈ Bienvenue à bord du vol ${f.number} à destination de ${to.def.short}. Attachez vos ceintures !` });
+    G.airCabin.enter(() => this.plane.root);
+    bus.emit("toast", { text: `✈ Bienvenue à bord du vol ${f.number} à destination de ${to.def.short} ! Promenez-vous dans la cabine, ou 🎥 pour la vue extérieure. Vos amis peuvent vous rejoindre (📱 À bord ensemble).` });
     G.audio.tone(660, 0.3, "sine", 0.1);
     setTimeout(() => G.audio.tone(880, 0.4, "sine", 0.1), 300);
     return `Embarquement immédiat : vol ${f.number} vers ${to.def.short}.`;
@@ -503,13 +525,83 @@ export class Airports {
     if (skip || f.phase !== "done") this.parkAt(f.plane, to, to.gateStand);
     if (f.passenger) {
       this.flight = null;
-      this.hud.hidden = true;
+      this.arrive(to);
+    }
+  }
+
+  // ---------------------------------------------------------------- cabine, vue extérieure, arrivée, vols partagés
+  outside = false;
+  private cabinSpot = new THREE.Vector3();
+  arrival: { to: Port; t: number } | null = null;
+  /** vol d'un ami que l'on a rejoint */
+  guest: { host: string; to: Port; last: THREE.Vector3; v: number } | null = null;
+
+  setOutside(on: boolean) {
+    if (on === this.outside || (!this.flight && !this.guest)) return;
+    if (on) {
+      this.cabinSpot.copy(G.player.sitting ? G.player.sitting.pos.clone().setY(G.player.sitting.pos.y - 0.75) : G.player.position);
+      G.mode = "cinematic";
+      G.player.hideBody = true;
+    } else {
       G.mode = "foot";
       G.player.hideBody = false;
-      G.player.teleport(to.hall.clone(), to.yawW(0));
-      bus.emit("mode");
-      bus.emit("toast", { text: `🛬 Bienvenue à ${to.def.short} ! Merci d'avoir voyagé avec Royal Airways.` });
+      G.player.teleport(this.cabinSpot.clone());
     }
+    this.outside = on;
+    bus.emit("mode");
+  }
+
+  private arrive(to: Port) {
+    if (this.outside) this.setOutside(false);
+    this.arrival = { to, t: 25 };
+    G.airCabin.arrived = true;
+    bus.emit("toast", { text: `🛬 Bienvenue à ${to.def.short} ! Descendez par la porte arrière (ou touchez 🚪 Descendre).` });
+    G.audio.tone(880, 0.3, "sine", 0.1);
+    setTimeout(() => G.audio.tone(660, 0.4, "sine", 0.1), 300);
+  }
+
+  leaveAircraft() {
+    const a = this.arrival;
+    if (!a) return;
+    this.arrival = null;
+    this.guest = null;
+    this.hud.hidden = true;
+    G.airCabin.leave();
+    G.mode = "foot";
+    G.player.hideBody = false;
+    G.player.teleport(a.to.hall.clone(), a.to.yawW(0));
+    bus.emit("mode");
+    bus.emit("toast", { text: `Merci d'avoir voyagé avec Royal Airways. Bienvenue à ${a.to.def.short} !` });
+  }
+
+  /** Rejoindre le vol d'un ami (on monte dans la même cabine). */
+  joinFlight(hostId: string): string {
+    const r = G.net.peers.get(hostId);
+    const fl = r?.state?.fl;
+    if (!r || !fl) return "Votre ami n'est pas (ou plus) en vol.";
+    if (this.flight) return "Vous êtes déjà dans un vol.";
+    const to = this.ports[fl[7]] ?? this.ports[0];
+    this.guest = { host: hostId, to, last: new THREE.Vector3(fl[0], fl[1], fl[2]), v: 0 };
+    this.arrival = null;
+    this.outside = false;
+    this.hud.hidden = false;
+    if (G.passenger?.ride) G.passenger.exit();
+    if (G.cabin?.inside) {
+      G.cabin.inside = false;
+      G.cabin.host = null;
+    }
+    bus.emit("fade");
+    G.airCabin.enter(() => r.planeRoot, hostId);
+    return `✈ Vous êtes à bord avec ${r.state!.n}, direction ${to.def.short} !`;
+  }
+
+  /** État de vol partagé (multijoueur). */
+  netFlight(): number[] | null {
+    const f = this.flight;
+    if (!f) return null;
+    const q = f.plane.root.quaternion;
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    return [r2(f.pos.x), r2(f.pos.y), r2(f.pos.z), r2(q.x), r2(q.y), r2(q.z), r2(q.w), this.ports.indexOf(f.to), PHASES.indexOf(f.phase), r2(f.gear), Math.round(f.v)];
   }
 
   /** Avance la position/orientation de l'avion vers une cible au sol. */
@@ -683,8 +775,7 @@ export class Airports {
   }
 
   // ---------------------------------------------------------------- caméra et HUD de vol
-  private flightCamera(f: Flight, dt: number) {
-    const p = f.plane.root;
+  private flightCamera(p: THREE.Object3D, dt: number) {
     p.updateMatrixWorld();
     this.camT += dt;
     let want: THREE.Vector3, look: THREE.Vector3;
@@ -715,26 +806,21 @@ export class Airports {
     G.camera.lookAt(look);
     G.camera.up.set(0, 1, 0);
     G.player.position.copy(p.position);
-    const alt = Math.max(0, Math.round(f.pos.y - G.physics.terrain(f.pos.x, f.pos.z)));
-    const kmh = Math.round(f.v * 3.6);
-    const label: Record<Phase, string> = {
-      board: "Embarquement…",
-      push: "Repoussage",
-      taxi: "Roulage vers la piste",
-      line: "Alignement sur la piste",
-      roll: "Décollage !",
-      climb: "Montée",
-      cruise: "Croisière",
-      approach: "Approche finale",
-      flare: "Arrondi",
-      rollout: "Atterrissage",
-      taxiin: "Roulage vers la porte",
-      done: "Arrivée"
-    };
-    const dist = Math.round(f.pos.distanceTo(f.to.W(0, 0, 0)) / 100) / 10;
-    this.hud.innerHTML = `<div class="fh-row"><b>✈ ${f.number}</b> · Royal Airways · ➜ ${f.to.def.short}</div>
-      <div class="fh-row"><span>${label[f.phase]}</span><span>ALT ${alt} m</span><span>${kmh} km/h</span><span>${dist} km</span></div>
-      <div class="fh-row"><button data-f="view">🎥 Vue : ${["Extérieur", "Hublot", "Cockpit", "Cinéma"][mode]}</button><button data-f="skip">⏩ Arriver</button></div>`;
+  }
+
+  private hudTimer = 0;
+  private drawHud(info: { number: string; to: Port; phase: Phase; pos: THREE.Vector3; v: number; host?: string }) {
+    if ((this.hudTimer += 1) % 6) return;
+    const alt = Math.max(0, Math.round(info.pos.y - G.physics.terrain(info.pos.x, info.pos.z)));
+    const dist = Math.round(info.pos.distanceTo(info.to.W(0, 0, 0)) / 100) / 10;
+    const mode = this.camMode;
+    this.hud.innerHTML = `<div class="fh-row"><b>✈ ${info.number}</b> · Royal Airways · ➜ ${info.to.def.short}${info.host ? ` · avec ${info.host}` : ""}</div>
+      <div class="fh-row"><span>${this.arrival ? "Arrivé !" : PHASE_LABEL[info.phase]}</span><span>ALT ${alt} m</span><span>${Math.round(info.v * 3.6)} km/h</span><span>${dist} km</span></div>
+      <div class="fh-row">${
+        this.arrival
+          ? `<button data-f="leave">🚪 Descendre de l'avion</button>`
+          : `<button data-f="outside">${this.outside ? "🪑 Retour en cabine" : "🎥 Vue extérieure"}</button>${this.outside ? `<button data-f="view">📷 ${["Extérieur", "Hublot", "Cockpit", "Cinéma"][mode]}</button>` : ""}${this.flight ? `<button data-f="skip">⏩ Arriver</button>` : ""}`
+      }</div>`;
   }
 
   update(dt: number, t: number) {
@@ -742,10 +828,33 @@ export class Airports {
     const f = this.flight;
     if (f) {
       this.stepFlight(f, dt, t);
-      if (G.input.hit("KeyV")) this.camMode = (this.camMode + 1) % 4;
-      this.flightCamera(f, dt);
+      if (this.outside) {
+        if (G.input.hit("KeyV")) this.camMode = (this.camMode + 1) % 4;
+        this.flightCamera(f.plane.root, dt);
+      }
+      this.drawHud({ number: f.number, to: f.to, phase: f.phase, pos: f.pos, v: f.v });
       if (f.phase === "done") this.finish(f);
     } else this.plane.update(dt, t, 1);
+    // vol d'un ami
+    const gst = this.guest;
+    if (gst && !this.arrival) {
+      const r = G.net.peers.get(gst.host);
+      const fl = r?.state?.fl;
+      if (!r || !fl || PHASES[fl[8]] === "done") this.arrive(gst.to);
+      else {
+        const pos = new THREE.Vector3(fl[0], fl[1], fl[2]);
+        gst.v = fl[10] ?? gst.v;
+        gst.last.copy(pos);
+        if (this.outside) this.flightCamera(r.planeRoot, dt);
+        this.drawHud({ number: "RA " + (100 + (gst.host.charCodeAt(0) % 800)), to: gst.to, phase: PHASES[fl[8]] ?? "cruise", pos, v: gst.v, host: r.state!.n });
+      }
+    }
+    // arrivée : débarquement automatique
+    if (this.arrival) {
+      this.drawHud({ number: "", to: this.arrival.to, phase: "done", pos: this.arrival.to.W(0, 0, 352), v: 0 });
+      this.arrival.t -= dt;
+      if (this.arrival.t <= 0) this.leaveAircraft();
+    }
     // trafic d'ambiance à l'aéroport royal : décollages réguliers
     const home = this.ports[0];
     if (!this.ambient) {

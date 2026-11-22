@@ -23,6 +23,8 @@ import type { Deco } from "./game/deco";
 import type { Mecha } from "./game/mecha";
 import type { Train } from "./game/train";
 import type { Airports } from "./game/airport";
+import type { ImperialPalace } from "./world/imperial";
+import type { AirCabin } from "./game/aircabin";
 
 export type Mode = "foot" | "ship" | "inspect" | "cinematic" | "car" | "passenger";
 
@@ -53,6 +55,8 @@ export interface GameContext {
   mecha: Mecha;
   train: Train;
   airports: Airports;
+  imperial: ImperialPalace;
+  airCabin: AirCabin;
   mode: Mode;
   time: number; // secondes écoulées
   uiFocus: boolean; // vrai quand un champ texte / menu a le focus

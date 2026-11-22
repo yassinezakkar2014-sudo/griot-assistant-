@@ -33,7 +33,7 @@ export class Phone {
   private pendingIce: RTCIceCandidateInit[] = [];
   private incoming: { from: string; name: string; sdp: RTCSessionDescriptionInit } | null = null;
   private callStart = 0;
-  private invite: { from: string; name: string } | null = null;
+  private invite: { from: string; name: string; plane?: boolean } | null = null;
   private rec: { mr: MediaRecorder; chunks: Blob[]; raf: number; timer: ReturnType<typeof setTimeout>; badge: HTMLElement } | null = null;
   private clip: { url: string; blob: Blob; ext: string } | null = null;
   private remote: MediaStream | null = null;
@@ -174,22 +174,22 @@ export class Phone {
         ${online ? `<p class="ph-hint">Salle : <b>${this.esc(G.net.room)}</b> — vos amis doivent ouvrir GRIOT et rejoindre cette même salle.</p>` : `<p class="ph-hint">Connexion au multijoueur… (ou touchez 🌐 Multijoueur pour choisir la salle).</p>`}
         ${ps.length ? ps.map((p) => `<div class="ph-row"><b>${this.esc(p.name)}</b><span class="ph-actions"><button data-chat="${p.id}">💬</button><button data-call="${p.id}">📹</button></span></div>`).join("") : online ? `<p class="ph-hint">Personne d'autre n'est connecté dans la salle « ${this.esc(G.net.room)} » pour l'instant.</p>` : ""}`;
     } else if (v.app === "aboard") {
-      const ps = [...G.net.peers.entries()].filter(([, r]) => r.state).map(([id, r]) => ({ id, name: r.state!.n, flying: r.state!.m === "ship" && !!r.state!.s && (r.state!.s as number[])[9] !== 1 }));
-      const piloting = G.mode === "ship" && !G.ship.opts.small;
+      const ps = [...G.net.peers.entries()].filter(([, r]) => r.state).map(([id, r]) => ({ id, name: r.state!.n, flying: r.state!.m === "ship" && !!r.state!.s && (r.state!.s as number[])[9] !== 1, plane: !!r.state!.fl }));
+      const piloting = (G.mode === "ship" && !G.ship.opts.small) || !!G.airports.flight;
       body = `<div class="ph-title">🛸 À bord ensemble</div>
         ${online ? "" : `<p class="ph-hint">Connexion au multijoueur…</p>`}
         ${
           piloting
-            ? `<p class="ph-hint">Vous pilotez le Royal Talon : invitez vos amis, ils montent à bord d'un seul toucher, où qu'ils soient.</p>
+            ? `<p class="ph-hint">${G.airports.flight ? "Vous êtes en vol : invitez vos amis dans votre avion" : "Vous pilotez le Royal Talon : invitez vos amis"}, ils montent à bord d'un seul toucher, où qu'ils soient.</p>
                <button class="ph-big" data-inviteall="1">📣 Inviter tout le monde</button>
                ${ps.map((p) => `<div class="ph-row"><b>${this.esc(p.name)}</b><span class="ph-actions"><button data-invite="${p.id}">Inviter</button></span></div>`).join("")}`
             : `<p class="ph-hint">Montez dans le Royal Talon d'un ami qui pilote (même s'il est loin), ou montez dans le vôtre et invitez-les.</p>
-               ${ps.length ? ps.map((p) => `<div class="ph-row"><b>${this.esc(p.name)}</b><small>${p.flying ? "🛸 pilote le Royal Talon" : "à pied"}</small>${p.flying ? `<span class="ph-actions"><button data-join="${p.id}" data-where="cabin">🛋️ Cabine</button><button data-join="${p.id}" data-where="cockpit">🧑‍✈️ Copilote</button></span>` : ""}</div>`).join("") : online ? `<p class="ph-hint">Aucun ami connecté dans la salle « ${this.esc(G.net.room)} ».</p>` : ""}
+               ${ps.length ? ps.map((p) => `<div class="ph-row"><b>${this.esc(p.name)}</b><small>${p.plane ? "✈ en avion" : p.flying ? "🛸 pilote le Royal Talon" : "à pied"}</small>${p.plane ? `<span class="ph-actions"><button data-joinplane="${p.id}">✈ Rejoindre son vol</button></span>` : p.flying ? `<span class="ph-actions"><button data-join="${p.id}" data-where="cabin">🛋️ Cabine</button><button data-join="${p.id}" data-where="cockpit">🧑‍✈️ Copilote</button></span>` : ""}</div>`).join("") : online ? `<p class="ph-hint">Aucun ami connecté dans la salle « ${this.esc(G.net.room)} ».</p>` : ""}
                <button class="ph-big" data-pilot="1">🚀 Piloter mon Royal Talon</button>`
         }`;
     } else if (v.app === "invite" && this.invite) {
-      body = `<div class="ph-incall"><div class="ph-avatar">🛸</div><div class="ph-who">${this.esc(this.invite.name)}</div><div class="ph-sub">vous invite dans la cabine de son Royal Talon</div>
-        <div class="ph-callbtns"><button class="no" data-noinvite="1">✕</button><button class="yes" data-join="${this.invite.from}">🧑‍🚀</button></div></div>`;
+      body = `<div class="ph-incall"><div class="ph-avatar">🛸</div><div class="ph-who">${this.esc(this.invite.name)}</div><div class="ph-sub">${this.invite.plane ? "vous invite dans son avion" : "vous invite dans la cabine de son Royal Talon"}</div>
+        <div class="ph-callbtns"><button class="no" data-noinvite="1">✕</button><button class="yes" ${this.invite.plane ? `data-joinplane="${this.invite.from}"` : `data-join="${this.invite.from}"`}>${this.invite.plane ? "✈" : "🧑‍🚀"}</button></div></div>`;
     } else if (v.app === "tiktok") {
       body = `<div class="ph-title">🎵 TikTok</div>
         ${
@@ -242,6 +242,11 @@ export class Phone {
         return bus.emit("ui:flight", near.def.id);
       }
       return this.go(d.app);
+    }
+    if (d.joinplane) {
+      this.invite = null;
+      this.close();
+      return bus.emit("toast", { text: G.airports.joinFlight(d.joinplane) });
     }
     if (d.join) {
       this.joinMode = d.where === "cockpit" ? "cockpit" : "cabin";
@@ -300,9 +305,10 @@ export class Phone {
 
   // ---------------------------------------------------------------- monter ensemble dans le Royal Talon
   private sendInvite(ids: string[]) {
-    if (G.mode !== "ship") return bus.emit("toast", { text: "Montez d'abord aux commandes de votre Royal Talon.", kind: "warn" });
+    const plane = !!G.airports.flight;
+    if (G.mode !== "ship" && !plane) return bus.emit("toast", { text: "Montez d'abord aux commandes de votre Royal Talon (ou prenez un vol).", kind: "warn" });
     let n = 0;
-    for (const id of ids) if (G.net.signal(id, { t: "invite" })) n++;
+    for (const id of ids) if (G.net.signal(id, { t: "invite", kind: plane ? "plane" : "ship" })) n++;
     bus.emit("toast", { text: n ? `📣 Invitation envoyée à ${n} ami${n > 1 ? "s" : ""}.` : "Aucun ami à inviter (connectez-vous au multijoueur).", kind: n ? undefined : "warn" });
   }
 
@@ -618,10 +624,10 @@ export class Phone {
     const d = s.d ?? {};
     switch (d.t) {
       case "invite":
-        this.invite = { from: s.from, name: s.name };
+        this.invite = { from: s.from, name: s.name, plane: d.kind === "plane" };
         this.el.hidden = false;
         this.go("invite");
-        bus.emit("toast", { text: `🛸 ${s.name} vous invite à bord du Royal Talon ! (📱 Téléphone)` });
+        bus.emit("toast", { text: d.kind === "plane" ? `✈ ${s.name} vous invite dans son avion ! (📱 Téléphone)` : `🛸 ${s.name} vous invite à bord du Royal Talon ! (📱 Téléphone)` });
         G.audio.tone(660, 0.2, "sine", 0.1);
         setTimeout(() => G.audio.tone(990, 0.25, "sine", 0.1), 220);
         break;

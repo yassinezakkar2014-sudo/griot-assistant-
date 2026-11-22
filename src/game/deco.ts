@@ -16,7 +16,7 @@ export const THEMES: Record<string, { name: string; marble: number; floor: numbe
   rubis: { name: "Rubis royal", marble: 0x8a1f2a, floor: 0x5a1018, gold: 0xf0c050, white: 0xb8404a, tint: 0xff8a7a }
 };
 
-type Kind = "canape" | "trone" | "statue" | "fontaine" | "plante" | "lampe" | "piano" | "aquarium" | "bibliotheque" | "tele" | "tapis" | "colonne" | "arbre" | "drapeau" | "lit" | "table";
+export type Kind = "canape" | "trone" | "statue" | "fontaine" | "plante" | "lampe" | "piano" | "aquarium" | "bibliotheque" | "tele" | "tapis" | "colonne" | "arbre" | "drapeau" | "lit" | "table";
 export const ITEMS: Record<Kind, { name: string; icon: string; size: [number, number, number] | null }> = {
   canape: { name: "Canapé", icon: "🛋️", size: [2.6, 0.9, 1] },
   trone: { name: "Trône", icon: "👑", size: [1.4, 2.6, 1.2] },
@@ -180,7 +180,7 @@ export class Deco {
     }
   }
 
-  private model(kind: Kind): THREE.Group {
+  model(kind: Kind): THREE.Group {
     const g = new THREE.Group();
     const B = (w: number, h: number, d: number, m: THREE.Material, x = 0, y = 0, z = 0) => {
       const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
@@ -402,4 +402,18 @@ export function kindFromText(n: string): Kind | null {
   ];
   for (const [re, k] of map) if (re.test(n)) return k;
   return null;
+}
+
+/** Construit un meuble de l'Atelier (pour décorer les palais), posé à (x, y, z) et tourné de ry. */
+let builder: Deco | null = null;
+export function furniture(kind: Kind, x: number, y: number, z: number, ry = 0, scale = 1) {
+  builder ??= new Deco();
+  const g = builder.model(kind);
+  g.position.set(x, y, z);
+  g.rotation.y = ry;
+  g.scale.setScalar(scale);
+  g.traverse((m) => {
+    if ((m as THREE.Mesh).isMesh) (m as THREE.Mesh).castShadow = true;
+  });
+  return g;
 }

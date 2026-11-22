@@ -1,6 +1,6 @@
 // Terrain procédural : plateau du palais, ville (est), jungle (sud), montagnes (nord), océan (ouest).
 import * as THREE from "three";
-import { COUNTRIES, EARTH, countryAt, AIRPORTS, airportRect } from "./countryData";
+import { COUNTRIES, EARTH, countryAt, AIRPORTS, airportRect, MOUNTAIN, onMountain } from "./countryData";
 
 export const WORLD = 8000; // côté de la carte en mètres
 export const SEA = -2;
@@ -134,6 +134,17 @@ export function worldHeight(x: number, z: number) {
     lh = mix(lh, c.base, 1 - smooth(c.r * 0.3, c.r * 0.44, dc)); // plateau de la capitale
     w = mix(w, lh, land);
   }
+  // Montagne Royale : falaises abruptes et plateau sommital parfaitement plat (Palais Impérial)
+  const M = MOUNTAIN;
+  const dm = Math.hypot(x - M.x, z - M.z);
+  if (dm < M.r * 1.25) {
+    const edge = dm + (fbm(x * 0.002 + 9, z * 0.002 - 3) - 0.5) * 260;
+    const land = 1 - smooth(M.r * 0.86, M.r, edge);
+    const slope = 1 - smooth(M.plateau + 40, M.r * 0.9, edge);
+    let mh = 20 + Math.pow(slope, 0.55) * (M.top - 20) + ridged(x * 0.003, z * 0.003 + 5) * 120 * slope * (1 - slope) * 4;
+    if (dm < M.plateau + 40) mh = M.top;
+    w = mix(w, mh, land);
+  }
   return w;
 }
 
@@ -247,6 +258,14 @@ export class Terrain {
   colorAt(x: number, z: number, h: number, out: THREE.Color) {
     if (Math.max(Math.abs(x), Math.abs(z)) > WORLD / 2 - 600) {
       const k = countryAt(x, z, 1.3);
+      if (onMountain(x, z, 1.2) && h > SEA + 1.5) {
+        const n = fbm(x * 0.005, z * 0.005);
+        if (h >= MOUNTAIN.top - 1) out.setRGB(0.3 + n * 0.1, 0.5 + n * 0.12, 0.24); // pelouses du plateau
+        else if (h > 420) out.setRGB(0.92, 0.93, 0.96);
+        else if (h > 120) out.setRGB(0.42 + n * 0.1, 0.4 + n * 0.1, 0.4 + n * 0.1);
+        else out.setRGB(0.25, 0.42, 0.2);
+        return;
+      }
       if (h < SEA + 1.5) out.setRGB(0.78, 0.72, 0.54);
       else if (k) {
         const n = fbm(x * 0.004, z * 0.004);

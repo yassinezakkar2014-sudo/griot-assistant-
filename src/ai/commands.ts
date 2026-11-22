@@ -74,6 +74,7 @@ function clause(raw: string): Intent | null {
     if (pl && pl.outdoor) return { action: "fly_to", target: pl.id + "|super" };
     return { action: "toggle_supersonic", target: /\b(desactiv\w*|coupe|arrete|ralenti\w*|off)\b/.test(t) ? "off" : "on" };
   }
+  if (/\b(furtif|furtivite|invisible|camouflage|cache)\w*\b/.test(t) && /\bpalais\b/.test(t)) return { action: "palace_stealth", target: /\b(desactiv\w*|coupe|arrete|visible|reapparai\w*|montre|off)\b/.test(t) ? "off" : "on" };
   if (/\b(furtif|furtivite|camouflage|stealth|cloak)\b/.test(t) || (/\binvisible\b/.test(t) && V.ship.test(t))) return { action: "toggle_stealth", target: /\b(desactiv\w*|coupe|arrete|enleve|visible|off)\b/.test(t) ? "off" : "on" };
   if (/\b(decoll\w*|take ?off|despeg\w*|leve|en l air)\b/.test(t)) return { action: "takeoff" };
   if (/\b(atterri\w*|land|landing|aterriz\w*|pose.toi|pose le vaisseau)\b/.test(t)) return { action: "land" };
