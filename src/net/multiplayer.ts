@@ -8,6 +8,7 @@ import { buildShipModel, buildSmallShipModel, cloakMaterial } from "../game/ship
 import { ArmorSet, type ArmorStyle } from "../game/armor";
 import { SHIP_SCALE } from "../game/ship";
 import { Mecha } from "../game/mecha";
+import { buildAirliner, type Airliner } from "../game/airliner";
 
 export interface NetState {
   n: string; // nom
@@ -29,6 +30,8 @@ export interface NetState {
   d?: Record<string, [number, number]>;
   /** apparence de l'avatar */
   lk?: Look;
+  /** vol en avion de ligne : [x, y, z, qx, qy, qz, qw, destination, phase, train] */
+  fl?: number[];
   /** invité dans la cabine de (id du pilote) */
   cb?: string;
   /** pouvoir d'armure spécial : "spectre" (invisible) ou "titan" (robot géant) */
@@ -157,10 +160,36 @@ class Remote {
   }
 
   private mecha: Mecha | null = null;
+  private plane: Airliner | null = null;
+  private planeGroup = new THREE.Group();
+  /** avion de ligne de ce joueur (vol partagé) */
+  get planeRoot(): THREE.Object3D {
+    return this.planeGroup;
+  }
+  private updatePlane(dt: number) {
+    const fl = this.state?.fl;
+    if (!fl) {
+      if (this.plane) this.planeGroup.visible = false;
+      return;
+    }
+    if (!this.plane) {
+      this.plane = buildAirliner("royal");
+      this.planeGroup.add(this.plane.root);
+      G.scene.add(this.planeGroup);
+      this.planeGroup.position.set(fl[0], fl[1], fl[2]);
+    }
+    this.planeGroup.visible = true;
+    const target = new THREE.Vector3(fl[0], fl[1], fl[2]);
+    if (this.planeGroup.position.distanceTo(target) > 300) this.planeGroup.position.copy(target);
+    else this.planeGroup.position.lerp(target, 1 - Math.exp(-dt * 8));
+    this.planeGroup.quaternion.slerp(new THREE.Quaternion(fl[3], fl[4], fl[5], fl[6]), 1 - Math.exp(-dt * 8));
+    this.plane.update(dt, performance.now() / 1000, fl[9] ?? 1);
+  }
 
   update(dt: number) {
     const st = this.state;
     if (!st) return;
+    this.updatePlane(dt);
     const inShip = (st.m === "ship" && st.s) || st.m === "car" || st.m === "passenger";
     this.body.root.visible = !inShip && st.sp !== "spectre" && st.sp !== "titan";
     if (st.sp === "titan" && !inShip) {
@@ -195,6 +224,7 @@ class Remote {
   dispose() {
     G.scene.remove(this.body.root, this.shipGroup);
     if (this.mecha) G.scene.remove(this.mecha.root);
+    G.scene.remove(this.planeGroup);
     G.interact.remove("peer-ship-" + this.id);
     G.interact.remove("peer-cabin-" + this.id);
   }
@@ -454,6 +484,7 @@ export class Multiplayer {
         : {}),
       ...(G.passenger?.ride ? { r: G.passenger.ride.owner } : {}),
       ...(G.cabin?.host && G.cabin.inside ? { cb: G.cabin.host } : {}),
+      ...(G.airports?.netFlight() ? { fl: G.airports.netFlight()! } : {}),
       d: this.sharedDoors(),
       ...(G.armor.worn && G.armor.style.special ? { sp: G.armor.style.special } : {}),
       ...(G.deco.version && performance.now() - this.decoSent > 3000 ? ((this.decoSent = performance.now()), { dk: G.deco.compact() }) : {}),

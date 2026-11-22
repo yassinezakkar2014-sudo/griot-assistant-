@@ -28,7 +28,9 @@ import { Deco } from "./game/deco";
 import { Mecha } from "./game/mecha";
 import { Train } from "./game/train";
 import { Airports } from "./game/airport";
+import { AirCabin } from "./game/aircabin";
 import { buildMSPalace } from "./world/msPalace";
+import { ImperialPalace } from "./world/imperial";
 import { buildMall, MALL } from "./world/mall";
 import { buildCountries } from "./world/countries";
 import { buildPalaceCrown, buildHyperTowers, buildMetropolis } from "./world/giant";
@@ -133,10 +135,13 @@ async function boot() {
   await new Promise((r) => setTimeout(r, 0));
   const countryList = buildCountries();
   buildMSPalace();
+  G.imperial = new ImperialPalace();
+  G.imperial.build();
   for (const ci of countryList)
     PLACES.push({ id: "country:" + ci.def.id, name: ci.def.name, pos: () => ci.front.clone(), fly: () => ci.pad.clone(), outdoor: true });
   PLACES.push({ id: "station", name: "la Station orbitale royale", pos: () => STATION.clone().add(new THREE.Vector3(30, 0.2, 60)), fly: () => STATION.clone(), outdoor: true, space: true });
   PLACES.push({ id: "moon", name: "la Lune", pos: () => MOON_BASE.clone().add(new THREE.Vector3(10, 0.2, 10)), fly: () => MOON_BASE.clone().add(new THREE.Vector3(50, 0, 50)), outdoor: true, space: true });
+  PLACES.push({ id: "imperial", name: "le Palais Impérial", pos: () => G.imperial.front.clone(), fly: () => G.imperial.pad.clone(), outdoor: true });
   PLACES.push({ id: "mall", name: "le Royal Mall", pos: () => new THREE.Vector3(MALL.x, 1.5, MALL.z + MALL.d / 2 + 8), outdoor: true });
   PLACES.push({ id: "airport", name: "l'Aéroport Royal", pos: () => new THREE.Vector3(2050, 6.3, -2750 + 535), outdoor: true });
   PLACES.push({ id: "airport-princesses", name: "l'aéroport de la Cité des Princesses", pos: () => new THREE.Vector3(6800, 8.3, -13900 - 535), outdoor: true });
@@ -185,6 +190,8 @@ async function boot() {
   G.train.build();
   G.airports = new Airports();
   G.airports.build();
+  G.airCabin = new AirCabin();
+  G.airCabin.build();
   G.armor = new ArmorSystem();
   G.armor.build();
   const companion = buildCompanion();

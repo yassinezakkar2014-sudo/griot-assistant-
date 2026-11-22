@@ -3,7 +3,7 @@
 // saillantes, pinacles), une salle du trône, une cour avec bassin et palmiers, une aire pour
 // le petit vaisseau « Faucon de Zuria ». Pas de garage.
 import * as THREE from "three";
-import { G } from "../core";
+import { G, bus } from "../core";
 import { mat } from "./materials";
 import { block, span, cyl, wallX, wallZ, glowLine, plane } from "./build";
 import { Door } from "./door";
@@ -11,6 +11,7 @@ import { ZONES } from "./terrain";
 import { applyPBR, concretePBR } from "./pbr";
 import { makeThrone } from "./floors";
 import type { Palace } from "./palace";
+import { furniture } from "../game/deco";
 
 export interface ZuriaInfo {
   pad: THREE.Vector3;
@@ -175,6 +176,7 @@ export function buildZuria(p: Palace): ZuriaInfo {
       { pos: new THREE.Vector3(cx + 12, y0 + 6, cz), color: 0xff9a4a, intensity: 120, distance: 20 }
     ]
   });
+  buildAnnex(root, p, cx, cz, y0, W, D, H, { adobe, adobeDark, wood, rug, lantern });
   buildTown(root, cx, cz);
   // affichage seulement à proximité
   p.updaters.push(() => {
@@ -195,7 +197,7 @@ function buildTown(root: THREE.Group, cx: number, cz: number) {
   const houses: { x: number; z: number; w: number; d: number; h: number; y: number; c: number; tower: boolean }[] = [];
   const market = new THREE.Vector3(cx, 0, cz - 115);
   const blocked = (x: number, z: number, r: number) =>
-    (Math.abs(x - cx) < 46 + r && z > cz - 52 - r && z < cz + 32 + r) || // palais + cour
+    (Math.abs(x - cx) < 46 + r && z > cz - 52 - r && z < cz + 78 + r) || // palais + cour
     Math.hypot(x - (cx + 62), z - (cz - 6)) < 22 + r || // aire du vaisseau
     Math.hypot(x - market.x, z - market.z) < 24 + r || // place du marché
     (Math.abs(x - cx) < 5 + r && z < cz - 50 && z > market.z - 10); // rue principale
@@ -326,4 +328,120 @@ function buildTown(root: THREE.Group, cx: number, cz: number) {
     root.add(pole, lamp);
   }
   G.world.markers.push({ id: "zuria-market", name: "Marché de Zuria", pos: market.clone(), icon: "⌂", visible: () => true });
+}
+
+// ---------------------------------------------------------------- AILE ROYALE DE ZURIA (amélioration)
+/** Aile nord : chambre royale et cuisine aménagées, dôme d'or, minarets, jardin à fontaine. */
+function buildAnnex(
+  root: THREE.Group,
+  p: Palace,
+  cx: number,
+  cz: number,
+  y0: number,
+  W: number,
+  D: number,
+  H: number,
+  m: { adobe: THREE.Material; adobeDark: THREE.Material; wood: THREE.Material; rug: THREE.Material; lantern: THREE.Material }
+) {
+  const z1 = cz + D + 1.2,
+    z2 = cz + D + 30;
+  span(root, cx - W - 6, 3.5, cz + D + 4, cx + W + 6, y0, z2 + 26, m.adobeDark); // socle prolongé
+  span(root, cx - W, y0 - 0.1, z1, cx + W, y0, z2, new THREE.MeshStandardMaterial({ color: 0xd9a066, roughness: 0.6 }), { solid: false });
+  const h = 8;
+  wallX(root, z2, cx - W, cx + W, y0, h, m.adobe, [], 1);
+  wallZ(root, cx - W, z1, z2, y0, h, m.adobe, [{ c: (z1 + z2) / 2, w: 4, h: 4 }], 1);
+  wallZ(root, cx + W, z1, z2, y0, h, m.adobe, [{ c: (z1 + z2) / 2, w: 4, h: 4 }], 1);
+  wallZ(root, cx, z1, z2, y0, h, m.adobe, [{ c: (z1 + z2) / 2, w: 3, h: 3.6 }], 0.6);
+  span(root, cx - W - 0.5, y0 + h, z1 - 0.5, cx + W + 0.5, y0 + h + 0.7, z2 + 0.5, m.adobeDark);
+  // chambre royale (ouest)
+  const F = (k: Parameters<typeof furniture>[0], x: number, z: number, ry = 0, sc = 1.1) => root.add(furniture(k, x, y0, z, ry, sc));
+  span(root, cx - W + 2, y0, z1 + 4, cx - 2, y0 + 0.03, z2 - 4, m.rug, { solid: false });
+  F("lit", cx - 9, z2 - 3, Math.PI, 1.3);
+  F("lampe", cx - 14, z2 - 2, 0, 0.9);
+  F("lampe", cx - 4, z2 - 2, 0, 0.9);
+  F("bibliotheque", cx - W + 1.2, z1 + 10, Math.PI / 2, 1.1);
+  F("canape", cx - 9, z1 + 6, 0, 1.1);
+  F("tele", cx - 9, z1 + 1.5, 0, 1.1);
+  F("plante", cx - 3, z1 + 3, 0, 1.2);
+  F("aquarium", cx - W + 1.5, z2 - 10, Math.PI / 2, 1);
+  // cuisine (est)
+  const counter = new THREE.MeshStandardMaterial({ color: 0xe8dcc8, roughness: 0.4 });
+  const steel = new THREE.MeshStandardMaterial({ color: 0xc8ccd4, metalness: 0.9, roughness: 0.25 });
+  span(root, cx + 2, y0, z2 - 2, cx + W - 1, y0 + 1, z2 - 0.6, counter);
+  span(root, cx + W - 2.4, y0, z1 + 2, cx + W - 1, y0 + 1, z2 - 2, counter);
+  span(root, cx + 6, y0, z1 + 10, cx + 13, y0 + 1, z1 + 14, counter); // îlot
+  span(root, cx + 3, y0, z2 - 2.2, cx + 6, y0 + 1.05, z2 - 0.6, steel, { solid: false }); // cuisinière
+  span(root, cx + 3, y0 + 3.2, z2 - 2, cx + 6, y0 + 3.9, z2 - 0.8, steel, { solid: false }); // hotte
+  span(root, cx + 14, y0, z2 - 2, cx + 17, y0 + 2.8, z2 - 0.6, steel); // frigo
+  for (let k = 0; k < 5; k++) {
+    const jar = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 0.6, 12), new THREE.MeshStandardMaterial({ color: [0xc0392b, 0xd8a12a, 0x1f6b4a, 0x8a5a2a, 0xe8dcc8][k] }));
+    jar.position.set(cx + W - 1.7, y0 + 1.3, z1 + 4 + k * 3);
+    root.add(jar);
+  }
+  F("table", cx + 9, z1 + 5, 0, 0.6);
+  G.interact.add({
+    id: "zuria-kitchen",
+    pos: new THREE.Vector3(cx + 9.5, y0 + 1, z1 + 12),
+    radius: 4,
+    label: () => "🍲 Cuisiner un plat de Zuria",
+    action: () => bus.emit("toast", { text: "🍲 Un tajine aux dattes et un thé à la menthe, préparés à la manière de Zuria. Délicieux !" })
+  });
+  G.interact.add({
+    id: "zuria-bed",
+    pos: new THREE.Vector3(cx - 9, y0 + 1, z2 - 6),
+    radius: 3.5,
+    label: () => "😴 Dormir dans la chambre royale de Zuria",
+    action: () => {
+      bus.emit("fade");
+      G.env.setHour(7.5);
+      G.player.sit(new THREE.Vector3(cx - 9, y0 + 1.6, z2 - 3), Math.PI);
+      bus.emit("toast", { text: "😴 Nuit douce à Zuria… ☀️ Le soleil se lève sur la savane." });
+    }
+  });
+  // dôme d'or sur le palais, minarets
+  const gold = mat.gold;
+  const domeG = new THREE.Mesh(new THREE.SphereGeometry(8, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), gold);
+  domeG.position.set(cx, y0 + H + 0.8, cz);
+  root.add(domeG);
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(8.2, 8.2, 2, 32), m.adobeDark);
+  drum.position.set(cx, y0 + H + 0.8, cz);
+  root.add(drum);
+  for (const sx of [-1, 1]) {
+    const min = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.8, 26, 16), m.adobe);
+    min.position.set(cx + sx * (W + 4), y0 + 13, z2 + 2);
+    const top = new THREE.Mesh(new THREE.SphereGeometry(1.9, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), gold);
+    top.position.set(cx + sx * (W + 4), y0 + 26, z2 + 2);
+    root.add(min, top);
+  }
+  // jardin nord : fontaine, palmiers, lanternes
+  const fz = z2 + 14;
+  const basin = new THREE.Mesh(new THREE.CylinderGeometry(5, 5.4, 0.8, 32), m.adobeDark);
+  basin.position.set(cx, y0 + 0.4, fz);
+  const water = new THREE.Mesh(new THREE.CircleGeometry(4.6, 32), new THREE.MeshStandardMaterial({ color: 0x0e7aa8, roughness: 0.05, emissive: 0x063a5a, emissiveIntensity: 0.4 }));
+  water.rotation.x = -Math.PI / 2;
+  water.position.set(cx, y0 + 0.75, fz);
+  root.add(basin, water);
+  const palmTrunk = new THREE.CylinderGeometry(0.25, 0.4, 8, 8);
+  const palmTop = new THREE.ConeGeometry(3, 1.5, 9);
+  const palmM = new THREE.MeshStandardMaterial({ color: 0x3d7a2e, flatShading: true });
+  for (const [dx, dz] of [[-12, -6], [12, -6], [-12, 8], [12, 8], [-20, 0], [20, 0]]) {
+    const t = new THREE.Mesh(palmTrunk, m.wood);
+    t.position.set(cx + dx, y0 + 4, fz + dz);
+    const tp = new THREE.Mesh(palmTop, palmM);
+    tp.position.set(cx + dx, y0 + 8.4, fz + dz);
+    root.add(t, tp);
+  }
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2;
+    const l = new THREE.Mesh(new THREE.SphereGeometry(0.35, 10, 8), m.lantern);
+    l.position.set(cx + Math.cos(a) * 9, y0 + 2.4, fz + Math.sin(a) * 9);
+    root.add(l);
+  }
+  p.zones.push({
+    contains: (q) => Math.abs(q.x - cx) < W && q.z > z1 && q.z < z2 && q.y < y0 + h,
+    lights: [
+      { pos: new THREE.Vector3(cx - 9, y0 + 6, (z1 + z2) / 2), color: 0xffc890, intensity: 90, distance: 24 },
+      { pos: new THREE.Vector3(cx + 9, y0 + 6, (z1 + z2) / 2), color: 0xfff0d8, intensity: 90, distance: 24 }
+    ]
+  });
 }

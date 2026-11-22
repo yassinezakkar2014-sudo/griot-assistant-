@@ -7,7 +7,7 @@ import { block, cyl, span, glowLine } from "./build";
 import { Terrain, ZONES, SEA, WORLD, fbm } from "./terrain";
 import { HYPER } from "./giant";
 import { MALL } from "./mall";
-import { EARTH, countryAt, inAirport } from "./countryData";
+import { EARTH, countryAt, inAirport, onMountain, MOUNTAIN } from "./countryData";
 
 export interface Marker {
   id: string;
@@ -622,8 +622,13 @@ export class World {
   zoneName(p: THREE.Vector3): string {
     const c = ZONES.city;
     if (G.cabin?.inside && p.distanceTo(G.player.position) < 1) return "Royal Talon — Cabine";
+    if (G.airCabin?.inside && p.distanceTo(G.player.position) < 1) return "✈ Cabine de l'avion";
     if (G.space?.active && p.y > 20000) return G.space.zone(p);
     if (Math.abs(p.x - MALL.x) < MALL.w / 2 && Math.abs(p.z - MALL.z) < MALL.d / 2) return "Royal Mall";
+    if (onMountain(p.x, p.z, 1)) {
+      const dm = Math.hypot(p.x - MOUNTAIN.x, p.z - MOUNTAIN.z);
+      return dm < MOUNTAIN.plateau ? (dm < 300 ? "Palais Impérial" : "Palais Impérial — jardins et cité") : "Montagne Royale";
+    }
     const ap = inAirport(p.x, p.z, 0);
     if (ap) return ap.name;
     const kc = countryAt(p.x, p.z, 1.05);

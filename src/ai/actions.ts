@@ -87,6 +87,7 @@ export function placeFromText(t: string): Place | null {
   const n = normalize(t);
   // pays du grand monde (noms exacts)
   for (const p of PLACES) if (p.id.startsWith("country:") && new RegExp(`\\b${normalize(p.name)}\\b`).test(n)) return p;
+  if (/imperial|palais (de la |sur la )?montagne|montagne royale|grand palais|mon nouveau palais/.test(n)) return PLACES.find((p) => p.id === "imperial") ?? null;
   if (/\bmall\b|centre commercial|boutique|magasin|shopping/.test(n)) return PLACES.find((p) => p.id === "mall") ?? null;
   if (/aeroport/.test(n)) return PLACES.find((p) => p.id === (/princesse/.test(n) ? "airport-princesses" : "airport")) ?? null;
   if (/princesse/.test(n)) return PLACES.find((p) => p.id === "country:princesses") ?? null;
@@ -399,11 +400,16 @@ export async function runAction(action: string, target?: string | null): Promise
       }
       return ap.fly(from, /panoram/.test(n) ? from : dest);
     }
+    case "palace_stealth": {
+      const on = String(target ?? "") !== "off";
+      G.imperial.setStealth(on);
+      return on ? "Le Palais Impérial devient invisible. Même vu du ciel, il a disparu." : "Le Palais Impérial réapparaît.";
+    }
     case "tiktok":
       bus.emit("ui:phone-app", target === "rec" ? "tiktok-rec" : "tiktok");
       return target === "rec" ? "Moteur… action ! Je filme 15 secondes de votre partie pour TikTok." : "Voici TikTok : filmez votre partie ou ouvrez l'appli.";
     case "invite":
-      if (G.mode !== "ship") return "Montez d'abord aux commandes de votre Royal Talon, puis je préviens vos amis.";
+      if (G.mode !== "ship" && !G.airports.flight) return "Montez d'abord aux commandes de votre Royal Talon (ou prenez un vol), puis je préviens vos amis.";
       bus.emit("ui:phone-app", "invite-all");
       return "Invitation envoyée à vos amis : ils peuvent monter à bord d'un seul toucher.";
     case "aboard":

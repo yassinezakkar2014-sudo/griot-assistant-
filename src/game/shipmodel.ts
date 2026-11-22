@@ -175,10 +175,16 @@ export function cloakMaterial() {
     vertexShader: /* glsl */ `
       varying vec3 vN; varying vec3 vV; varying float vY;
       void main() {
-        vec4 mv = modelViewMatrix * vec4(position, 1.0);
-        vN = normalize(normalMatrix * normal);
+        vec4 p = vec4(position, 1.0);
+        vec3 n = normal;
+        #ifdef USE_INSTANCING
+          p = instanceMatrix * p;
+          n = mat3(instanceMatrix) * n;
+        #endif
+        vec4 mv = modelViewMatrix * p;
+        vN = normalize(normalMatrix * n);
         vV = normalize(-mv.xyz);
-        vY = (modelMatrix * vec4(position, 1.0)).y;
+        vY = (modelMatrix * p).y;
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */ `
