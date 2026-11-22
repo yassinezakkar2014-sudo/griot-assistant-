@@ -515,3 +515,25 @@ html.touch .keys-help { display: none; }
 @keyframes cloakText { 0% { opacity: 0; transform: scale(1.4); filter: blur(6px); } 25% { opacity: 1; transform: scale(1); filter: blur(0); } 70% { opacity: 1; } 100% { opacity: 0; letter-spacing: .8em; } }
 .keys-help { max-height: calc(100vh - 470px); overflow: hidden; }
 body[data-mode="ship"] .keys-help { font-size: 11px; }
+/* super vitesse : lignes de vitesse et halo électrique */
+.superspeed-fx { position: fixed; inset: 0; pointer-events: none; z-index: 5; opacity: 0; transition: opacity .25s; display: none;
+  background: repeating-conic-gradient(from 0deg at 50% 50%, rgba(160,230,255,.0) 0deg 3deg, rgba(200,240,255,.28) 3.4deg 3.8deg, rgba(160,230,255,0) 4.2deg 9deg);
+  -webkit-mask: radial-gradient(circle at 50% 50%, transparent 0 32%, #000 70%); mask: radial-gradient(circle at 50% 50%, transparent 0 32%, #000 70%);
+  animation: ssfx .18s linear infinite; }
+.superspeed-fx.on { display: block; }
+.superspeed-fx::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 120px rgba(255,214,90,.35), inset 0 0 40px rgba(90,200,255,.4); }
+@keyframes ssfx { from { transform: rotate(0deg) scale(1.02); } to { transform: rotate(4deg) scale(1); } }
+/* pilote automatique et garage */
+.autopilot-bar { position: fixed; right: 12px; top: 50%; transform: translateY(-50%); z-index: 55; display: grid; gap: 6px; font: 600 13px Manrope, system-ui, sans-serif; }
+.autopilot-bar button { padding: 9px 12px; border-radius: 12px; border: 1px solid rgba(255,214,122,.5); background: rgba(10,16,30,.85); color: #ffe7b0; cursor: pointer; text-align: left; }
+.autopilot-bar button.on { background: linear-gradient(90deg,#d8b25a,#ffdf8a); color: #1a1406; }
+.autopilot-bar .ap-list { display: grid; gap: 4px; }
+.autopilot-bar .ap-status { padding: 6px 10px; border-radius: 10px; background: rgba(0,0,0,.55); color: #bfe8ff; max-width: 220px; }
+.garage-panel { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 80; width: min(94vw, 560px); max-height: 86vh; overflow: auto; padding: 16px; border-radius: 18px; background: rgba(8,12,24,.94); border: 1px solid rgba(255,214,122,.55); color: #f4ecd8; font: 500 14px Manrope, system-ui, sans-serif; }
+.garage-panel .gp-title { font: 700 17px Georgia, serif; color: #ffd27a; margin-bottom: 10px; }
+.garage-panel .gp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.garage-panel .gp-grid button { display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,.15); background: rgba(255,255,255,.06); color: inherit; cursor: pointer; text-align: left; }
+.garage-panel .gp-grid button:disabled { opacity: .45; cursor: default; }
+.garage-panel .gp-grid i { width: 18px; height: 18px; border-radius: 50%; border: 1px solid #fff6; flex: none; }
+.garage-panel p { opacity: .8; font-size: 13px; }
+.garage-panel .gp-close { padding: 8px 14px; border-radius: 10px; border: 0; background: #d8b25a; color: #1a1406; font-weight: 700; cursor: pointer; }

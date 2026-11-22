@@ -5,8 +5,12 @@ import { G, bus } from "../core";
 import { mat, tex } from "./materials";
 import { block, span } from "./build";
 import { SEA } from "./terrain";
+import { PASS } from "./countryData";
 
 const HALF_W = 11; // demi-largeur de l'autoroute (4 voies + bandes d'arrêt)
+
+/** Tracés (x, z) des routes, échantillonnés : utilisés par le pilote automatique. */
+export const routePaths: [number, number][][] = [];
 
 export interface Highway {
   heightAt: (x: number, z: number) => number;
@@ -20,8 +24,13 @@ export function buildHighway(): Highway {
     // branche ouest → GRAND PONT ROYAL au-dessus de l'océan, jusqu'au marché de Zuria
     [[-275, 0], [-480, -40], [-760, -160], [-980, -240], [-1300, -210], [-1800, -70], [-2200, 50], [-2460, 135], [-2700, 178], [-2872, 185]],
     // route spéciale de l'Aéroport Royal (et de sa gare), depuis l'autoroute
-    [[1700, -1310], [1750, -1600], [1820, -1900], [1850, -2108]]
+    [[1700, -1310], [1750, -1600], [1820, -1900], [1850, -2108]],
+    // ROUTE IMPÉRIALE : du portail nord de l'ancien palais, par le col royal (viaduc), jusqu'à la porte du Palais Impérial
+    [[0, 312], [0, 700], [0, 1500], [0, 2400], [0, 3300], [0, PASS.z2 - 4]]
   ];
+  const IMPERIAL_ROUTE = 3;
+  // profil en long de la route impériale : rampe régulière jusqu'au plateau (600 m)
+  const ramp = (z: number) => Math.min(1, Math.max(0, (z - (PASS.z1 + 300)) / (PASS.z2 - 60 - (PASS.z1 + 300)))) * PASS.top;
   const BRIDGE_ROUTE = 1;
   const DECK = 34; // hauteur du tablier au-dessus de l'océan (les navires passent dessous)
   const bridgeTowers: THREE.Vector3[] = [];
@@ -49,8 +58,9 @@ export function buildHighway(): Highway {
     // profil en long : relief lissé, jamais sous le terrain ni sous la mer
     const raw = pts.map((p) => Math.max(G.physics.terrain(p.x, p.z), SEA + 2.5));
     // pont : au-dessus de l'eau le tablier monte à DECK m, avec de longues rampes d'accès
-    const target = bridge ? raw.map((y) => (y <= SEA + 2.6 ? DECK : y)) : raw;
-    const win = bridge ? 34 : 12;
+    const imperial = ri === IMPERIAL_ROUTE;
+    const target = bridge ? raw.map((y) => (y <= SEA + 2.6 ? DECK : y)) : imperial ? pts.map((p, i) => Math.max(ramp(p.z), Math.min(raw[i], 2))) : raw;
+    const win = bridge ? 34 : imperial ? 6 : 12;
     const smooth = raw.map((_, i) => {
       let s = 0,
         c = 0;
@@ -175,7 +185,7 @@ export function buildHighway(): Highway {
   c.font = "bold 64px Arial";
   c.fillText("A1  AUTOROUTE ROYALE", 40, 82);
   c.font = "36px Arial";
-  c.fillText("Ville  ·  Montagnes  ·  ✈ Aéroport  ·  Pont → Zuria ↰", 40, 132);
+  c.fillText("Ville  ·  ♛ Palais Impérial  ·  ✈ Aéroport  ·  Pont → Zuria ↰", 40, 132);
   const st = new THREE.CanvasTexture(sign);
   st.colorSpace = THREE.SRGBColorSpace;
   const gy = G.physics.terrain(0, -360) + 0.1;
@@ -203,6 +213,10 @@ export function buildHighway(): Highway {
     return best;
   };
   G.physics.surfaces.push(heightAt);
+  // tracés des routes (pilote automatique des voitures)
+  routePaths.length = 0;
+  for (const ctrl of routes) routePaths.push(new THREE.CatmullRomCurve3(ctrl.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, "centripetal").getSpacedPoints(Math.ceil(ctrl.length * 30)).map((p) => [p.x, p.z] as [number, number]));
+  G.world.markers.push({ id: "imperial-road", name: "Route impériale (col royal)", pos: new THREE.Vector3(0, 0, 2400), icon: "♛", visible: () => true });
   G.world.markers.push({ id: "highway", name: "Autoroute royale", pos: new THREE.Vector3(1700, 0, -1310), icon: "═", visible: () => true });
   bus.emit("highway", Math.round(total));
   return { heightAt, onRoad: (x, z) => heightAt(x, z) > -Infinity };

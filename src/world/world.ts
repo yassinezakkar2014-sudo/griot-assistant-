@@ -625,8 +625,12 @@ export class World {
     if (G.airCabin?.inside && p.distanceTo(G.player.position) < 1) return "✈ Cabine de l'avion";
     if (G.space?.active && p.y > 20000) return G.space.zone(p);
     if (Math.abs(p.x - MALL.x) < MALL.w / 2 && Math.abs(p.z - MALL.z) < MALL.d / 2) return "Royal Mall";
-    if (onMountain(p.x, p.z, 1)) {
+    if (onMountain(p.x, p.z, 1) || (Math.abs(p.x) < 240 && p.z > 320 && p.z < MOUNTAIN.z)) {
       const dm = Math.hypot(p.x - MOUNTAIN.x, p.z - MOUNTAIN.z);
+      if (Math.abs(p.x - MOUNTAIN.x - 600) < 52 && Math.abs(p.z - MOUNTAIN.z + 300) < 42) return "Garage impérial";
+      const ap = inAirport(p.x, p.z, 0);
+      if (ap) return ap.name;
+      if (dm >= MOUNTAIN.plateau && Math.abs(p.x) < 240) return "Route impériale — col royal";
       return dm < MOUNTAIN.plateau ? (dm < 300 ? "Palais Impérial" : "Palais Impérial — jardins et cité") : "Montagne Royale";
     }
     const ap = inAirport(p.x, p.z, 0);

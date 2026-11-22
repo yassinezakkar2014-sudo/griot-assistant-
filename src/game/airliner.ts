@@ -25,6 +25,7 @@ export interface Livery {
 export const LIVERIES: Record<string, Livery> = {
   royal: { name: "ROYAL AIRWAYS", body: "#f7f8fb", stripe: "#1b3f8f", accent: "#d8b25a", tail: "#1b3f8f", logo: "♛" },
   princess: { name: "PRINCESS AIR", body: "#fbf6fa", stripe: "#9a4ac8", accent: "#2ab8b0", tail: "#9a4ac8", logo: "♥" },
+  imperial: { name: "IMPERIAL ONE", body: "#16161c", stripe: "#d8b25a", accent: "#ffffff", tail: "#d8b25a", logo: "♛" },
   zuria: { name: "ZURIA AIRLINES", body: "#fbf8f2", stripe: "#a8743a", accent: "#1f6b4a", tail: "#1f6b4a", logo: "✺" }
 };
 

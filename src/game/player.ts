@@ -27,6 +27,20 @@ export class Player {
   height = 1.8;
   sitting: { pos: THREE.Vector3; yaw: number } | null = null;
   speedMul = 1;
+  /** SUPER VITESSE (touche U / ⚡) : course éclair à plus de 400 km/h */
+  superSpeed = false;
+  private fx: HTMLElement | null = null;
+  setSuperSpeed(on: boolean) {
+    this.superSpeed = on;
+    if (!this.fx) {
+      this.fx = document.createElement("div");
+      this.fx.className = "superspeed-fx";
+      document.body.appendChild(this.fx);
+    }
+    this.fx.classList.toggle("on", on);
+    G.audio.whoosh(on ? 0.6 : 0.4, on ? 300 : 1600, on ? 2400 : 200, 0.15);
+    bus.emit("toast", { text: on ? "⚡ SUPER VITESSE activée — Maj pour l'éclair (≈ 430 km/h) · U pour arrêter" : "Super vitesse désactivée" });
+  }
   jumpMul = 1;
   private groundBody: import("../engine/physics").Body | null = null;
   private camPos = new THREE.Vector3();
@@ -103,6 +117,7 @@ export class Player {
     this.pitch = clamp(this.pitch - look.y, -1.35, 1.2);
     if (inp.wheel) this.camDist = clamp(this.camDist + inp.wheel * 0.6, 1.8, 9);
     if (inp.hit("KeyV")) this.toggleView();
+    if (inp.hit("KeyU")) this.setSuperSpeed(!this.superSpeed);
 
     if (this.sitting) {
       if (inp.down("KeyW", "KeyA", "KeyS", "KeyD", "Space") || Math.abs(inp.touchMove.x) + Math.abs(inp.touchMove.y) > 0.3) this.stand();
@@ -124,8 +139,8 @@ export class Player {
     const right = new THREE.Vector3().crossVectors(fwd, UP);
     const wish = new THREE.Vector3().addScaledVector(fwd, fwdIn).addScaledVector(right, sideIn);
     if (wish.lengthSq() > 1) wish.normalize();
-    const maxSpeed = (run ? 8.5 : 4.6) * this.speedMul;
-    const accel = this.onGround ? 14 : 4;
+    const maxSpeed = (run ? 8.5 : 4.6) * this.speedMul * (this.superSpeed ? (run ? 14 : 7) : 1);
+    const accel = this.onGround ? (this.superSpeed ? 9 : 14) : this.superSpeed ? 3 : 4;
     this.velocity.x = damp(this.velocity.x, wish.x * maxSpeed, accel, dt);
     this.velocity.z = damp(this.velocity.z, wish.z * maxSpeed, accel, dt);
 
@@ -157,9 +172,23 @@ export class Player {
     }
 
     const p = this.position;
-    p.x += this.velocity.x * dt;
-    p.z += this.velocity.z * dt;
-    G.physics.resolve(p, this.radius, this.height);
+    // sous-pas : à très grande vitesse on ne traverse pas les murs
+    const hs = Math.hypot(this.velocity.x, this.velocity.z) * dt;
+    const steps = Math.min(12, Math.max(1, Math.ceil(hs / 0.3)));
+    for (let k = 0; k < steps; k++) {
+      p.x += (this.velocity.x * dt) / steps;
+      p.z += (this.velocity.z * dt) / steps;
+      if (this.superSpeed && this.onGround) p.y = Math.max(p.y, G.physics.ground(p.x, p.y + 0.6, p.z, 0.6, this.radius).y);
+      G.physics.resolve(p, this.radius, this.height);
+    }
+    // effet éclair : champ de vision élargi
+    const sp = Math.hypot(this.velocity.x, this.velocity.z);
+    const wantFov = this.superSpeed && sp > 12 ? Math.min(98, 70 + sp * 0.25) : 70;
+    if (this.superSpeed || G.camera.fov !== 70) {
+      G.camera.fov = Math.abs(G.camera.fov - wantFov) < 0.05 ? wantFov : damp(G.camera.fov, wantFov, 4, dt);
+      G.camera.updateProjectionMatrix();
+    }
+    if (this.fx) this.fx.style.opacity = this.superSpeed ? String(Math.min(1, sp / 60)) : "0";
 
     p.y += this.velocity.y * dt;
     const g = G.physics.ground(p.x, Math.max(p.y, p.y - this.velocity.y * dt), p.z, 0.6, this.radius);

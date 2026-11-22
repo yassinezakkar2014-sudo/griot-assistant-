@@ -162,6 +162,9 @@ export class Environment {
     else this.scene.background = null;
 
     this.bloom.strength = lerp(0.75, 0.38, day);
+    // en altitude, le brouillard s'éclaircit : on voit le sol au lieu d'un voile bleu
+    const alt = Math.max(0, this.camera.position.y - Math.max(0, G.physics?.terrain(this.camera.position.x, this.camera.position.z) ?? 0) - 120);
+    this.fog.density = 0.00028 / (1 + alt / 300);
     if (this.space) {
       this.scene.fog = null;
       this.sky.visible = false;

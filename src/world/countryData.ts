@@ -66,11 +66,16 @@ export interface AirportDef {
   len: number; // longueur de piste
   side: 1 | -1;
   big: boolean;
+  /** aéroport privé (jet privé) */
+  private?: boolean;
 }
 export const AIRPORTS: AirportDef[] = [
   { id: "royal", name: "Aéroport Royal International", short: "Aéroport Royal", x: 2050, z: -2750, h: 6, len: 2500, side: 1, big: true },
-  { id: "princesses", name: "Aéroport de la Cité des Princesses", short: "Cité des Princesses", x: 6800, z: -13900, h: 8, len: 1600, side: -1, big: false }
+  { id: "princesses", name: "Aéroport de la Cité des Princesses", short: "Cité des Princesses", x: 6800, z: -13900, h: 8, len: 1600, side: -1, big: false },
+  { id: "imperial", name: "Aéroport privé impérial", short: "Palais Impérial", x: 0, z: 5600 + 1000, h: 600, len: 1000, side: -1, big: false, private: true }
 ];
+/** Col royal : route et train de l'ancien palais (nord) jusqu'à la porte du Palais Impérial (600 m). */
+export const PASS = { x: 0, z1: 300, z2: 5600 - 1390, top: 600 };
 /** Emprise (rectangle monde) d'un aéroport, marges comprises. */
 export function airportRect(a: AirportDef, margin = 0) {
   const half = a.len / 2 + 320 + margin;
@@ -87,7 +92,7 @@ export function inAirport(x: number, z: number, margin = 40) {
 }
 
 /** La MONTAGNE ROYALE : île-montagne au nord-est du royaume ; le Palais Impérial couvre son plateau sommital. */
-export const MOUNTAIN = { x: 5600, z: 6000, r: 2500, plateau: 1450, top: 600 };
+export const MOUNTAIN = { x: 0, z: 5600, r: 2500, plateau: 1450, top: 600 };
 export function onMountain(x: number, z: number, margin = 1) {
   return Math.hypot(x - MOUNTAIN.x, z - MOUNTAIN.z) < MOUNTAIN.r * margin;
 }
