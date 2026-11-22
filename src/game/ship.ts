@@ -404,20 +404,117 @@ export class Ship {
     if (on === this.stealth) return;
     if (on && this.energy < 0.1) return bus.emit("toast", { text: "Énergie insuffisante pour le mode furtif.", kind: "warn" });
     this.stealth = on;
-    const cloak = cloakMaterial();
+    // ANIMATION : une vague d'énergie balaie le vaisseau du nez à la queue ; chaque pièce
+    // passe en camouflage (ou réapparaît) quand la vague la traverse, avec étincelles et flash.
+    if (this.cloakFx) this.finishCloak();
+    const parts: { me: THREE.Mesh; z: number }[] = [];
+    this.model.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(this.model.matrixWorld).invert();
+    const box = new THREE.Box3();
+    const c = new THREE.Vector3();
     this.model.traverse((o) => {
       const me = o as THREE.Mesh;
-      if (!me.isMesh || this.isCockpitPart(me)) return;
-      if (on) {
-        this.originals.set(me, me.material);
-        me.material = cloak;
-      } else if (this.originals.has(me)) me.material = this.originals.get(me)!;
+      if (!me.isMesh || this.isCockpitPart(me) || me.userData.fx) return;
+      box.setFromObject(me).getCenter(c).applyMatrix4(inv);
+      parts.push({ me, z: c.z });
+      if (on && !this.originals.has(me)) this.originals.set(me, me.material);
     });
-    if (!on) this.originals.clear();
-    G.audio.whoosh(1.4, on ? 2400 : 200, on ? 120 : 2400, 0.25);
+    const zs = parts.map((p) => p.z);
+    const z0 = Math.min(...zs) - 0.6,
+      z1 = Math.max(...zs) + 0.6;
+    // anneau d'énergie + voile de balayage + étincelles (dans le repère du modèle)
+    const ringMat = new THREE.MeshBasicMaterial({ color: on ? 0x7fdcff : 0xffd27a, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.06, 10, 64), ringMat);
+    ring.scale.set(7.6, 2.6, 1);
+    const sheet = new THREE.Mesh(
+      new THREE.CircleGeometry(1, 48),
+      new THREE.MeshBasicMaterial({ color: on ? 0x3fa8ff : 0xffb050, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })
+    );
+    sheet.scale.set(7.4, 2.5, 1);
+    const N = 260;
+    const pos = new Float32Array(N * 3);
+    const vel = new Float32Array(N * 3);
+    const sg = new THREE.BufferGeometry();
+    sg.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    const sparks = new THREE.Points(sg, new THREE.PointsMaterial({ color: on ? 0xbfefff : 0xffe0a0, size: 0.09, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+    sparks.frustumCulled = false;
+    for (const m of [ring, sheet, sparks]) {
+      m.userData.fx = true;
+      this.model.add(m);
+    }
+    this.cloakFx = { on, t: 0, dur: 1.8, parts, z0, z1, ring, sheet, sparks, vel, emitted: 0 };
+    G.audio.whoosh(1.8, on ? 2400 : 200, on ? 120 : 2400, 0.25);
+    G.audio.tone(on ? 1200 : 400, 0.6, "sine", 0.08, on ? 300 : 1400);
     bus.emit("shake", 0.25);
-    bus.emit("toast", { text: on ? "👁‍🗨 Mode furtif activé : le Royal Talon est invisible." : "Mode furtif désactivé." });
+    bus.emit("cloak:fx", on);
+    bus.emit("toast", { text: on ? "👁‍🗨 Mode furtif activé : le Royal Talon disparaît…" : "✨ Mode furtif désactivé : le Royal Talon réapparaît." });
     bus.emit("mission", { type: "stealth" });
+  }
+
+  private cloakFx: {
+    on: boolean;
+    t: number;
+    dur: number;
+    parts: { me: THREE.Mesh; z: number }[];
+    z0: number;
+    z1: number;
+    ring: THREE.Mesh;
+    sheet: THREE.Mesh;
+    sparks: THREE.Points;
+    vel: Float32Array;
+    emitted: number;
+  } | null = null;
+
+  private updateCloak(dt: number) {
+    const fx = this.cloakFx;
+    if (!fx) return;
+    fx.t += dt;
+    const k = Math.min(1, fx.t / fx.dur);
+    const e = k * k * (3 - 2 * k);
+    const z = fx.z0 + (fx.z1 - fx.z0) * e;
+    const cloak = cloakMaterial();
+    for (const p of fx.parts) {
+      const passed = p.z < z;
+      if (fx.on) p.me.material = passed ? cloak : this.originals.get(p.me) ?? p.me.material;
+      else if (passed && this.originals.has(p.me)) p.me.material = this.originals.get(p.me)!;
+    }
+    fx.ring.position.set(0, 0.9, z);
+    fx.sheet.position.set(0, 0.9, z);
+    const pulse = 1 + Math.sin(fx.t * 30) * 0.06;
+    fx.ring.scale.set(7.6 * pulse, 2.6 * pulse, 1);
+    const fade = k < 0.85 ? 1 : (1 - k) / 0.15;
+    (fx.ring.material as THREE.MeshBasicMaterial).opacity = 0.95 * fade;
+    (fx.sheet.material as THREE.MeshBasicMaterial).opacity = 0.25 * fade * (0.7 + Math.random() * 0.3);
+    // étincelles émises sur le passage de la vague
+    const a = fx.sparks.geometry.attributes.position as THREE.BufferAttribute;
+    const n = a.count;
+    const want = Math.min(n, Math.floor(k * n));
+    for (; fx.emitted < want; fx.emitted++) {
+      const i = fx.emitted;
+      const ang = Math.random() * Math.PI * 2;
+      a.setXYZ(i, Math.cos(ang) * 7 * Math.random(), 0.9 + Math.sin(ang) * 2.2 * Math.random(), z);
+      fx.vel.set([(Math.random() - 0.5) * 3, Math.random() * 2.5, (Math.random() - 0.5) * 2 + 1.5], i * 3);
+    }
+    for (let i = 0; i < fx.emitted; i++) a.setXYZ(i, a.getX(i) + fx.vel[i * 3] * dt, a.getY(i) + fx.vel[i * 3 + 1] * dt, a.getZ(i) + fx.vel[i * 3 + 2] * dt);
+    a.needsUpdate = true;
+    (fx.sparks.material as THREE.PointsMaterial).opacity = fade;
+    if (fx.t >= fx.dur + 0.4) this.finishCloak();
+  }
+
+  private finishCloak() {
+    const fx = this.cloakFx;
+    if (!fx) return;
+    this.cloakFx = null;
+    const cloak = cloakMaterial();
+    for (const p of fx.parts) {
+      if (fx.on) p.me.material = cloak;
+      else if (this.originals.has(p.me)) p.me.material = this.originals.get(p.me)!;
+    }
+    if (!fx.on) this.originals.clear();
+    for (const m of [fx.ring, fx.sheet, fx.sparks]) {
+      this.model.remove(m);
+      (m as THREE.Mesh).geometry.dispose();
+    }
   }
   private isCockpitPart(o: THREE.Object3D) {
     for (let p: THREE.Object3D | null = o; p; p = p.parent) if (p === this.cockpit) return true;
@@ -589,6 +686,7 @@ export class Ship {
     this.lightMat.emissiveIntensity = this.lights ? 2.2 + Math.sin(t * 2) * 0.3 : 0.05;
     this.padGlow.emissiveIntensity = this.padLights ? 2 + Math.sin(t * 3) : 0.6;
     cloakTime.value = t;
+    this.updateCloak(dt);
     this.updateSupersonic(dt);
     if (this.stealth) {
       this.energy = Math.max(0, this.energy - dt * 0.015);

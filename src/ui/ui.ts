@@ -68,6 +68,13 @@ export class UI {
     $("phoneBtn").onclick = () => this.phone.toggle();
     bus.on("ui:phone", (o?: { gift?: boolean }) => this.phone.open(!!o?.gift));
     bus.on("ui:vision", () => this.vision());
+    bus.on("cloak:fx", (on: boolean) => {
+      const fx = document.createElement("div");
+      fx.className = "cloak-fx " + (on ? "on" : "off");
+      fx.innerHTML = `<span>${on ? "MODE FURTIF" : "VISIBLE"}</span>`;
+      document.body.appendChild(fx);
+      setTimeout(() => fx.remove(), 1900);
+    });
     bus.on("griot:command", (t: string) => this.griot.send(t));
     // pendant un appel entre joueurs, GRIOT se tait et libère le micro
     bus.on("call:active", (on: boolean) => {
