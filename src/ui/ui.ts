@@ -1472,11 +1472,11 @@ export class UI {
     const K = (k: string, t: string) => `<div><kbd>${k}</kbd><span>${t}</span></div>`;
     const common = K("M", "Carte") + K("Entrée", "Parler à GRIOT") + K("T", "Micro") + K("P", "Menu") + K("J", "Missions");
     const lists: Record<string, string> = {
-      foot: K("ZQSD / WASD", "Marcher") + K("Souris", "Regarder") + K("Maj", "Courir") + K("Espace ×2", "Double saut") + K("E", "Interagir") + K("V", "Vue 1re / 3e pers.") + common,
+      foot: K("ZQSD / WASD", "Marcher") + K("Souris", "Regarder") + K("Maj", "Courir") + K("Espace ×2", "Double saut") + K("U", "⚡ Super vitesse") + K("E", "Interagir") + K("V", "Vue 1re / 3e pers.") + common,
       armor: K("ZQSD", "Marcher") + K("Espace ×2", "Double saut") + K("1", "Onde de choc") + K("2", "Bouclier") + K("3", "Surcharge") + K("4", "Vision") + K("5 / G", "Rayon") + K("X", "Masque") + K("E", "Interagir") + common,
       titan: K("ZQSD", "Marcher (Titan)") + K("Espace", "Réacteurs") + K("5 / G", "Canon") + K("1", "Frappe au sol") + common,
       ship: K("Souris", "Tourner / cabrer") + K("W / S", "Poussée") + K("A / D", "Tourner") + K("Q / E", "Inclinaison") + K("Espace / C", "Monter / descendre") + K("Maj", "Post-combustion") + K("R", "Moteurs") + K("H", "Atterrir") + K("B", "Supersonique") + K("K", "Furtif") + K("I", "Cabine") + K("O", "Espace") + K("V", "Vue") + K("F", "Sortir"),
-      car: K("W / S", "Accélérer / freiner") + K("A / D", "Tourner") + K("V", "Vue") + K("F", "Sortir") + common
+      car: K("W / S", "Accélérer / freiner") + K("A / D", "Tourner") + K("Y", "🤖 Pilote auto") + K("V", "Vue") + K("F", "Sortir") + common
     };
     $("keysHelp").innerHTML = `<div class="kh-title">⌨ Touches</div>${lists[mode] ?? common}`;
   }

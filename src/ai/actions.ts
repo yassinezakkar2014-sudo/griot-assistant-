@@ -1,4 +1,5 @@
 // Exécution réelle des actions demandées à GRIOT (commandes locales ou appels d'outils du modèle).
+import { GARAGE } from "../game/autopilot";
 import * as THREE from "three";
 import { G, bus, normalize } from "../core";
 import { FLOORS, BASE } from "../world/palace";
@@ -391,8 +392,9 @@ export async function runAction(action: string, target?: string | null): Promise
       const ap = G.airports;
       const p = G.player.position;
       const near = ap.ports.reduce((a, b) => (a.W(0, 0, 450).distanceTo(p) < b.W(0, 0, 450).distanceTo(p) ? a : b));
-      const dest = /princesse|ile|fille/.test(n) ? "princesses" : /royal|palais|royaume|maison/.test(n) ? "royal" : near.def.id === "royal" ? "princesses" : "royal";
-      const from = /panoram/.test(n) ? near.def.id : dest === "princesses" ? "royal" : "princesses";
+      const dest = /imperial|prive|jet/.test(n) ? "imperial" : /princesse|ile|fille/.test(n) ? "princesses" : /royal|palais|royaume|maison/.test(n) ? "royal" : near.def.id === "royal" ? "princesses" : "royal";
+      const nearOk = near.W(0, 0, 450).distanceTo(p) <= 1500;
+      const from = /panoram/.test(n) ? near.def.id : nearOk && near.def.id !== dest ? near.def.id : dest === "royal" ? "princesses" : "royal";
       if (near.W(0, 0, 450).distanceTo(p) > 1500) {
         // on emmène d'abord le joueur à l'aérogare de départ
         const fp = ap.ports.find((x) => x.def.id === from)!;
@@ -424,6 +426,34 @@ export async function runAction(action: string, target?: string | null): Promise
     case "call":
       bus.emit("ui:call");
       return "Je vous appelle, Majesté.";
+    case "super_speed": {
+      const on = String(target ?? "") !== "off";
+      if (G.player.superSpeed !== on) G.player.setSuperSpeed(on);
+      return on ? "Super vitesse activée ! Maintenez Maj (ou ») pour courir comme l'éclair, touche U pour arrêter." : "Super vitesse désactivée.";
+    }
+    case "autopilot": {
+      if (String(target ?? "") === "off") {
+        G.autopilot.stop("Pilote automatique désactivé.");
+        return "Vous reprenez le volant.";
+      }
+      return G.autopilot.go(String(target ?? ""));
+    }
+    case "garage": {
+      const gx = GARAGE.x - 62,
+        gz = GARAGE.z + 20;
+      if (G.mode !== "foot") return "Descendez d'abord du véhicule.";
+      if (Math.hypot(G.player.position.x - gx, G.player.position.z - gz) > 300) {
+        bus.emit("fade");
+        G.player.teleport(new THREE.Vector3(gx, GARAGE.y + 0.3, gz), Math.PI / 2);
+      }
+      return G.garage.deliver(normalize(String(target ?? "")));
+    }
+    case "portal": {
+      const atImp = G.player.position.z > 3000;
+      bus.emit("fade");
+      G.player.teleport(atImp ? new THREE.Vector3(46, G.physics.terrain(46, 367) + 0.3, 367) : new THREE.Vector3(-46, GARAGE.y + 0.3, GARAGE.z + 300 - 1293), atImp ? 0 : Math.PI);
+      return atImp ? "Portail royal : vous voici devant l'ancien palais." : "Portail royal : vous voici au Palais Impérial.";
+    }
     case "train": {
       const n = normalize(String(target ?? ""));
       return G.train.rideTo(n);

@@ -59,6 +59,7 @@ interface Flight {
 export class Airports {
   ports: Port[] = [];
   plane!: Airliner; // l'avion des vols du joueur
+  jet!: Airliner; // le jet privé impérial (vols depuis/vers l'aéroport privé du Palais Impérial)
   traffic!: Airliner; // trafic d'ambiance
   flight: Flight | null = null;
   ambient: Flight | null = null;
@@ -74,6 +75,11 @@ export class Airports {
     this.plane = buildAirliner("royal");
     G.scene.add(this.plane.root);
     this.parkAt(this.plane, this.ports[0], this.ports[0].gateStand);
+    const priv = this.ports.find((p) => p.def.private);
+    this.jet = buildAirliner("imperial");
+    this.jet.root.scale.setScalar(0.62);
+    G.scene.add(this.jet.root);
+    if (priv) this.parkAt(this.jet, priv, priv.gateStand);
     this.traffic = buildAirliner("zuria");
     this.traffic.root.visible = false;
     G.scene.add(this.traffic.root);
@@ -454,7 +460,8 @@ export class Airports {
     const port: Port = { def: d, W, yawW, stands, gateStand: big ? 1 : 0, taxiZ, connectors, hall, root };
     stands.forEach((_, i) => {
       if (i === port.gateStand) return;
-      const p = buildAirliner(i % 2 ? "princess" : "zuria");
+      const p = buildAirliner(d.private ? "imperial" : i % 2 ? "princess" : "zuria");
+      if (d.private) p.root.scale.setScalar(0.62);
       G.scene.add(p.root);
       this.parkAt(p, port, i);
       this.parked.push(p);
@@ -482,15 +489,17 @@ export class Airports {
     if (!from || !to) return "Vol introuvable.";
     if (this.flight) return "Un vol est déjà en cours.";
     if (G.mode !== "foot") return "Descendez d'abord du véhicule.";
-    this.parkAt(this.plane, from, from.gateStand);
-    const f = this.makeFlight(this.plane, from, to, true);
+    // jet privé impérial pour tout vol qui part de / arrive à l'aéroport privé
+    const plane = from.def.private || to.def.private ? this.jet : this.plane;
+    this.parkAt(plane, from, from.gateStand);
+    const f = this.makeFlight(plane, from, to, true);
     this.flight = f;
     this.arrival = null;
     this.outside = false;
     this.hud.hidden = false;
     this.camPos.copy(G.camera.position);
     bus.emit("fade");
-    G.airCabin.enter(() => this.plane.root);
+    G.airCabin.enter(() => plane.root);
     bus.emit("toast", { text: `✈ Bienvenue à bord du vol ${f.number} à destination de ${to.def.short} ! Promenez-vous dans la cabine, ou 🎥 pour la vue extérieure. Vos amis peuvent vous rejoindre (📱 À bord ensemble).` });
     G.audio.tone(660, 0.3, "sine", 0.1);
     setTimeout(() => G.audio.tone(880, 0.4, "sine", 0.1), 300);
@@ -516,7 +525,7 @@ export class Airports {
       gear: 1,
       t: 0,
       pos: plane.root.position.clone(),
-      number: (from.def.id === "royal" ? "RA " : "PA ") + (100 + Math.floor(Math.random() * 800))
+      number: (from.def.private || to.def.private ? "IMP " : from.def.id === "royal" ? "RA " : "PA ") + (100 + Math.floor(Math.random() * 800))
     };
   }
 
@@ -814,7 +823,7 @@ export class Airports {
     const alt = Math.max(0, Math.round(info.pos.y - G.physics.terrain(info.pos.x, info.pos.z)));
     const dist = Math.round(info.pos.distanceTo(info.to.W(0, 0, 0)) / 100) / 10;
     const mode = this.camMode;
-    this.hud.innerHTML = `<div class="fh-row"><b>✈ ${info.number}</b> · Royal Airways · ➜ ${info.to.def.short}${info.host ? ` · avec ${info.host}` : ""}</div>
+    this.hud.innerHTML = `<div class="fh-row"><b>✈ ${info.number}</b> · ${info.number.startsWith("IMP") ? "Imperial One — jet privé" : "Royal Airways"} · ➜ ${info.to.def.short}${info.host ? ` · avec ${info.host}` : ""}</div>
       <div class="fh-row"><span>${this.arrival ? "Arrivé !" : PHASE_LABEL[info.phase]}</span><span>ALT ${alt} m</span><span>${Math.round(info.v * 3.6)} km/h</span><span>${dist} km</span></div>
       <div class="fh-row">${
         this.arrival
@@ -835,6 +844,7 @@ export class Airports {
       this.drawHud({ number: f.number, to: f.to, phase: f.phase, pos: f.pos, v: f.v });
       if (f.phase === "done") this.finish(f);
     } else this.plane.update(dt, t, 1);
+    if (!f || f.plane !== this.jet) this.jet.update(dt, t, 1);
     // vol d'un ami
     const gst = this.guest;
     if (gst && !this.arrival) {

@@ -453,7 +453,16 @@ export class CarSystem {
     const car = this.active;
     if (!car || (G.mode as string) !== "car") return;
     const inp = G.input;
-    if (inp.hit("KeyF")) return this.exit();
+    if (inp.hit("KeyF")) {
+      if (G.autopilot?.dest) {
+        G.autopilot.stop();
+        car.speed = 0;
+      }
+      return this.exit();
+    }
+    if (!G.autopilot?.dest && inp.hit("KeyY")) G.autopilot?.toggleMenu();
+    // pilote automatique : la voiture conduit seule
+    const auto = !!G.autopilot?.drive(dt);
     if (inp.hit("KeyV")) {
       this.view = this.view === "chase" ? "inside" : "chase";
       bus.emit("toast", { text: this.view === "inside" ? "Vue conducteur" : "Vue extérieure" });
@@ -461,42 +470,45 @@ export class CarSystem {
     if (inp.hit("KeyL")) car.setEngine(!car.engine || car.headMat.emissiveIntensity < 1 ? true : car.engine);
     if (inp.hit("KeyH")) G.audio.tone(392, 0.35, "square", 0.08);
 
-    const thr = inp.axis(["KeyS", "ArrowDown"], ["KeyW", "ArrowUp"]) + -inp.touchMove.y;
-    const steerIn = inp.axis(["KeyD", "ArrowRight"], ["KeyA", "ArrowLeft"]) - inp.touchMove.x;
-    const boost = inp.down("ShiftLeft", "ShiftRight");
-    if (thr > 0.05) car.speed += thr * (car.speed < 0 ? 18 : boost ? 13 : 8.5) * dt;
-    else if (thr < -0.05) car.speed += thr * (car.speed > 0.5 ? 20 : 5) * dt;
-    car.speed -= car.speed * 0.18 * dt + Math.sign(car.speed) * Math.min(Math.abs(car.speed), 0.8 * dt);
-    car.speed = clamp(car.speed, -9, boost ? 80 : 62);
-    const steerMax = 0.55 / (1 + Math.abs(car.speed) / 25);
-    car.steer = damp(car.steer, clamp(steerIn, -1, 1) * steerMax, 6, dt);
-    car.yaw += (car.speed * Math.tan(car.steer) / 3.0) * dt;
+    if (!auto) {
+      const thr = inp.axis(["KeyS", "ArrowDown"], ["KeyW", "ArrowUp"]) + -inp.touchMove.y;
+      const steerIn = inp.axis(["KeyD", "ArrowRight"], ["KeyA", "ArrowLeft"]) - inp.touchMove.x;
+      const boost = inp.down("ShiftLeft", "ShiftRight");
+      if (thr > 0.05) car.speed += thr * (car.speed < 0 ? 18 : boost ? 13 : 8.5) * dt;
+      else if (thr < -0.05) car.speed += thr * (car.speed > 0.5 ? 20 : 5) * dt;
+      car.speed -= car.speed * 0.18 * dt + Math.sign(car.speed) * Math.min(Math.abs(car.speed), 0.8 * dt);
+      car.speed = clamp(car.speed, -9, boost ? 80 : 62);
+      const steerMax = 0.55 / (1 + Math.abs(car.speed) / 25);
+      car.steer = damp(car.steer, clamp(steerIn, -1, 1) * steerMax, 6, dt);
+      car.yaw += (car.speed * Math.tan(car.steer) / 3.0) * dt;
 
-    const p = car.pos;
-    const before = p.clone();
-    p.addScaledVector(car.forward(), car.speed * dt);
-    const probe = p.clone();
-    G.physics.resolve(probe, car.spec.W * 0.55, 1.3, 0.6);
-    // avant et arrière du véhicule
-    const half = car.forward().multiplyScalar(car.spec.L * 0.38);
-    const fp = p.clone().add(half),
-      bp = p.clone().sub(half);
-    const hitF = G.physics.resolve(fp, 0.9, 1.3, 0.6),
-      hitB = G.physics.resolve(bp, 0.9, 1.3, 0.6);
-    if (probe.distanceToSquared(p) > 1e-6 || hitF || hitB) {
-      if (Math.abs(car.speed) > 12) {
-        G.audio.whoosh(0.35, 300, 90, 0.3);
-        bus.emit("shake", Math.min(0.8, Math.abs(car.speed) / 40));
+      const p = car.pos;
+      const before = p.clone();
+      p.addScaledVector(car.forward(), car.speed * dt);
+      const probe = p.clone();
+      G.physics.resolve(probe, car.spec.W * 0.55, 1.3, 0.6);
+      // avant et arrière du véhicule
+      const half = car.forward().multiplyScalar(car.spec.L * 0.38);
+      const fp = p.clone().add(half),
+        bp = p.clone().sub(half);
+      const hitF = G.physics.resolve(fp, 0.9, 1.3, 0.6),
+        hitB = G.physics.resolve(bp, 0.9, 1.3, 0.6);
+      if (probe.distanceToSquared(p) > 1e-6 || hitF || hitB) {
+        if (Math.abs(car.speed) > 12) {
+          G.audio.whoosh(0.35, 300, 90, 0.3);
+          bus.emit("shake", Math.min(0.8, Math.abs(car.speed) / 40));
+        }
+        p.copy(before);
+        car.speed *= -0.2;
       }
-      p.copy(before);
-      car.speed *= -0.2;
+      const g = G.physics.ground(p.x, p.y + 0.9, p.z, 0.9, 1).y;
+      p.y = g > p.y ? damp(p.y, g, 25, dt) : Math.max(g, p.y - 9.8 * dt * 2);
+      if (Math.abs(p.x) > 31000 || Math.abs(p.z) > 31000) car.speed = 0;
+      car.body.rotation.z = damp(car.body.rotation.z, -car.steer * car.speed * 0.012, 4, dt);
+      car.body.rotation.x = damp(car.body.rotation.x, clamp(thr * 0.012 * (car.speed > 0 ? 1 : 0), -0.02, 0.02), 4, dt);
+      G.audio.setEngine(0.05 + Math.min(1, Math.abs(car.speed) / 60) * 0.8);
     }
-    const g = G.physics.ground(p.x, p.y + 0.9, p.z, 0.9, 1).y;
-    p.y = g > p.y ? damp(p.y, g, 25, dt) : Math.max(g, p.y - 9.8 * dt * 2);
-    if (Math.abs(p.x) > 3900 || Math.abs(p.z) > 3900) car.speed = 0;
-    car.body.rotation.z = damp(car.body.rotation.z, -car.steer * car.speed * 0.012, 4, dt);
-    car.body.rotation.x = damp(car.body.rotation.x, clamp(thr * 0.012 * (car.speed > 0 ? 1 : 0), -0.02, 0.02), 4, dt);
-    G.audio.setEngine(0.05 + Math.min(1, Math.abs(car.speed) / 60) * 0.8);
+    const p = car.pos;
     G.player.position.copy(p);
 
     // phare (une seule lumière, réutilisée)

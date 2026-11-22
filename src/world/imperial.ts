@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { G, bus } from "../core";
 import { mat } from "./materials";
 import { wallX, wallZ } from "./build";
-import { MOUNTAIN } from "./countryData";
+import { MOUNTAIN, inAirport } from "./countryData";
 import { furniture } from "../game/deco";
 import { cloakMaterial } from "../game/shipmodel";
 
@@ -151,6 +151,7 @@ export class ImperialPalace {
     inst(new THREE.SphereGeometry(1.5, 16, 12).translate(0, 14.4, 0), gold, statues);
     // fontaines monumentales
     for (const [fx, fz] of [[0, -900], [0, -560], [-500, 300], [500, 300], [-700, -500], [700, -500], [0, 700], [-850, 650], [850, 650]]) {
+      if (inAirport(C.x + fx, C.z + fz, 40)) continue;
       cyl(22, 2.5, stone, fx, 0, fz, 48);
       const w = new THREE.Mesh(new THREE.CircleGeometry(20.5, 48), water);
       w.rotation.x = -Math.PI / 2;
@@ -168,7 +169,7 @@ export class ImperialPalace {
     const trees: { p: [number, number, number]; s: [number, number, number] }[] = [];
     const flowers: { p: [number, number, number]; s: [number, number, number] }[] = [];
     const inPalace = (x: number, z: number, m = 0) => Math.abs(x) < 430 + m && z > -300 - m && z < 280 + m;
-    const onAvenue = (x: number, z: number, m = 0) => Math.abs(x) < 110 + m && z < -250;
+    const onAvenue = (x: number, z: number, m = 0) => (Math.abs(x) < 110 + m && z < -250) || !!inAirport(C.x + x, C.z + z, m) || (Math.abs(x - 560) < 90 + m && Math.abs(z + 700) < 90 + m) || (Math.abs(x + 560) < 70 + m && Math.abs(z + 640) < 90 + m) || (Math.abs(x - 600) < 150 + m && Math.abs(z + 300) < 120 + m);
     for (let k = 0; k < 2400; k++) {
       const a = rnd() * Math.PI * 2,
         d = 200 + Math.sqrt(rnd()) * (RR - 260);

@@ -1,5 +1,5 @@
 // LE TRAIN ROYAL — train à grande vitesse sur viaduc (jusqu'à 340 km/h) : Zuria ⇄ pont ⇄ palais ⇄
-// ville futuriste ⇄ Aéroport Royal. Gares avec quai, verrière et ascenseur ; on monte
+// ville futuriste ⇄ Palais Impérial (col royal) ⇄ Aéroport Royal. Gares avec quai, verrière et ascenseur ; on monte
 // à bord depuis la gare (ou à la voix : « prends le train pour Zuria »), caméra de voyage, arrivée en gare.
 import * as THREE from "three";
 import { G, bus, clamp, normalize } from "../core";
@@ -28,6 +28,23 @@ const ROUTE: [number, number, string?][] = [
   [500, -390],
   [760, -220],
   [850, 70, "Ville futuriste"],
+  // montée vers le Palais Impérial par le col royal (aller à l'ouest de la route, retour à l'est)
+  [760, 520],
+  [420, 820],
+  [60, 1250],
+  [-62, 1750],
+  [-62, 2700],
+  [-62, 3500],
+  [-62, 3960, "Palais Impérial"],
+  [0, 4140],
+  [62, 3960],
+  [62, 3500],
+  [62, 2700],
+  [70, 1750],
+  [330, 1300],
+  [700, 1000],
+  [900, 600],
+  [930, 0],
   [800, -500],
   [880, -1050],
   [1250, -1650],
@@ -236,7 +253,7 @@ export class Train {
   /** Monte dans le train vers une destination (texte libre ou id de gare). */
   rideTo(text: string): string {
     const n = normalize(text);
-    const to = this.stations.find((s) => n.includes(s.id) || n.includes(s.id.split(" ")[0])) ?? (/ville|city/.test(n) ? this.stations.find((s) => /ville/.test(s.id)) : /palais|maison/.test(n) ? this.stations.find((s) => /palais/.test(s.id)) : null);
+    const to = this.stations.find((s) => n.includes(s.id)) ?? (/imperial|empire/.test(n) ? this.stations.find((s) => /imperial/.test(s.id)) : null) ?? this.stations.find((s) => n.includes(s.id.split(" ")[0])) ?? (/ville|city/.test(n) ? this.stations.find((s) => /ville/.test(s.id)) : /palais|maison/.test(n) ? this.stations.find((s) => /palais/.test(s.id)) : null);
     if (!to) return `Gares du train royal : ${this.stations.map((s) => s.name).join(", ")}. Dites par exemple « prends le train pour Zuria ».`;
     if (G.mode !== "foot") return "Descendez d'abord du véhicule.";
     const p = G.player.position;

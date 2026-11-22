@@ -14,6 +14,8 @@ import type { Missions } from "./game/missions";
 import type { World } from "./world/world";
 import type { Multiplayer } from "./net/multiplayer";
 import type { CarSystem } from "./game/car";
+import type { Autopilot } from "./game/autopilot";
+import type { ImperialGarage } from "./game/garage";
 import type { AntiAir } from "./world/antiair";
 import type { Passenger } from "./net/passenger";
 import type { Cabin } from "./game/cabin";
@@ -46,6 +48,8 @@ export interface GameContext {
   world: World;
   net: Multiplayer;
   cars: CarSystem;
+  autopilot: Autopilot;
+  garage: ImperialGarage;
   antiair: AntiAir;
   passenger: Passenger;
   cabin: Cabin;
