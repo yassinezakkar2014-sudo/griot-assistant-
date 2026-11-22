@@ -19,6 +19,8 @@ const H = 3.6;
 export class Cabin {
   root = new THREE.Group();
   inside = false;
+  /** invité dans la cabine du Royal Talon d'un ami (id du pilote) */
+  host: string | null = null;
   private ship!: Ship;
   private rt = new THREE.WebGLRenderTarget(512, 256, { type: THREE.HalfFloatType });
   private cam = new THREE.PerspectiveCamera(78, 2, 1, 6000);
@@ -109,7 +111,7 @@ export class Cabin {
       pos: new THREE.Vector3(ox, oy + 1, oz + Z2 - 1.5),
       radius: 3.2,
       enabled: () => this.inside,
-      label: () => "Sortir du Royal Talon",
+      label: () => (this.host ? `Sortir du Royal Talon de ${this.hostName()}` : "Sortir du Royal Talon"),
       action: () => this.exit()
     });
 
@@ -256,7 +258,7 @@ export class Cabin {
       pos: new THREE.Vector3(ox, oy + 1, oz + Z1 + 2.4),
       radius: 3.2,
       enabled: () => this.inside,
-      label: () => "Prendre les commandes (poste de pilotage)",
+      label: () => (this.host ? `Rejoindre ${this.hostName()} au poste de pilotage` : "Prendre les commandes (poste de pilotage)"),
       action: () => this.toCockpit()
     });
 
@@ -369,10 +371,64 @@ export class Cabin {
     if (this.frame % 3 === 0) this.renderOutside();
   }
 
+  private hostPeer() {
+    return this.host ? G.net.peers.get(this.host) : undefined;
+  }
+  hostName() {
+    return this.hostPeer()?.state?.n ?? "votre ami";
+  }
+  /** Le vaisseau de l'hôte est-il en vol ? */
+  private hostFlying() {
+    const r = this.hostPeer();
+    if (!r?.state?.s) return false;
+    const g = r.shipGroup.position;
+    return g.y - G.physics.terrain(g.x, g.z) > 14 * r.shipScale;
+  }
+
+  /** Monte dans la cabine du Royal Talon d'un ami (même en vol). */
+  enterAsGuest(peerId: string) {
+    const r = G.net.peers.get(peerId);
+    if (!r?.state?.s) {
+      bus.emit("toast", { text: "Le vaisseau de votre ami n'est pas disponible.", kind: "warn" });
+      return false;
+    }
+    if (G.passenger.ride) G.passenger.exit();
+    if (G.mode === "ship") G.ship.exit();
+    if ((G.mode as string) === "car") G.cars.exit();
+    if (G.mode !== "foot") return false;
+    this.host = peerId;
+    this.inside = true;
+    G.player.teleport(new THREE.Vector3(CABIN.x + 1.5, CABIN.y, CABIN.z + Z2 - 3), 0);
+    this.renderOutside();
+    bus.emit("toast", { text: `🛋️ Vous êtes dans la cabine du Royal Talon de ${this.hostName()} ! Salon, télé, cuisine, chambre… Les hublots montrent le vol en direct.` });
+    G.audio.whoosh(0.6, 300, 900, 0.12);
+    return true;
+  }
+
   /** Caméra extérieure : depuis le flanc gauche du vaisseau, vers l'extérieur. */
   private renderOutside() {
-    const s = this.ship;
     const r = G.renderer;
+    const peer = this.hostPeer();
+    if (peer?.state?.s) {
+      // vaisseau de l'ami : on filme depuis son flanc
+      const g = peer.shipGroup;
+      const sc = peer.shipScale;
+      g.updateMatrixWorld();
+      this.cam.position.copy(g.position).add(new THREE.Vector3(-7 * sc, 0.9 * sc, 0).applyQuaternion(g.quaternion));
+      this.cam.lookAt(g.position.clone().add(new THREE.Vector3(-60 * sc, 0.2 * sc, 2 * sc).applyQuaternion(g.quaternion)));
+      const vis = g.visible;
+      const au = r.shadowMap.autoUpdate;
+      g.visible = false;
+      r.shadowMap.autoUpdate = false;
+      const prev = r.getRenderTarget();
+      r.setRenderTarget(this.rt);
+      r.render(G.scene, this.cam);
+      r.setRenderTarget(prev);
+      r.shadowMap.autoUpdate = au;
+      g.visible = vis;
+      return;
+    }
+    const s = this.ship;
     s.root.updateMatrixWorld();
     this.cam.position.copy(s.root.localToWorld(s.V(-7, 0.9, 0)));
     this.cam.lookAt(s.root.localToWorld(s.V(-60, 0.2, 2)));
@@ -409,6 +465,22 @@ export class Cabin {
 
   /** Sortie par le sas arrière, au pied du vaisseau. */
   exit() {
+    const peer = this.hostPeer();
+    if (this.host) {
+      if (peer?.state?.s && this.hostFlying()) {
+        bus.emit("toast", { text: `✈️ Le vaisseau de ${this.hostName()} est en vol ! Attendez l'atterrissage (ou allez au poste de pilotage).`, kind: "warn" });
+        return;
+      }
+      this.inside = false;
+      this.host = null;
+      if (peer?.state?.s) {
+        const g = peer.shipGroup;
+        const back = g.position.clone().add(new THREE.Vector3(0, 0, 8.6 * peer.shipScale).applyQuaternion(g.quaternion));
+        back.y = G.physics.ground(back.x, g.position.y, back.z, 3).y;
+        G.player.teleport(back);
+      } else G.player.teleport(G.palace.spots.gardens.pos.clone(), Math.PI);
+      return;
+    }
     const s = this.ship;
     this.inside = false;
     const back = s.root.position.clone().add(new THREE.Vector3(0, 0, 8.6 * s.S).applyAxisAngle(new THREE.Vector3(0, 1, 0), s.yaw));
@@ -418,6 +490,16 @@ export class Cabin {
 
   /** Du couloir de la cabine au siège du pilote. */
   toCockpit() {
+    if (this.host) {
+      // invité : siège à côté du pilote (vue passager), on pourra revenir en cabine
+      const id = this.host;
+      const peer = this.hostPeer();
+      if (!peer?.state?.s || peer.state.m !== "ship") return bus.emit("toast", { text: `${this.hostName()} n'est pas aux commandes en ce moment.`, kind: "warn" });
+      this.inside = false;
+      G.passenger.board("ship", id);
+      G.passenger.returnToCabin = id;
+      return;
+    }
     const s = this.ship;
     this.inside = false;
     const side = s.root.position.clone().add(new THREE.Vector3(-5.8 * s.S, 0, -2.5 * s.S).applyAxisAngle(new THREE.Vector3(0, 1, 0), s.yaw));
@@ -431,6 +513,16 @@ export class Cabin {
 
   /** Sécurité : si le joueur quitte la cabine autrement (téléportation…), on n'est plus « dedans ». */
   check() {
-    if (this.inside && G.player.position.distanceTo(CABIN) > 60) this.inside = false;
+    if (this.inside && G.player.position.distanceTo(CABIN) > 60) {
+      this.inside = false;
+      this.host = null;
+    }
+    // l'ami s'est déconnecté : on reste dans la cabine, mais les hublots reviennent sur notre vaisseau
+    if (this.host && !G.net.peers.has(this.host)) {
+      bus.emit("toast", { text: "Votre ami s'est déconnecté. La porte vous ramène au palais." });
+      this.host = null;
+      this.inside = false;
+      G.player.teleport(G.palace.spots.gardens.pos.clone(), Math.PI);
+    }
   }
 }

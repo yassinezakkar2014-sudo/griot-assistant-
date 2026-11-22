@@ -184,11 +184,11 @@ export class Phone {
                <button class="ph-big" data-inviteall="1">📣 Inviter tout le monde</button>
                ${ps.map((p) => `<div class="ph-row"><b>${this.esc(p.name)}</b><span class="ph-actions"><button data-invite="${p.id}">Inviter</button></span></div>`).join("")}`
             : `<p class="ph-hint">Montez dans le Royal Talon d'un ami qui pilote (même s'il est loin), ou montez dans le vôtre et invitez-les.</p>
-               ${ps.length ? ps.map((p) => `<div class="ph-row"><b>${this.esc(p.name)}</b><small>${p.flying ? "🛸 pilote le Royal Talon" : "à pied"}</small>${p.flying ? `<span class="ph-actions"><button data-join="${p.id}">Monter à bord</button></span>` : ""}</div>`).join("") : online ? `<p class="ph-hint">Aucun ami connecté dans la salle « ${this.esc(G.net.room)} ».</p>` : ""}
+               ${ps.length ? ps.map((p) => `<div class="ph-row"><b>${this.esc(p.name)}</b><small>${p.flying ? "🛸 pilote le Royal Talon" : "à pied"}</small>${p.flying ? `<span class="ph-actions"><button data-join="${p.id}" data-where="cabin">🛋️ Cabine</button><button data-join="${p.id}" data-where="cockpit">🧑‍✈️ Copilote</button></span>` : ""}</div>`).join("") : online ? `<p class="ph-hint">Aucun ami connecté dans la salle « ${this.esc(G.net.room)} ».</p>` : ""}
                <button class="ph-big" data-pilot="1">🚀 Piloter mon Royal Talon</button>`
         }`;
     } else if (v.app === "invite" && this.invite) {
-      body = `<div class="ph-incall"><div class="ph-avatar">🛸</div><div class="ph-who">${this.esc(this.invite.name)}</div><div class="ph-sub">vous invite à bord du Royal Talon</div>
+      body = `<div class="ph-incall"><div class="ph-avatar">🛸</div><div class="ph-who">${this.esc(this.invite.name)}</div><div class="ph-sub">vous invite dans la cabine de son Royal Talon</div>
         <div class="ph-callbtns"><button class="no" data-noinvite="1">✕</button><button class="yes" data-join="${this.invite.from}">🧑‍🚀</button></div></div>`;
     } else if (v.app === "tiktok") {
       body = `<div class="ph-title">🎵 TikTok</div>
@@ -243,7 +243,10 @@ export class Phone {
       }
       return this.go(d.app);
     }
-    if (d.join) return this.joinShip(d.join);
+    if (d.join) {
+      this.joinMode = d.where === "cockpit" ? "cockpit" : "cabin";
+      return this.joinShip(d.join);
+    }
     if (d.noinvite) {
       this.invite = null;
       return this.go("home");
@@ -305,14 +308,17 @@ export class Phone {
 
   private joinShip(id: string) {
     const r = G.net.peers.get(id);
-    if (!r?.state || r.state.m !== "ship" || !r.state.s) return bus.emit("toast", { text: "Votre ami n'est pas (ou plus) aux commandes de son vaisseau.", kind: "warn" });
+    if (!r?.state?.s) return bus.emit("toast", { text: "Le vaisseau de votre ami n'est pas disponible.", kind: "warn" });
+    if (this.joinMode === "cockpit" && r.state.m !== "ship") return bus.emit("toast", { text: "Votre ami n'est pas aux commandes : montez plutôt dans la cabine.", kind: "warn" });
     this.invite = null;
     if (G.mode === "ship") G.ship.exit();
     if ((G.mode as string) === "car") G.cars.exit();
     if (G.cabin?.inside) G.cabin.exit();
     this.close();
-    G.passenger.board("ship", id);
+    if (this.joinMode === "cockpit") G.passenger.board("ship", id);
+    else G.cabin.enterAsGuest(id);
   }
+  private joinMode: "cabin" | "cockpit" = "cabin";
 
   // ---------------------------------------------------------------- TikTok : filmer la partie (vertical, avec le son)
   private startRec() {

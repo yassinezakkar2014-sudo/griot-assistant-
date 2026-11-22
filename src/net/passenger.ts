@@ -11,6 +11,8 @@ export interface Ride {
 
 export class Passenger {
   ride: Ride | null = null;
+  /** passager venu de la cabine : F l'y ramène */
+  returnToCabin: string | null = null;
   view: "inside" | "chase" = "inside";
   private look = { yaw: 0, pitch: 0 };
   private camPos = new THREE.Vector3();
@@ -30,7 +32,7 @@ export class Passenger {
     G.audio.whoosh(0.8, 300, 1200, 0.15);
     bus.emit("fade");
     bus.emit("mode");
-    bus.emit("toast", { text: `🧑‍🚀 Passager avec ${peer.state?.n ?? "un joueur"} — V : vue · F : descendre` });
+    bus.emit("toast", { text: kind === "ship" ? `🧑‍🚀 Copilote avec ${peer.state?.n ?? "un joueur"} — V : vue · F : aller dans la cabine` : `🧑‍🚀 Passager avec ${peer.state?.n ?? "un joueur"} — V : vue · F : descendre` });
   }
 
   exit(reason?: string) {
@@ -64,7 +66,19 @@ export class Passenger {
     const peer = G.net.peers.get(r.owner);
     if (!peer) return this.exit("Le pilote s'est déconnecté. Vous êtes descendu.");
     const inp = G.input;
-    if (inp.hit("KeyF")) return this.exit(`Vous êtes descendu (${this.ownerName()}).`);
+    if (inp.hit("KeyF")) {
+      // vaisseau : on va dans la cabine (en vol on ne peut pas sauter dehors)
+      if (r.kind === "ship") {
+        const owner = r.owner;
+        this.ride = null;
+        this.returnToCabin = null;
+        G.mode = "foot";
+        bus.emit("mode");
+        G.cabin.enterAsGuest(owner);
+        return;
+      }
+      return this.exit(`Vous êtes descendu (${this.ownerName()}).`);
+    }
     if (inp.hit("KeyV")) this.view = this.view === "inside" ? "chase" : "inside";
     const look = inp.consumeMouse();
     this.look.yaw = clamp(this.look.yaw - look.x, -2.2, 2.2);
