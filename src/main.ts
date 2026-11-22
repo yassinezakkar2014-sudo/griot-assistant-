@@ -369,6 +369,7 @@ async function boot() {
       ui.shake = Math.max(0, ui.shake - dt * 1.5);
     }
     G.env.render();
+    (window as any).__afterRender?.(); // capture vidéo (TikTok) juste après le rendu
     G.input.endFrame();
   };
   loop();

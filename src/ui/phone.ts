@@ -33,6 +33,9 @@ export class Phone {
   private pendingIce: RTCIceCandidateInit[] = [];
   private incoming: { from: string; name: string; sdp: RTCSessionDescriptionInit } | null = null;
   private callStart = 0;
+  private invite: { from: string; name: string } | null = null;
+  private rec: { mr: MediaRecorder; chunks: Blob[]; raf: number; timer: ReturnType<typeof setTimeout>; badge: HTMLElement } | null = null;
+  private clip: { url: string; blob: Blob; ext: string } | null = null;
   private remote: MediaStream | null = null;
   private ringTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -61,6 +64,12 @@ export class Phone {
       this.push("all", { from: d.name, text: d.text, me: false, at: Date.now() });
     });
     bus.on("mp:signal", (s: { from: string; name: string; d: any }) => this.onSignal(s));
+    bus.on("ui:phone-app", (app: string) => {
+      if (app === "tiktok-rec") return this.startRec();
+      if (app === "invite-all") return this.sendInvite([...G.net.peers.keys()]);
+      this.open();
+      this.go(app);
+    });
     bus.on("mp:peers", () => !this.el.hidden && !["chat", "call", "incoming"].includes(this.view.app) && this.render());
   }
 
@@ -137,7 +146,9 @@ export class Phone {
         ["avatar", "👤", "Avatar", ""],
         ["vision", "👁️", "Caméra", ""],
         ["flight", "✈️", "Vols", ""],
-        ["mp", "🌐", "Multijoueur", ""]
+        ["mp", "🌐", "Multijoueur", ""],
+        ["aboard", "🛸", "À bord ensemble", this.invite ? "<i>1</i>" : ""],
+        ["tiktok", "🎵", "TikTok", this.rec ? "<i>●</i>" : ""]
       ];
       body = `<div class="ph-wall"><div class="ph-clock">${time}</div><div class="ph-date">${new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</div></div>
         <div class="ph-grid">${apps.map(([id, ic, n, badge]) => `<button data-app="${id}"><span class="ic">${ic}${badge}</span><span>${n}</span></button>`).join("")}</div>`;
@@ -162,6 +173,33 @@ export class Phone {
       body = `<div class="ph-title">${v.app === "video" ? "📹 Appels vidéo" : "👥 Joueurs connectés"}</div>
         ${online ? `<p class="ph-hint">Salle : <b>${this.esc(G.net.room)}</b> — vos amis doivent ouvrir GRIOT et rejoindre cette même salle.</p>` : `<p class="ph-hint">Connexion au multijoueur… (ou touchez 🌐 Multijoueur pour choisir la salle).</p>`}
         ${ps.length ? ps.map((p) => `<div class="ph-row"><b>${this.esc(p.name)}</b><span class="ph-actions"><button data-chat="${p.id}">💬</button><button data-call="${p.id}">📹</button></span></div>`).join("") : online ? `<p class="ph-hint">Personne d'autre n'est connecté dans la salle « ${this.esc(G.net.room)} » pour l'instant.</p>` : ""}`;
+    } else if (v.app === "aboard") {
+      const ps = [...G.net.peers.entries()].filter(([, r]) => r.state).map(([id, r]) => ({ id, name: r.state!.n, flying: r.state!.m === "ship" && !!r.state!.s && (r.state!.s as number[])[9] !== 1 }));
+      const piloting = G.mode === "ship" && !G.ship.opts.small;
+      body = `<div class="ph-title">🛸 À bord ensemble</div>
+        ${online ? "" : `<p class="ph-hint">Connexion au multijoueur…</p>`}
+        ${
+          piloting
+            ? `<p class="ph-hint">Vous pilotez le Royal Talon : invitez vos amis, ils montent à bord d'un seul toucher, où qu'ils soient.</p>
+               <button class="ph-big" data-inviteall="1">📣 Inviter tout le monde</button>
+               ${ps.map((p) => `<div class="ph-row"><b>${this.esc(p.name)}</b><span class="ph-actions"><button data-invite="${p.id}">Inviter</button></span></div>`).join("")}`
+            : `<p class="ph-hint">Montez dans le Royal Talon d'un ami qui pilote (même s'il est loin), ou montez dans le vôtre et invitez-les.</p>
+               ${ps.length ? ps.map((p) => `<div class="ph-row"><b>${this.esc(p.name)}</b><small>${p.flying ? "🛸 pilote le Royal Talon" : "à pied"}</small>${p.flying ? `<span class="ph-actions"><button data-join="${p.id}">Monter à bord</button></span>` : ""}</div>`).join("") : online ? `<p class="ph-hint">Aucun ami connecté dans la salle « ${this.esc(G.net.room)} ».</p>` : ""}
+               <button class="ph-big" data-pilot="1">🚀 Piloter mon Royal Talon</button>`
+        }`;
+    } else if (v.app === "invite" && this.invite) {
+      body = `<div class="ph-incall"><div class="ph-avatar">🛸</div><div class="ph-who">${this.esc(this.invite.name)}</div><div class="ph-sub">vous invite à bord du Royal Talon</div>
+        <div class="ph-callbtns"><button class="no" data-noinvite="1">✕</button><button class="yes" data-join="${this.invite.from}">🧑‍🚀</button></div></div>`;
+    } else if (v.app === "tiktok") {
+      body = `<div class="ph-title">🎵 TikTok</div>
+        ${
+          this.clip
+            ? `<video class="ph-clip" src="${this.clip.url}" playsinline controls loop autoplay muted></video>
+               <div class="ph-tt-btns"><button class="ph-big" data-share="1">📤 Partager sur TikTok</button><button class="ph-big alt" data-save="1">💾 Enregistrer la vidéo</button><button class="ph-big alt" data-rec="1">🎬 Refilmer</button></div>`
+            : `<p class="ph-hint">Filmez votre partie en format vertical (comme TikTok), avec le son du jeu, puis partagez-la directement sur TikTok.</p>
+               <button class="ph-big" data-rec="1">${this.rec ? "⏹ Arrêter le film" : "🎬 Filmer une vidéo (15 s)"}</button>`
+        }
+        <button class="ph-big alt" data-opentt="1">🎵 Ouvrir l'appli TikTok</button>`;
     } else if (v.app === "incoming" && this.incoming) {
       body = `<div class="ph-incall"><div class="ph-avatar">📹</div><div class="ph-who">${this.esc(this.incoming.name)}</div><div class="ph-sub">Appel vidéo entrant…</div>
         <div class="ph-callbtns"><button class="no" data-decline="1">✕</button><button class="yes" data-accept="1">📹</button></div></div>`;
@@ -205,6 +243,21 @@ export class Phone {
       }
       return this.go(d.app);
     }
+    if (d.join) return this.joinShip(d.join);
+    if (d.noinvite) {
+      this.invite = null;
+      return this.go("home");
+    }
+    if (d.invite) return this.sendInvite([d.invite]);
+    if (d.inviteall) return this.sendInvite([...G.net.peers.keys()]);
+    if (d.pilot) {
+      this.close();
+      return bus.emit("griot:command", "monte dans le royal talon");
+    }
+    if (d.rec) return this.rec ? this.stopRec() : this.startRec();
+    if (d.share) return this.shareClip();
+    if (d.save) return this.saveClip();
+    if (d.opentt) return void window.open("https://www.tiktok.com/", "_blank", "noopener");
     if (d.chat) return this.go("chat", d.chat);
     if (d.send) return this.sendCurrent();
     if (d.call) return this.call(d.call);
@@ -240,6 +293,120 @@ export class Phone {
     if (id === "all") G.net.say(text);
     else if (!G.net.signal(id, { t: "dm", text })) return bus.emit("toast", { text: "Messages privés indisponibles sur ce relais.", kind: "warn" });
     this.push(id, { from: G.net.name, text, me: true, at: Date.now() });
+  }
+
+  // ---------------------------------------------------------------- monter ensemble dans le Royal Talon
+  private sendInvite(ids: string[]) {
+    if (G.mode !== "ship") return bus.emit("toast", { text: "Montez d'abord aux commandes de votre Royal Talon.", kind: "warn" });
+    let n = 0;
+    for (const id of ids) if (G.net.signal(id, { t: "invite" })) n++;
+    bus.emit("toast", { text: n ? `📣 Invitation envoyée à ${n} ami${n > 1 ? "s" : ""}.` : "Aucun ami à inviter (connectez-vous au multijoueur).", kind: n ? undefined : "warn" });
+  }
+
+  private joinShip(id: string) {
+    const r = G.net.peers.get(id);
+    if (!r?.state || r.state.m !== "ship" || !r.state.s) return bus.emit("toast", { text: "Votre ami n'est pas (ou plus) aux commandes de son vaisseau.", kind: "warn" });
+    this.invite = null;
+    if (G.mode === "ship") G.ship.exit();
+    if ((G.mode as string) === "car") G.cars.exit();
+    if (G.cabin?.inside) G.cabin.exit();
+    this.close();
+    G.passenger.board("ship", id);
+  }
+
+  // ---------------------------------------------------------------- TikTok : filmer la partie (vertical, avec le son)
+  private startRec() {
+    const src = document.getElementById("scene") as HTMLCanvasElement | null;
+    if (!src || typeof MediaRecorder === "undefined" || !(HTMLCanvasElement.prototype as any).captureStream) return bus.emit("toast", { text: "Filmer n'est pas possible sur ce navigateur.", kind: "warn" });
+    if (!(window as any).__aisamActive) return bus.emit("toast", { text: "Lancez d'abord le jeu AISAM pour le filmer.", kind: "warn" });
+    // toile verticale 9:16 recadrée au centre du jeu, avec un filigrane
+    const W = 720,
+      H = 1280;
+    const cv = document.createElement("canvas");
+    cv.width = W;
+    cv.height = H;
+    const c = cv.getContext("2d")!;
+    const draw = () => {
+      const sw = src.width,
+        sh = src.height;
+      const cropW = Math.min(sw, (sh * W) / H);
+      c.drawImage(src, (sw - cropW) / 2, 0, cropW, sh, 0, 0, W, H);
+      c.fillStyle = "rgba(0,0,0,0.35)";
+      c.fillRect(0, H - 90, W, 90);
+      c.fillStyle = "#ffd27a";
+      c.font = "bold 40px Arial";
+      c.fillText("♛ GRIOT · AISAM", 28, H - 32);
+    };
+    // on recopie l'image juste après chaque rendu 3D (sinon la toile WebGL peut être vide)
+    (window as any).__afterRender = draw;
+    const stream = (cv as any).captureStream(30) as MediaStream;
+    const audio = G.audio.recordStream();
+    audio?.getAudioTracks().forEach((t) => stream.addTrack(t));
+    const types = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm"];
+    const mimeType = types.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
+    let mr: MediaRecorder;
+    try {
+      mr = new MediaRecorder(stream, mimeType ? { mimeType, videoBitsPerSecond: 5_000_000 } : undefined);
+    } catch {
+      return bus.emit("toast", { text: "Enregistrement vidéo indisponible.", kind: "warn" });
+    }
+    const chunks: Blob[] = [];
+    mr.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    mr.onstop = () => {
+      const type = mr.mimeType || mimeType || "video/webm";
+      const blob = new Blob(chunks, { type });
+      if (this.clip) URL.revokeObjectURL(this.clip.url);
+      this.clip = { url: URL.createObjectURL(blob), blob, ext: type.includes("mp4") ? "mp4" : "webm" };
+      this.el.hidden = false;
+      this.go("tiktok");
+      bus.emit("toast", { text: "🎬 Vidéo prête ! Partagez-la sur TikTok." });
+    };
+    const badge = document.createElement("button");
+    badge.className = "rec-badge";
+    badge.textContent = "● REC — toucher pour arrêter";
+    badge.onclick = () => this.stopRec();
+    document.body.appendChild(badge);
+    this.clip = null;
+    this.rec = { mr, chunks, raf: 0, timer: setTimeout(() => this.stopRec(), 15000), badge };
+    mr.start(500);
+    this.el.hidden = true;
+    bus.emit("toast", { text: "🎬 On tourne ! 15 secondes… (touchez ● REC pour arrêter avant)" });
+  }
+
+  private stopRec() {
+    const r = this.rec;
+    if (!r) return;
+    this.rec = null;
+    clearTimeout(r.timer);
+    (window as any).__afterRender = null;
+    r.badge.remove();
+    if (r.mr.state !== "inactive") r.mr.stop();
+  }
+
+  private async shareClip() {
+    const c = this.clip;
+    if (!c) return;
+    const file = new File([c.blob], `griot-aisam.${c.ext}`, { type: c.blob.type });
+    const nav = navigator as any;
+    if (nav.canShare?.({ files: [file] })) {
+      try {
+        await nav.share({ files: [file], title: "Ma partie dans GRIOT · AISAM", text: "#GRIOT #AISAM" });
+        return;
+      } catch {}
+    }
+    this.saveClip();
+    bus.emit("toast", { text: "Vidéo enregistrée : ouvrez TikTok → + → importez-la depuis vos vidéos." });
+  }
+
+  private saveClip() {
+    const c = this.clip;
+    if (!c) return;
+    const a = document.createElement("a");
+    a.href = c.url;
+    a.download = `griot-aisam.${c.ext}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
 
   // ---------------------------------------------------------------- appels vidéo (WebRTC)
@@ -444,6 +611,14 @@ export class Phone {
   private async onSignal(s: { from: string; name: string; d: any }) {
     const d = s.d ?? {};
     switch (d.t) {
+      case "invite":
+        this.invite = { from: s.from, name: s.name };
+        this.el.hidden = false;
+        this.go("invite");
+        bus.emit("toast", { text: `🛸 ${s.name} vous invite à bord du Royal Talon ! (📱 Téléphone)` });
+        G.audio.tone(660, 0.2, "sine", 0.1);
+        setTimeout(() => G.audio.tone(990, 0.25, "sine", 0.1), 220);
+        break;
       case "dm":
         this.push(s.from, { from: s.name, text: String(d.text ?? "").slice(0, 200), me: false, at: Date.now() });
         break;

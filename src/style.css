@@ -496,3 +496,8 @@ html.touch .keys-help { display: none; }
 .ph-status:empty { display: none; }
 .ph-level { position: relative; display: flex; align-items: center; gap: 6px; width: 70%; margin-bottom: 6px; font-size: 12px; }
 .ph-level i { display: block; height: 6px; width: 0; border-radius: 3px; background: #30c85a; transition: width .08s; }
+.ph-big { display: block; width: calc(100% - 24px); margin: 8px 12px; padding: 11px; border: 0; border-radius: 14px; background: var(--phc); color: #fff; font: 700 14px Manrope, system-ui; cursor: pointer; }
+.ph-big.alt { background: rgba(255,255,255,.14); }
+.ph-clip { display: block; width: calc(100% - 24px); margin: 0 12px; max-height: 300px; border-radius: 14px; background: #000; object-fit: contain; }
+.rec-badge { position: fixed; top: max(14px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 90; border: 0; border-radius: 999px; padding: 8px 16px; background: #ff2d55; color: #fff; font: 700 14px Manrope, system-ui; cursor: pointer; animation: recblink 1s infinite; }
+@keyframes recblink { 50% { opacity: .55; } }

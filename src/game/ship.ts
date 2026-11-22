@@ -197,13 +197,13 @@ export class Ship {
     G.scene.add(this.root);
     if (this.opts.pad) this.buildPad();
     this.park();
-    G.physics.addDynamic(hullBox, "ship");
+    this.body = G.physics.addDynamic(hullBox, "ship");
 
     G.interact.add({
       id: this.opts.small ? "ship-" + normalize(this.name).replace(/\s+/g, "-") : "ship",
       pos: () => this.root.position.clone().add(new THREE.Vector3(-5.6 * this.S, -this.GEAR + 1, -2.5 * this.S).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw)),
       radius: 9,
-      enabled: () => G.mode === "foot",
+      enabled: () => G.mode === "foot" && !this.friendHere,
       label: () => `Monter à bord : ${this.name}`,
       action: () => this.board()
     });
@@ -231,12 +231,24 @@ export class Ship {
       id: "ship-cabin",
       pos: () => this.root.position.clone().add(new THREE.Vector3(0, -this.GEAR + 1, 8.6 * this.S).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw)),
       radius: 10,
-      enabled: () => G.mode === "foot" && this.landed && !!G.cabin && !G.cabin.inside,
+      enabled: () => G.mode === "foot" && this.landed && !!G.cabin && !G.cabin.inside && !this.friendHere,
       label: () => "Entrer dans la cabine du Royal Talon (salon, chambre, télé)",
       action: () => G.cabin.enter()
     });
   }
   ramp: THREE.Object3D | null = null;
+  body: import("../engine/physics").Body | null = null;
+  /** le Royal Talon d'un ami est posé ici et piloté : on cache le nôtre (pas de vaisseaux superposés) */
+  friendHere = false;
+  private checkFriends() {
+    if (this.opts.small || G.mode === "ship" || G.ship === this && G.mode === "cinematic") return (this.friendHere = false);
+    let here = false;
+    for (const r of G.net?.peers.values() ?? []) {
+      const st = r.state;
+      if (st?.s && st.m === "ship" && (st.s as number[])[9] !== 1 && r.shipGroup.position.distanceTo(this.root.position) < 60) here = true;
+    }
+    this.friendHere = here;
+  }
 
   // ---------------------------------------------------------------- plateforme royale
   padLights = false;
@@ -592,8 +604,13 @@ export class Ship {
 
     if (G.mode !== "ship" || G.ship !== this) {
       this.updateIdleGround();
+      this.checkFriends();
+      this.root.visible = !this.friendHere;
+      if (this.body) this.body.enabled = !this.friendHere;
       return;
     }
+    this.root.visible = true;
+    if (this.body) this.body.enabled = true;
     const inp = G.input;
     if (inp.hit("KeyR")) this.startEngines(!this.engines);
     if (inp.hit("KeyL")) this.setLights(!this.lights);

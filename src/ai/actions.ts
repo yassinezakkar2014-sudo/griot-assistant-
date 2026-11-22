@@ -399,6 +399,16 @@ export async function runAction(action: string, target?: string | null): Promise
       }
       return ap.fly(from, /panoram/.test(n) ? from : dest);
     }
+    case "tiktok":
+      bus.emit("ui:phone-app", target === "rec" ? "tiktok-rec" : "tiktok");
+      return target === "rec" ? "Moteur… action ! Je filme 15 secondes de votre partie pour TikTok." : "Voici TikTok : filmez votre partie ou ouvrez l'appli.";
+    case "invite":
+      if (G.mode !== "ship") return "Montez d'abord aux commandes de votre Royal Talon, puis je préviens vos amis.";
+      bus.emit("ui:phone-app", "invite-all");
+      return "Invitation envoyée à vos amis : ils peuvent monter à bord d'un seul toucher.";
+    case "aboard":
+      bus.emit("ui:phone-app", "aboard");
+      return "Choisissez l'ami qui pilote, ou prenez les commandes et invitez-les.";
     case "phone":
       bus.emit("ui:phone");
       return "Voici votre Royal Phone : messages et appels vidéo avec vos amis.";
