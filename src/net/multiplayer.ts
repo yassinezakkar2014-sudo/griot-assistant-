@@ -29,6 +29,8 @@ export interface NetState {
   d?: Record<string, [number, number]>;
   /** apparence de l'avatar */
   lk?: Look;
+  /** invité dans la cabine de (id du pilote) */
+  cb?: string;
   /** pouvoir d'armure spécial : "spectre" (invisible) ou "titan" (robot géant) */
   sp?: string;
   /** décoration du palais (envoyée régulièrement ; la plus récente gagne) */
@@ -93,6 +95,7 @@ class Remote {
   }
 
   private lookKey = "";
+  cabinSeen = false;
   apply(st: NetState) {
     if (!this.state || this.state.n !== st.n) this.setName(st.n);
     this.state = st;
@@ -193,6 +196,7 @@ class Remote {
     G.scene.remove(this.body.root, this.shipGroup);
     if (this.mecha) G.scene.remove(this.mecha.root);
     G.interact.remove("peer-ship-" + this.id);
+    G.interact.remove("peer-cabin-" + this.id);
   }
 }
 
@@ -365,6 +369,9 @@ export class Multiplayer {
     r.apply({ ...st, n: String(st.n || "Joueur").slice(0, 16) });
     if (st.r === this.id && !wasRiding) bus.emit("toast", { text: `🧑‍🚀 ${r.state!.n} est monté à bord avec vous.` });
     if (st.r !== this.id && wasRiding) bus.emit("toast", { text: `${r.state!.n} est descendu.` });
+    if (st.cb === this.id && r.cabinSeen !== true) bus.emit("toast", { text: `🛋️ ${r.state!.n} est dans la cabine de votre Royal Talon.` });
+    if (st.cb !== this.id && r.cabinSeen) bus.emit("toast", { text: `${r.state!.n} a quitté votre cabine.` });
+    r.cabinSeen = st.cb === this.id;
     // décoration du palais : la plus récente gagne
     if (st.dk && typeof st.dk === "object" && Number(st.dk.v) > G.deco.version) G.deco.load(st.dk as any);
     // portes et barrières : le changement le plus récent gagne
@@ -397,6 +404,17 @@ export class Multiplayer {
         enabled: () => G.mode === "foot" && !!r!.state?.s && r!.state.m === "ship" && r!.shipGroup.position.y - G.physics.terrain(r!.shipGroup.position.x, r!.shipGroup.position.z) < 14 * r!.shipScale,
         label: () => `🧑‍🚀 Monter à bord avec ${r!.state?.n ?? "ce joueur"}`,
         action: () => G.passenger.board("ship", id)
+      });
+      G.interact.add({
+        id: "peer-cabin-" + id,
+        pos: () => {
+          const sc = r!.shipScale;
+          return r!.shipGroup.position.clone().add(new THREE.Vector3(0, -1.35 * sc + 1, 8.6 * sc).applyQuaternion(r!.shipGroup.quaternion));
+        },
+        radius: 14,
+        enabled: () => G.mode === "foot" && !!r!.state?.s && (r!.state.s as number[])[9] !== 1 && r!.shipGroup.position.y - G.physics.terrain(r!.shipGroup.position.x, r!.shipGroup.position.z) < 14 * r!.shipScale,
+        label: () => `🛋️ Entrer dans la cabine de ${r!.state?.n ?? "ce joueur"}`,
+        action: () => G.cabin.enterAsGuest(id)
       });
     }
     if (st.say && st.say.text) {
@@ -435,6 +453,7 @@ export class Multiplayer {
         ? { c: [G.cars.active.def.id, r2(G.cars.active.pos.x), r2(G.cars.active.pos.y), r2(G.cars.active.pos.z), r2(G.cars.active.yaw), r2(G.cars.active.speed), 1] as [string, number, number, number, number, number, number] }
         : {}),
       ...(G.passenger?.ride ? { r: G.passenger.ride.owner } : {}),
+      ...(G.cabin?.host && G.cabin.inside ? { cb: G.cabin.host } : {}),
       d: this.sharedDoors(),
       ...(G.armor.worn && G.armor.style.special ? { sp: G.armor.style.special } : {}),
       ...(G.deco.version && performance.now() - this.decoSent > 3000 ? ((this.decoSent = performance.now()), { dk: G.deco.compact() }) : {}),
