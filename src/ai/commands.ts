@@ -41,6 +41,9 @@ function clause(raw: string): Intent | null {
     if (/\b(dors|dormir|sommeil|coucher|lit)\b/.test(t)) return { action: "cabin", target: "sleep" };
     return { action: "cabin", target: "enter" };
   }
+  if (/\b(tiktok|tik tok)\b/.test(t) || (/\b(filme|filmer|enregistre)\b/.test(t) && /\b(video|partie|jeu|clip)\b/.test(t))) return { action: "tiktok", target: /\b(filme|filmer|enregistre|video)\b/.test(t) ? "rec" : "open" };
+  if (/\b(invite|inviter)\b/.test(t) && /\b(amis?|joueurs?|bord|vaisseau|talon|tout le monde)\b/.test(t)) return { action: "invite" };
+  if (/\b(monter ensemble|montons ensemble|a bord ensemble|on monte ensemble)\b/.test(t)) return { action: "aboard" };
   if (/\b(telephone|portable|smartphone|mon phone|royal phone)\b/.test(t) && !/\b(boutique|magasin|achete|va|emmene)\b/.test(t)) return { action: "phone" };
   if (/\b(avion|vol|aeroport|decoller en avion)\b/.test(t) && /\b(prends|prendre|monte|embarque|reserve|vole|vol pour|vol vers|avion pour|avion vers|en avion|billet)\b/.test(t)) return { action: "flight", target: t };
   if (/\b(avatar|personnage|apparence|coiffure|tenue|habits?|vetements?)\b/.test(t) && /\b(change|modifie|personnalis\w*|choisis|ouvre|nouveau|nouvelle)\b/.test(t)) return { action: "avatar" };

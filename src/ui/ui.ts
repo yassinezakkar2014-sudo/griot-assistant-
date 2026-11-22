@@ -68,6 +68,7 @@ export class UI {
     $("phoneBtn").onclick = () => this.phone.toggle();
     bus.on("ui:phone", (o?: { gift?: boolean }) => this.phone.open(!!o?.gift));
     bus.on("ui:vision", () => this.vision());
+    bus.on("griot:command", (t: string) => this.griot.send(t));
     // pendant un appel entre joueurs, GRIOT se tait et libère le micro
     bus.on("call:active", (on: boolean) => {
       if (!on) return;

@@ -393,9 +393,9 @@ export class Multiplayer {
           const sc = r!.shipScale;
           return r!.shipGroup.position.clone().add(new THREE.Vector3(-5.8 * sc, -1.35 * sc + 1, -2.5 * sc).applyQuaternion(r!.shipGroup.quaternion));
         },
-        radius: 9,
-        enabled: () => G.mode === "foot" && !!r!.state?.s && r!.state.m === "ship" && r!.shipGroup.position.y - G.physics.terrain(r!.shipGroup.position.x, r!.shipGroup.position.z) < 12 * r!.shipScale,
-        label: () => `Monter en passager avec ${r!.state?.n ?? "ce joueur"}`,
+        radius: 14,
+        enabled: () => G.mode === "foot" && !!r!.state?.s && r!.state.m === "ship" && r!.shipGroup.position.y - G.physics.terrain(r!.shipGroup.position.x, r!.shipGroup.position.z) < 14 * r!.shipScale,
+        label: () => `🧑‍🚀 Monter à bord avec ${r!.state?.n ?? "ce joueur"}`,
         action: () => G.passenger.board("ship", id)
       });
     }

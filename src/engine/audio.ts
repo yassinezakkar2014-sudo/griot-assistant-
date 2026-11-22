@@ -49,6 +49,17 @@ export class AudioFX {
     this.master.connect(this.ctx.destination);
   }
 
+  private recDest: MediaStreamAudioDestinationNode | null = null;
+  /** Flux audio des sons du jeu (pour filmer une vidéo). */
+  recordStream(): MediaStream | null {
+    if (!this.ctx) return null;
+    if (!this.recDest) {
+      this.recDest = this.ctx.createMediaStreamDestination();
+      this.master.connect(this.recDest);
+    }
+    return this.recDest.stream;
+  }
+
   setVolume(v: number) {
     this.volume = v;
     if (this.ctx) this.master.gain.value = v;
