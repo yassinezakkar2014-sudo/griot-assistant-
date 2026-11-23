@@ -27,8 +27,6 @@ jobs:
       - run: npm run build
       # Boutique Belgessem (site statique) → <adresse Pages>/belgessem/
       - run: cp -r belgessem dist/belgessem
-      # Assistant NOVA (page autonome, hors GRIOT) → <adresse Pages>/nova/
-      - run: cp -r nova dist/nova
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
