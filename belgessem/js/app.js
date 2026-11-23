@@ -93,7 +93,7 @@
     const page = document.body.dataset.page;
     const link = (href, label, key) => `<a href="${href}"${page === key ? ' aria-current="page"' : ""}>${label}</a>`;
     $("#site-header").innerHTML = `
-      <div class="topbar">Livraison offerte dès ${SHIPPING_FREE_FROM} € · Retours gratuits sous 30 jours · Garantie 2 ans</div>
+      <div class="topbar">Site fictif, aucune vente réelle · Livraison offerte dès ${SHIPPING_FREE_FROM} € · Retours gratuits sous 30 jours · Garantie 2 ans</div>
       <div class="container nav">
         <a class="logo" href="index.html"><span class="logo-mark">B</span>Belgessem</a>
         <button class="menu-toggle" aria-expanded="false" aria-controls="main-nav">Menu</button>
