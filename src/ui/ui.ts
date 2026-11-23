@@ -1,4 +1,5 @@
 // Interface : HUD, panneau GRIOT, menus, carte, panneaux du royaume, contrôles tactiles.
+import { FaceID } from "./faceid";
 import * as THREE from "three";
 import { G, bus, clamp } from "../core";
 import { FLOORS } from "../world/palace";
@@ -61,6 +62,9 @@ export class UI {
     requestAnimationFrame(tick);
     $("homeTalk").onclick = () => this.talk();
     $("keyBtn").onclick = () => this.keyPanel();
+    this.faceid = new FaceID((id, html, cls) => this.openModal(id, html, cls), (fn) => (this.onModalClose = fn));
+    $("faceBtn").onclick = () => this.faceid.panel();
+    this.faceid.startLock();
     $("visBtn").onclick = () => this.vision();
     $("callBtn").onclick = () => this.call();
     $("avatarBtn").onclick = () => this.avatarPanel();
@@ -473,6 +477,7 @@ export class UI {
   }
 
   private onModalClose: (() => void) | null = null;
+  faceid!: FaceID;
   closeModal() {
     if (!this.modalOpen) return;
     this.onModalClose?.();

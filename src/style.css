@@ -537,3 +537,21 @@ body[data-mode="ship"] .keys-help { font-size: 11px; }
 .garage-panel .gp-grid i { width: 18px; height: 18px; border-radius: 50%; border: 1px solid #fff6; flex: none; }
 .garage-panel p { opacity: .8; font-size: 13px; }
 .garage-panel .gp-close { padding: 8px 14px; border-radius: 10px; border: 0; background: #d8b25a; color: #1a1406; font-weight: 700; cursor: pointer; }
+/* reconnaissance faciale */
+.faceid-lock { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: radial-gradient(circle at 50% 30%, #12234a, #04060d 70%); color: #f4ecd8; font: 500 15px Manrope, system-ui, sans-serif; transition: opacity .6s, transform .6s; padding: 16px; }
+.faceid-lock.open { opacity: 0; transform: scale(1.06); pointer-events: none; }
+.fl-card { width: min(420px, 100%); text-align: center; display: grid; gap: 12px; justify-items: center; }
+.fl-card h2 { margin: 0; font: 700 22px Georgia, serif; color: #ffd27a; }
+.fl-card p { margin: 0; opacity: .75; }
+.fl-crown { font-size: 40px; color: #ffd27a; }
+.fl-cam { position: relative; width: 240px; height: 240px; border-radius: 50%; overflow: hidden; background: #000; border: 3px solid rgba(255,214,122,.6); }
+.fl-cam.small { width: 170px; height: 170px; margin: 8px auto; }
+.fl-cam video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.fl-ring { position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 0 3px rgba(79,210,255,.5); animation: flring 2s linear infinite; }
+@keyframes flring { 50% { box-shadow: inset 0 0 0 8px rgba(79,210,255,.15); } }
+.fl-status { min-height: 1.4em; color: #bfe8ff; text-align: center; }
+.faceid-lock details { opacity: .8; } .faceid-lock details .row { display: flex; gap: 6px; margin-top: 6px; }
+.faceid-lock input { padding: 8px; border-radius: 10px; border: 1px solid #fff3; background: #0008; color: #fff; }
+.fid-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; background: rgba(255,255,255,.06); margin-bottom: 6px; }
+.fid-toggle { display: flex; align-items: center; gap: 6px; }
+.admin-badge { position: fixed; left: 50%; top: 8px; transform: translateX(-50%); z-index: 70; padding: 4px 12px; border-radius: 999px; background: rgba(10,16,30,.8); border: 1px solid rgba(255,214,122,.5); color: #ffd27a; font: 600 12px Manrope, system-ui, sans-serif; cursor: pointer; }
