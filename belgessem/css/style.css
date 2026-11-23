@@ -93,6 +93,21 @@ section { padding: 56px 0; }
 .hero-visual svg { width: 78%; }
 @media (max-width: 820px) { .hero-grid { grid-template-columns: 1fr; } .hero { padding-top: 40px; } }
 
+/* Fond de l'application : avatars de Sandrata et Nour */
+#backdrop { position: fixed; inset: 0; z-index: -1; display: grid; grid-template-columns: 1fr 1fr; }
+.backdrop-img { background-size: cover; background-position: center; }
+#backdrop::after { content: ""; position: absolute; inset: 0; background: var(--bg); opacity: 0.8; }
+.backdrop-name { position: absolute; z-index: 1; left: 0; right: 0; bottom: 4vh; margin: 0; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em; font-size: clamp(1.6rem, 6vw, 5rem); line-height: 1; color: var(--brand); opacity: 0.18; }
+@media (max-width: 820px) { #backdrop { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }
+
+/* Héros : Sandrata et Nour */
+.hero-duo { margin: 0; display: grid; gap: 16px; }
+.duo-photos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.duo-photos img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 20px; box-shadow: var(--shadow); }
+.duo-photos img:last-child { transform: translateY(24px); }
+.hero-duo figcaption { font-weight: 900; text-transform: uppercase; font-size: clamp(1.4rem, 3.2vw, 2.2rem); line-height: 1.05; letter-spacing: 0.02em; margin-top: 24px; }
+.hero-duo figcaption span { color: var(--brand); }
+
 /* Atouts */
 .perks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 .perk { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
