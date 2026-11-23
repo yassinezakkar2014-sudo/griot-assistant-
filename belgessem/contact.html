@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contact — Belgessem</title>
+  <meta name="description" content="Contactez le service client Belgessem, FAQ, livraison et retours.">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234f46e5'/><text x='16' y='23' font-size='20' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>B</text></svg>">
+</head>
+<body data-page="contact" data-init="contact">
+  <header id="site-header"></header>
+  <main class="container">
+    <div class="shop-head"><p class="eyebrow">Service client</p><h1>Contactez-nous</h1><p class="lead">Une question sur un produit ou une commande ? Nous répondons sous 24 h, du lundi au samedi.</p></div>
+    <section class="contact-grid">
+      <form id="contact-form" class="contact-form">
+        <label>Nom <input required name="name" autocomplete="name"></label>
+        <label>E-mail <input required type="email" name="email" autocomplete="email"></label>
+        <label>Sujet
+          <select name="subject"><option>Question produit</option><option>Suivi de commande</option><option>Retour / échange</option><option>Autre</option></select>
+        </label>
+        <label>Message <textarea required name="message" rows="5"></textarea></label>
+        <button class="btn" type="submit">Envoyer</button>
+      </form>
+      <div>
+        <h2 id="faq">Questions fréquentes</h2>
+        <details><summary>Comment laver un slip connecté ?</summary><p>Retirez le module électronique (aimanté), puis lavez le slip en machine à 40 °C maximum. Ne pas passer au sèche-linge.</p></details>
+        <details><summary>Les slips fonctionnent-ils avec n'importe quel téléphone ?</summary><p>Oui, l'application Belgessem est disponible sur Android et iOS. Les téléphones Belgessem offrent en plus l'appairage automatique.</p></details>
+        <details><summary>Que deviennent mes données ?</summary><p>Elles sont chiffrées et stockées sur votre téléphone. Belgessem ne les vend jamais et vous pouvez les supprimer à tout moment.</p></details>
+        <details id="livraison"><summary>Livraison et retours</summary><p>Livraison en 48 h, offerte dès 80 € (sinon 5,90 €). Retours gratuits sous 30 jours ; pour des raisons d'hygiène, les slips doivent être retournés non portés, dans leur emballage.</p></details>
+        <details><summary>Quelle garantie ?</summary><p>Tous les produits Belgessem sont garantis 2 ans, pièces et main-d'œuvre.</p></details>
+      </div>
+    </section>
+  </main>
+  <footer id="site-footer"></footer>
+  <script src="js/products.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
