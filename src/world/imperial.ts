@@ -94,7 +94,9 @@ export class ImperialPalace {
       const am = (a0 + a1) / 2;
       // grande porte au sud (vers le royaume)
       const gate = Math.abs(Math.atan2(Math.sin(am + Math.PI / 2), Math.cos(am + Math.PI / 2))) < 0.03;
-      if (k % 7 === 0) towers.push({ p: [Math.cos(a0) * RR, 0, Math.sin(a0) * RR] });
+      // pas de tour dans l'ouverture de la grande porte (la route impériale y entre)
+      const nearGate = Math.abs(Math.atan2(Math.sin(a0 + Math.PI / 2), Math.cos(a0 + Math.PI / 2))) < 0.07;
+      if (k % 7 === 0 && !nearGate) towers.push({ p: [Math.cos(a0) * RR, 0, Math.sin(a0) * RR] });
       if (gate) continue;
       const x0 = Math.cos(a0) * RR,
         z0 = Math.sin(a0) * RR,
