@@ -131,6 +131,23 @@
     updateCartCount();
   }
 
+  // ---------- Écran d'accueil animé : Dobby et Milo (une fois par visite) ----------
+  function splash() {
+    try { if (sessionStorage.getItem("belgessem-splash")) return; sessionStorage.setItem("belgessem-splash", "1"); } catch { /* stockage indisponible */ }
+    document.body.insertAdjacentHTML("beforeend", `<div id="splash" role="dialog" aria-label="Bienvenue">
+      <div class="splash-card">
+        <img src="img/dobby-milo.jpg" alt="Le chien Dobby et Milo">
+        <h1 class="splash-name">${[..."Dobby et Milo"].map((c, i) => `<span style="--i:${i}">${c === " " ? "&nbsp;" : c}</span>`).join("")}</h1>
+        <button class="btn" type="button">Entrer sur le site</button>
+      </div>
+    </div>`);
+    const el = $("#splash");
+    const close = () => { el.classList.add("out"); setTimeout(() => el.remove(), 600); };
+    el.querySelector("button").addEventListener("click", close);
+    el.querySelector("button").focus();
+    setTimeout(close, 5000);
+  }
+
   let toastTimer;
   function toast(msg) {
     let el = $("#toast");
@@ -297,6 +314,7 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     const name = document.body.dataset.init;
+    splash();
     if (name === "shop") return pages.shop(); // la boutique règle le menu actif avant le layout
     layout();
     pages[name]?.();

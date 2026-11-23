@@ -240,3 +240,17 @@ summary { cursor: pointer; font-weight: 600; }
 /* Notification */
 #toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 140%); background: var(--text); color: var(--bg); padding: 12px 20px; border-radius: 99px; font-weight: 600; transition: transform 0.3s; z-index: 50; max-width: calc(100% - 32px); }
 #toast.show { transform: translate(-50%, 0); }
+
+/* Écran d'accueil animé : Dobby et Milo */
+#splash { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 16px; background: radial-gradient(circle at 50% 40%, #b45309, #1c0f05 75%); transition: opacity 0.6s, visibility 0.6s; }
+#splash.out { opacity: 0; visibility: hidden; }
+.splash-card { display: grid; justify-items: center; gap: 20px; text-align: center; }
+.splash-card img { width: min(300px, 70vw); aspect-ratio: 1; object-fit: cover; border-radius: 50%; border: 6px solid #fde68a; box-shadow: 0 0 0 12px #fde68a33, 0 20px 60px #000a; animation: splash-pop 0.9s cubic-bezier(.34,1.56,.64,1) both, splash-float 3s 0.9s ease-in-out infinite; }
+.splash-name { margin: 0; color: #fff7ed; font-size: clamp(2.4rem, 9vw, 4.5rem); font-weight: 900; letter-spacing: -0.02em; text-shadow: 0 4px 20px #0008; }
+.splash-name span { display: inline-block; animation: splash-letter 0.5s calc(0.7s + var(--i) * 0.06s) cubic-bezier(.34,1.56,.64,1) both; }
+#splash .btn { background: #fde68a; color: #1c0f05; animation: splash-letter 0.5s 1.6s both; }
+#splash .btn:hover { background: #fff7ed; }
+@keyframes splash-pop { from { transform: scale(0.2) rotate(-20deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes splash-float { 50% { transform: translateY(-10px) rotate(2deg); } }
+@keyframes splash-letter { from { transform: translateY(40px) scale(0.5); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .splash-card img, .splash-name span, #splash .btn { animation: none; } }
