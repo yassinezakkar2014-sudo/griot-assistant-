@@ -110,7 +110,7 @@ export function rawHeight(x: number, z: number) {
   if (Math.abs(x - PASS.x) < 230 && z > PASS.z1 - 200 && z < PASS.z2 + 60) {
     const u = Math.min(1, Math.max(0, (z - (PASS.z1 + 300)) / (PASS.z2 - 60 - (PASS.z1 + 300))));
     const target = Math.max(u * PASS.top - 1, 1);
-    const w = (1 - smooth(70, 230, Math.abs(x - PASS.x))) * Math.min(smooth(PASS.z1 - 200, PASS.z1 + 200, z), 1);
+    const w = (1 - smooth(110, 230, Math.abs(x - PASS.x))) * Math.min(smooth(PASS.z1 - 200, PASS.z1 + 200, z), 1);
     if (h > target) h = mix(h, target, w);
   }
   // aéroports : grande plaine parfaitement plate

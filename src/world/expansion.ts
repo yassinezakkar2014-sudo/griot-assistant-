@@ -46,6 +46,7 @@ export function buildHighway(): Highway {
   const railMat = new THREE.MeshStandardMaterial({ color: 0xc8ccd6, metalness: 0.9, roughness: 0.3, side: THREE.DoubleSide });
   const lamps: THREE.Vector3[] = [];
   const pillars: { p: THREE.Vector3; h: number }[] = [];
+  const barrier: { a: THREE.Vector3; b: THREE.Vector3 }[] = [];
   let total = 0;
 
   for (const [ri, ctrl] of routes.entries()) {
@@ -56,10 +57,15 @@ export function buildHighway(): Highway {
     const n = Math.ceil(len / 6);
     const pts = curve.getSpacedPoints(n);
     // profil en long : relief lissé, jamais sous le terrain ni sous la mer
-    const raw = pts.map((p) => Math.max(G.physics.terrain(p.x, p.z), SEA + 2.5));
-    // pont : au-dessus de l'eau le tablier monte à DECK m, avec de longues rampes d'accès
     const imperial = ri === IMPERIAL_ROUTE;
-    const target = bridge ? raw.map((y) => (y <= SEA + 2.6 ? DECK : y)) : imperial ? pts.map((p, i) => Math.max(ramp(p.z), Math.min(raw[i], 2))) : raw;
+    // route impériale : on prend le relief le plus haut sur toute la largeur (le relief ne perce jamais la chaussée)
+    const raw = pts.map((p) => {
+      let h = G.physics.terrain(p.x, p.z);
+      if (imperial) for (const o of [-18, -9, 9, 18]) h = Math.max(h, G.physics.terrain(p.x + o, p.z));
+      return Math.max(h, SEA + 2.5);
+    });
+    // pont : au-dessus de l'eau le tablier monte à DECK m, avec de longues rampes d'accès
+    const target = bridge ? raw.map((y) => (y <= SEA + 2.6 ? DECK : y)) : imperial ? pts.map((p, i) => Math.max(ramp(p.z), raw[i] + 0.6)) : raw;
     const win = bridge ? 34 : imperial ? 6 : 12;
     const smooth = raw.map((_, i) => {
       let s = 0,
@@ -71,7 +77,7 @@ export function buildHighway(): Highway {
       }
       return s / c;
     });
-    const ys = smooth.map((y, i) => Math.max(y, raw[i] + 0.15) + 0.12);
+    const ys = smooth.map((y, i) => Math.max(y, raw[i] + (imperial ? 0.45 : 0.15)) + 0.12);
     // ruban de chaussée + glissières
     const pos: number[] = [],
       uv: number[] = [],
@@ -108,8 +114,10 @@ export function buildHighway(): Highway {
       }
       if (i % 10 === 0) lamps.push(new THREE.Vector3(p.x + nx * (HALF_W + 0.6) * (i % 20 ? 1 : -1), y, p.z + nz * (HALF_W + 0.6) * (i % 20 ? 1 : -1)));
       if (i % 5 === 0 && y - raw[i] > 2.5) pillars.push({ p: new THREE.Vector3(p.x, y, p.z), h: y - raw[i] + 2 });
-      // garde-corps solides sur les parties en hauteur (ponts, viaducs) : on ne tombe plus
-      if (i && (y - raw[i] > 1.5 || ys[i - 1] - raw[i - 1] > 1.5)) {
+      // GRANDE BARRIÈRE : murets béton + vitrage sur toute la route impériale et sur les parties en hauteur
+      const walled = i > 0 && (imperial || y - raw[i] > 1.5 || ys[i - 1] - raw[i - 1] > 1.5);
+      if (walled) for (const sd of [1, -1]) barrier.push({ a: new THREE.Vector3(pts[i - 1].x + nx * (HALF_W + 0.5) * sd, ys[i - 1], pts[i - 1].z + nz * (HALF_W + 0.5) * sd), b: new THREE.Vector3(p.x + nx * (HALF_W + 0.5) * sd, y, p.z + nz * (HALF_W + 0.5) * sd) });
+      if (walled) {
         const a = pts[i - 1],
           ay = ys[i - 1];
         for (let k = 0; k < 6; k++) {
@@ -120,7 +128,7 @@ export function buildHighway(): Highway {
           for (const sd of [1, -1]) {
             const rx = x + nx * (HALF_W + 0.25) * sd,
               rz = z + nz * (HALF_W + 0.25) * sd;
-            G.physics.addBox({ x: rx - 0.3, y: yy - 0.5, z: rz - 0.3 }, { x: rx + 0.3, y: yy + 1.3, z: rz + 0.3 }, "rail");
+            G.physics.addBox({ x: rx - 0.35, y: yy - 0.5, z: rz - 0.35 }, { x: rx + 0.35, y: yy + 3.2, z: rz + 0.35 }, "rail");
           }
         }
       }
@@ -145,6 +153,33 @@ export function buildHighway(): Highway {
     rg.setIndex(railIdx);
     rg.computeVertexNormals();
     root.add(new THREE.Mesh(rg, railMat));
+  }
+
+  // grande barrière (instanciée) : muret béton, vitrage bleuté, lisse dorée
+  {
+    const wallM = new THREE.MeshStandardMaterial({ color: 0xd9dce3, roughness: 0.6 });
+    const glassM = new THREE.MeshStandardMaterial({ color: 0x8fd0ff, transparent: true, opacity: 0.35, roughness: 0.1, metalness: 0.2, depthWrite: false, side: THREE.DoubleSide });
+    const walls = new THREE.InstancedMesh(new THREE.BoxGeometry(0.7, 1.3, 1).translate(0, 0.45, 0), wallM, Math.max(1, barrier.length));
+    const glass = new THREE.InstancedMesh(new THREE.BoxGeometry(0.12, 1.9, 1).translate(0, 2.05, 0), glassM, Math.max(1, barrier.length));
+    const cap = new THREE.InstancedMesh(new THREE.BoxGeometry(0.3, 0.18, 1).translate(0, 3.05, 0), mat.gold, Math.max(1, barrier.length));
+    const mm = new THREE.Matrix4();
+    const qq = new THREE.Quaternion();
+    const e = new THREE.Euler(0, 0, 0, "YXZ");
+    barrier.forEach((w, k) => {
+      const d = w.b.clone().sub(w.a);
+      const L = Math.hypot(d.x, d.z);
+      e.set(-Math.atan2(d.y, L), Math.atan2(d.x, d.z), 0);
+      qq.setFromEuler(e);
+      mm.compose(w.a.clone().add(w.b).multiplyScalar(0.5), qq, new THREE.Vector3(1, 1, d.length() + 0.08));
+      walls.setMatrixAt(k, mm);
+      glass.setMatrixAt(k, mm);
+      cap.setMatrixAt(k, mm);
+    });
+    for (const im of [walls, glass, cap]) {
+      im.count = barrier.length;
+      root.add(im);
+    }
+    walls.castShadow = walls.receiveShadow = true;
   }
 
   // lampadaires (instanciés)
