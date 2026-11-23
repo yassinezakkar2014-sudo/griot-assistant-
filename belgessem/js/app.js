@@ -91,6 +91,14 @@
   // ---------- En-tête et pied de page communs ----------
   function layout() {
     const page = document.body.dataset.page;
+    if (!$("#backdrop")) {
+      // Fond de l'application : les avatars de Sandrata et Nour, voilés pour garder le texte lisible
+      document.body.insertAdjacentHTML("afterbegin", `<div id="backdrop" aria-hidden="true">
+        <div class="backdrop-img" style="background-image:url(img/avatar-1.jpg)"></div>
+        <div class="backdrop-img" style="background-image:url(img/avatar-2.jpg)"></div>
+        <p class="backdrop-name">Sandrata et Nour Belgessem</p>
+      </div>`);
+    }
     const link = (href, label, key) => `<a href="${href}"${page === key ? ' aria-current="page"' : ""}>${label}</a>`;
     $("#site-header").innerHTML = `
       <div class="topbar">Site fictif, aucune vente réelle · Livraison offerte dès ${SHIPPING_FREE_FROM} € · Retours gratuits sous 30 jours · Garantie 2 ans</div>
