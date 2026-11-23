@@ -426,6 +426,9 @@ export async function runAction(action: string, target?: string | null): Promise
     case "call":
       bus.emit("ui:call");
       return "Je vous appelle, Majesté.";
+    case "faceid":
+      bus.emit("ui:faceid");
+      return "Voici la reconnaissance faciale des administrateurs (2 maximum). Les visages restent sur cet appareil.";
     case "super_speed": {
       const on = String(target ?? "") !== "off";
       if (G.player.superSpeed !== on) G.player.setSuperSpeed(on);

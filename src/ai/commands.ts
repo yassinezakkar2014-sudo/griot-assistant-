@@ -48,6 +48,7 @@ function clause(raw: string): Intent | null {
   if (/\b(avion|vol|aeroport|decoller en avion)\b/.test(t) && /\b(prends|prendre|monte|embarque|reserve|vole|vol pour|vol vers|avion pour|avion vers|en avion|billet)\b/.test(t)) return { action: "flight", target: t };
   if (/\b(avatar|personnage|apparence|coiffure|tenue|habits?|vetements?)\b/.test(t) && /\b(change|modifie|personnalis\w*|choisis|ouvre|nouveau|nouvelle)\b/.test(t)) return { action: "avatar" };
   if (/\b(appel video|appelle.moi|on s appelle|facetime|mode appel|appel avec griot|passe.moi un appel)\b/.test(t)) return { action: "call" };
+  if (/\b(reconnaissance faciale|face ?id|administrateurs?|admins?|verrou facial)\b/.test(t)) return { action: "faceid" };
   if (/\b(super ?vitesse|super speed|vitesse eclair|mode flash|course eclair)\b/.test(t)) return { action: "super_speed", target: /\b(arrete|desactive|stop|enleve|coupe)\b/.test(t) ? "off" : "on" };
   if (/\bpilote auto(matique)?\b|\bautopilot\b|\bconduis.moi\b/.test(t)) return { action: "autopilot", target: /\b(arrete|desactive|stop|coupe)\b/.test(t) ? "off" : t };
   if (/\b(sors|sortir|sort|amene|apporte|donne)\b.*\b(voiture|bagnole|auto)\b|\bgarage (auto|automatique|imperial)\b/.test(t)) return { action: "garage", target: t };

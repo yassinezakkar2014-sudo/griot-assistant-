@@ -12,6 +12,7 @@
     "test": "node --test server/tests/*.test.js"
   },
   "dependencies": {
+    "@vladmandic/face-api": "^1.7.15",
     "docx": "^9.1.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
