@@ -367,6 +367,9 @@ app.put("/api/save", (req, res) => {
   res.json({ ok: true });
 });
 
+// ---- Site boutique Belgessem (statique) → /belgessem ----
+app.use("/belgessem", express.static(path.resolve("belgessem")));
+
 // ---- Front-end ----
 if (DEV) {
   const { createServer } = await import("vite");
