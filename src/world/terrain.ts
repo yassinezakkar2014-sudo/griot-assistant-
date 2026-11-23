@@ -106,6 +106,12 @@ export function rawHeight(x: number, z: number) {
   // GRAND MONDE : au-delà du royaume, l'océan et les continents des autres pays
   const dd = Math.max(Math.abs(x), Math.abs(z));
   if (dd > 3300) h = mix(h, worldHeight(x, z), smooth(3300, 4700, dd));
+  // Montagne Royale : son plateau reste parfaitement plat à 600 m, même là où il touche le cœur du royaume
+  const dmM = Math.hypot(x - MOUNTAIN.x, z - MOUNTAIN.z);
+  if (dmM < MOUNTAIN.r * 1.25) {
+    const k = 1 - smooth(MOUNTAIN.plateau + 200, MOUNTAIN.plateau + 500, dmM);
+    h = mix(Math.max(h, worldHeight(x, z)), MOUNTAIN.top, k);
+  }
   // col royal : la montagne est creusée en pente douce jusqu'au Palais Impérial (les vallées restent : la route passe en viaduc)
   if (Math.abs(x - PASS.x) < 230 && z > PASS.z1 - 200 && z < PASS.z2 + 60) {
     const u = Math.min(1, Math.max(0, (z - (PASS.z1 + 300)) / (PASS.z2 - 60 - (PASS.z1 + 300))));
@@ -147,9 +153,9 @@ export function worldHeight(x: number, z: number) {
   if (dm < M.r * 1.25) {
     const edge = dm + (fbm(x * 0.002 + 9, z * 0.002 - 3) - 0.5) * 260;
     const land = 1 - smooth(M.r * 0.86, M.r, edge);
-    const slope = 1 - smooth(M.plateau + 40, M.r * 0.9, edge);
+    const slope = 1 - smooth(M.plateau + 200, M.r * 0.9, edge);
     let mh = 20 + Math.pow(slope, 0.55) * (M.top - 20) + ridged(x * 0.003, z * 0.003 + 5) * 120 * slope * (1 - slope) * 4;
-    if (dm < M.plateau + 40) mh = M.top;
+    if (dm < M.plateau + 200) mh = M.top;
     w = mix(w, mh, land);
   }
   return w;
