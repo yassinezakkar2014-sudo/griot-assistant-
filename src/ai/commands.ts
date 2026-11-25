@@ -61,6 +61,8 @@ function clause(raw: string): Intent | null {
   if (/\b(course|contre la montre|chrono)\b/.test(t) && !/\b(courses? au|faire les courses|eclair)\b/.test(t)) return { action: "race", target: /\b(aerienne|ciel|anneaux|vaisseau)\b/.test(t) ? "ciel" : /\b(mer|bateau|yacht)\b/.test(t) ? "mer" : /\b(arrete|stop|abandonne)\b/.test(t) ? "stop" : "route" };
   if (/\b(visite guidee|fais.moi visiter|visite du royaume|guide.moi|fais.moi la visite|stop visite|arrete la visite)\b/.test(t)) return { action: "tour", target: /\b(stop|arrete)\b/.test(t) ? "stop" : "start" };
 
+  // --- suite royale du méga-yacht ---
+  if (/\b(cabine|suite|chambre)\b/.test(t) && /\b(yacht|bateau|etoile royale)\b/.test(t)) return { action: "cabin", target: (/\b(sors|sortir|quitte|quitter)\b/.test(t) ? "sors " : "") + "yacht" };
   // --- cabine habitable du Royal Talon ---
   if (/\b(cabine|interieur du (vaisseau|talon|royal talon)|salon du vaisseau|chambre du vaisseau|appartement du vaisseau|cabin)\b/.test(t) || (/\b(tele|television|tv|chaine)\b/.test(t) && /\b(allume|mets|change|chaine)\w*\b/.test(t)) || /\b(je veux dormir|va dormir|dors dans le vaisseau)\b/.test(t)) {
     if (/\b(sors|sortir|quitte|quitter|exit)\b/.test(t)) return { action: "cabin", target: "exit" };

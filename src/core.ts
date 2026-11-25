@@ -18,6 +18,7 @@ import type { Autopilot } from "./game/autopilot";
 import type { Weather, Fireworks } from "./game/weather";
 import type { Traffic, Treasure, ThemePark, Races, Tour } from "./game/leisure";
 import type { Yacht } from "./game/megayacht";
+import type { YachtCabin } from "./game/yachtcabin";
 import type { EmoteWheel } from "./ui/emotes";
 import type { ActionMenu } from "./ui/actions";
 import type { Gamepads } from "./engine/gamepad";
@@ -61,6 +62,7 @@ export interface GameContext {
   treasure: Treasure;
   park: ThemePark;
   yacht: Yacht;
+  yachtCabin: YachtCabin;
   emotes: EmoteWheel;
   actions: ActionMenu;
   gamepad: Gamepads;
