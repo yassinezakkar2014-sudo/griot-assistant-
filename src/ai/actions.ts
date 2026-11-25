@@ -426,6 +426,36 @@ export async function runAction(action: string, target?: string | null): Promise
     case "call":
       bus.emit("ui:call");
       return "Je vous appelle, Majesté.";
+    case "fireworks":
+      G.fireworks.show(30);
+      return "Feu d'artifice royal ! Regardez le ciel, Majesté.";
+    case "weather": {
+      const w = String(target ?? "clear") as "clear" | "rain" | "snow" | "storm" | "aurora";
+      G.weather.set(w);
+      return { clear: "Le soleil revient sur le royaume.", rain: "Il pleut sur le royaume.", snow: "La neige tombe sur le royaume.", storm: "Un orage gronde… restez à l'abri, Majesté.", aurora: "Voici une aurore boréale. Levez les yeux !" }[w] ?? "Météo changée.";
+    }
+    case "treasure": {
+      const n = String(target ?? "start");
+      return n === "hint" ? G.treasure.hint() : n === "reset" ? G.treasure.reset() : G.treasure.start();
+    }
+    case "yacht":
+      if (G.mode === "boat") return "Vous êtes déjà à la barre du yacht.";
+      if (G.mode !== "foot") return "Descendez d'abord du véhicule.";
+      if (G.player.position.distanceTo(new THREE.Vector3(-1000, 1, 520)) > 150 && G.player.position.distanceTo(G.park.pier) > 150) {
+        bus.emit("fade");
+        G.player.teleport(new THREE.Vector3(-1000, 1.3, 520), Math.PI / 2);
+      }
+      return G.yacht.board();
+    case "race": {
+      const n = String(target ?? "route");
+      if (n === "stop") {
+        G.races.stop();
+        return "Course abandonnée.";
+      }
+      return G.races.start(n);
+    }
+    case "tour":
+      return String(target) === "stop" ? G.tour.stop() : G.tour.start();
     case "faceid":
       bus.emit("ui:faceid");
       return "Voici la reconnaissance faciale des administrateurs (2 maximum). Les visages restent sur cet appareil.";

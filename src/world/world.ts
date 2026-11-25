@@ -365,6 +365,7 @@ export class World {
       const z = -1500 + Math.random() * 3000;
       const h = this.terrain.height(x, z);
       if (h < SEA + 0.5 || h > SEA + 12) continue;
+      if (Math.hypot(x - ZONES.park.x, z - ZONES.park.z) < ZONES.park.r * 1.15 || (Math.abs(z - 500) < 30 && x < -820)) continue;
       const th = 8 + Math.random() * 5;
       m4.compose(new THREE.Vector3(x, h, z), q, new THREE.Vector3(0.5, th, 0.5));
       ptr.setMatrixAt(pc, m4);
@@ -625,6 +626,8 @@ export class World {
     if (G.airCabin?.inside && p.distanceTo(G.player.position) < 1) return "✈ Cabine de l'avion";
     if (G.space?.active && p.y > 20000) return G.space.zone(p);
     if (Math.abs(p.x - MALL.x) < MALL.w / 2 && Math.abs(p.z - MALL.z) < MALL.d / 2) return "Royal Mall";
+    if (Math.hypot(p.x - ZONES.park.x, p.z - ZONES.park.z) < ZONES.park.r * 1.1) return "Île des Attractions";
+    if (Math.abs(p.z - 520) < 40 && p.x < -820 && p.x > -1120) return "Marina royale";
     if (onMountain(p.x, p.z, 1) || (Math.abs(p.x) < 240 && p.z > 320 && p.z < MOUNTAIN.z)) {
       const dm = Math.hypot(p.x - MOUNTAIN.x, p.z - MOUNTAIN.z);
       if (Math.abs(p.x - MOUNTAIN.x - 600) < 52 && Math.abs(p.z - MOUNTAIN.z + 300) < 42) return "Garage impérial";

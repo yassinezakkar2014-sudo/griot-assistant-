@@ -63,7 +63,9 @@ export const ZONES = {
   /** le pays voisin, de l'autre côté de l'océan */
   zuria: { x: -2900, z: 300, r: 850 },
   /** Nouvelle Métropole : le prolongement géant de la ville futuriste, à l'est de l'autoroute */
-  metro: { x1: 3050, x2: 3950, z1: -1400, z2: 1400 }
+  metro: { x1: 3050, x2: 3950, z1: -1400, z2: 1400 },
+  /** Île des Attractions (parc royal), au nord-ouest dans l'océan */
+  park: { x: -1550, z: 1400, r: 330 }
 };
 
 /** Hauteur analytique (utilisée pour générer la grille). */
@@ -96,6 +98,10 @@ export function rawHeight(x: number, z: number) {
   const island = 1 - smooth(zu.r * 0.65, zu.r, dz);
   if (island > 0) h = mix(h, 5 + fbm(x * 0.004 + 40, z * 0.004 - 7) * 40, island);
   h = mix(h, 4, 1 - smooth(170, 280, dz));
+  // Île des Attractions : plateau plat à 3 m, plages en pente douce
+  const pk = ZONES.park;
+  const dpk = Math.hypot(x - pk.x, z - pk.z);
+  if (dpk < pk.r * 1.3) h = mix(h, 3, 1 - smooth(pk.r * 0.82, pk.r * 1.12, dpk));
   // Nouvelle Métropole : plaine
   const mt = ZONES.metro;
   const mtw = Math.min(smooth(mt.x1 - 200, mt.x1, x), 1 - smooth(mt.x2, mt.x2 + 200, x), smooth(mt.z1 - 200, mt.z1, z), 1 - smooth(mt.z2, mt.z2 + 200, z));

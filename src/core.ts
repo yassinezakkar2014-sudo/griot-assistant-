@@ -15,6 +15,8 @@ import type { World } from "./world/world";
 import type { Multiplayer } from "./net/multiplayer";
 import type { CarSystem } from "./game/car";
 import type { Autopilot } from "./game/autopilot";
+import type { Weather, Fireworks } from "./game/weather";
+import type { Traffic, Treasure, ThemePark, Yacht, Races, Tour } from "./game/leisure";
 import type { ImperialGarage } from "./game/garage";
 import type { AntiAir } from "./world/antiair";
 import type { Passenger } from "./net/passenger";
@@ -28,7 +30,7 @@ import type { Airports } from "./game/airport";
 import type { ImperialPalace } from "./world/imperial";
 import type { AirCabin } from "./game/aircabin";
 
-export type Mode = "foot" | "ship" | "inspect" | "cinematic" | "car" | "passenger";
+export type Mode = "foot" | "ship" | "inspect" | "cinematic" | "car" | "passenger" | "ride" | "boat";
 
 export interface GameContext {
   scene: THREE.Scene;
@@ -49,6 +51,14 @@ export interface GameContext {
   net: Multiplayer;
   cars: CarSystem;
   autopilot: Autopilot;
+  weather: Weather;
+  fireworks: Fireworks;
+  traffic: Traffic;
+  treasure: Treasure;
+  park: ThemePark;
+  yacht: Yacht;
+  races: Races;
+  tour: Tour;
   garage: ImperialGarage;
   antiair: AntiAir;
   passenger: Passenger;

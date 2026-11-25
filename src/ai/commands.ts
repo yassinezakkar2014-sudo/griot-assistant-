@@ -33,6 +33,17 @@ function clause(raw: string): Intent | null {
   if (/\b(diagnostic|diagnostique|diag|teste ton (cerveau|moteur|ia)|teste l ia|pourquoi tu (ne )?reponds pas)\b/.test(t)) return { action: "diag" };
   if (/^(aide|help|ayuda|que peux.tu faire|what can you do|commandes)\b/.test(t)) return { action: "help" };
   if (/\b(sauvegard\w*|save|guardar)\b/.test(t) && !/projet/.test(t)) return { action: "save" };
+  // --- loisirs : météo, feux d'artifice, trésor, parc, yacht, courses, visite ---
+  if (/\b(feux? d artifice|fireworks?)\b/.test(t)) return { action: "fireworks" };
+  if (/\b(meteo|pluie|pleu\w*|neige|neiger|orage|eclairs?|aurores? (boreales?)?|beau temps|il fait beau|arrete la pluie|arrete la neige)\b/.test(t) && !/\b(armure|vaisseau)\b/.test(t)) {
+    const w = /\baurore/.test(t) ? "aurora" : /\b(orage|eclair)/.test(t) ? "storm" : /\bneig/.test(t) && !/arrete/.test(t) ? "snow" : /\b(pluie|pleu)/.test(t) && !/arrete/.test(t) ? "rain" : "clear";
+    return { action: "weather", target: w };
+  }
+  if (/\b(chasse au tresor|tresor|joyaux?|indice)\b/.test(t)) return { action: "treasure", target: /\b(indice|ou est|aide.moi)\b/.test(t) ? "hint" : /\b(recommence|rejouer|reset)\b/.test(t) ? "reset" : "start" };
+  if (/\b(grande roue|montagnes? russes?|carrousel|manege|parc d attractions?|ile des attractions|fete foraine)\b/.test(t)) return { action: "teleport", target: "park" };
+  if (/\b(yacht|bateau|marina|regate)\b/.test(t)) return { action: /\bregate\b/.test(t) ? "race" : "yacht", target: /\bregate\b/.test(t) ? "mer" : null };
+  if (/\b(course|contre la montre|chrono)\b/.test(t) && !/\b(courses? au|faire les courses|eclair)\b/.test(t)) return { action: "race", target: /\b(aerienne|ciel|anneaux|vaisseau)\b/.test(t) ? "ciel" : /\b(mer|bateau|yacht)\b/.test(t) ? "mer" : /\b(arrete|stop|abandonne)\b/.test(t) ? "stop" : "route" };
+  if (/\b(visite guidee|fais.moi visiter|visite du royaume|guide.moi|fais.moi la visite|stop visite|arrete la visite)\b/.test(t)) return { action: "tour", target: /\b(stop|arrete)\b/.test(t) ? "stop" : "start" };
 
   // --- cabine habitable du Royal Talon ---
   if (/\b(cabine|interieur du (vaisseau|talon|royal talon)|salon du vaisseau|chambre du vaisseau|appartement du vaisseau|cabin)\b/.test(t) || (/\b(tele|television|tv|chaine)\b/.test(t) && /\b(allume|mets|change|chaine)\w*\b/.test(t)) || /\b(je veux dormir|va dormir|dors dans le vaisseau)\b/.test(t)) {

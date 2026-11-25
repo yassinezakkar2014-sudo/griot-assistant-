@@ -80,6 +80,11 @@ export class UI {
       setTimeout(() => fx.remove(), 1900);
     });
     bus.on("griot:command", (t: string) => this.griot.send(t));
+    // GRIOT parle de lui-même (visite guidée…)
+    bus.on("griot:say", (t: string) => {
+      this.griot.render("assistant", t);
+      this.griot.voice.say(t);
+    });
     // pendant un appel entre joueurs, GRIOT se tait et libère le micro
     bus.on("call:active", (on: boolean) => {
       if (!on) return;
@@ -1481,6 +1486,8 @@ export class UI {
       armor: K("ZQSD", "Marcher") + K("Espace ×2", "Double saut") + K("1", "Onde de choc") + K("2", "Bouclier") + K("3", "Surcharge") + K("4", "Vision") + K("5 / G", "Rayon") + K("X", "Masque") + K("E", "Interagir") + common,
       titan: K("ZQSD", "Marcher (Titan)") + K("Espace", "Réacteurs") + K("5 / G", "Canon") + K("1", "Frappe au sol") + common,
       ship: K("Souris", "Tourner / cabrer") + K("W / S", "Poussée") + K("A / D", "Tourner") + K("Q / E", "Inclinaison") + K("Espace / C", "Monter / descendre") + K("Maj", "Post-combustion") + K("R", "Moteurs") + K("H", "Atterrir") + K("B", "Supersonique") + K("K", "Furtif") + K("I", "Cabine") + K("O", "Espace") + K("V", "Vue") + K("F", "Sortir"),
+      boat: K("W / S", "Gaz") + K("A / D", "Barre") + K("Maj", "Pleine vitesse") + K("F", "Descendre (au quai)") + common,
+      ride: K("F", "Descendre") + common,
       car: K("W / S", "Accélérer / freiner") + K("A / D", "Tourner") + K("Y", "🤖 Pilote auto") + K("V", "Vue") + K("F", "Sortir") + common
     };
     $("keysHelp").innerHTML = `<div class="kh-title">⌨ Touches</div>${lists[mode] ?? common}`;
