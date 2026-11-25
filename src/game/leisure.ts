@@ -621,7 +621,7 @@ export class Tour {
     this.timer = 16;
     const { runAction } = await import("../ai/actions");
     await runAction("teleport", s.place);
-    bus.emit("griot:say", `${this.step + 1}/${TOUR.length} — ${s.text}`);
+    bus.emit("griot:say", { text: `${this.step + 1}/${TOUR.length} — ${s.text}` });
   }
 }
 

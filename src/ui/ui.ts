@@ -62,6 +62,10 @@ export class UI {
     requestAnimationFrame(tick);
     $("homeTalk").onclick = () => this.talk();
     $("keyBtn").onclick = () => this.keyPanel();
+    const tag = document.createElement("div");
+    tag.className = "build-tag";
+    tag.textContent = "version " + __BUILD__;
+    document.body.appendChild(tag);
     this.faceid = new FaceID((id, html, cls) => this.openModal(id, html, cls), (fn) => (this.onModalClose = fn));
     $("faceBtn").onclick = () => this.faceid.panel();
     this.faceid.startLock();
@@ -80,11 +84,6 @@ export class UI {
       setTimeout(() => fx.remove(), 1900);
     });
     bus.on("griot:command", (t: string) => this.griot.send(t));
-    // GRIOT parle de lui-même (visite guidée…)
-    bus.on("griot:say", (t: string) => {
-      this.griot.render("assistant", t);
-      this.griot.voice.say(t);
-    });
     // pendant un appel entre joueurs, GRIOT se tait et libère le micro
     bus.on("call:active", (on: boolean) => {
       if (!on) return;
@@ -495,7 +494,7 @@ export class UI {
   menu() {
     const card = this.openModal(
       "menu",
-      `<h2 class="mt">GRIOT <small>THINK. SPEAK. RULE.</small></h2>
+      `<h2 class="mt">GRIOT <small>THINK. SPEAK. RULE. · version ${__BUILD__}</small></h2>
       <div class="menu-grid">
         <button class="btn primary" data-a="resume">▶ Reprendre</button>
         <button class="btn" data-a="missions">🏆 Missions</button>
