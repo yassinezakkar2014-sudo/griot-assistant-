@@ -624,6 +624,7 @@ export class World {
     const c = ZONES.city;
     if (G.cabin?.inside && p.distanceTo(G.player.position) < 1) return "Royal Talon — Cabine";
     if (G.airCabin?.inside && p.distanceTo(G.player.position) < 1) return "✈ Cabine de l'avion";
+    if (G.yachtCabin?.inside && p.distanceTo(G.player.position) < 1) return "🛥 Suite royale du yacht";
     if (G.space?.active && p.y > 20000) return G.space.zone(p);
     if (Math.abs(p.x - MALL.x) < MALL.w / 2 && Math.abs(p.z - MALL.z) < MALL.d / 2) return "Royal Mall";
     if (Math.hypot(p.x - ZONES.park.x, p.z - ZONES.park.z) < ZONES.park.r * 1.1) return "Île des Attractions";

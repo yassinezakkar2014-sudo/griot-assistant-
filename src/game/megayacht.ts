@@ -209,6 +209,7 @@ export class Yacht {
     G.scene.add(pier);
     G.physics.addBox({ x: -1020, y: -6, z: 516 }, { x: -840, y: yG, z: 524 }, "marina");
     G.interact.add({ id: "yacht-board", pos: V3(-1005, 1.4, 520), radius: 6, enabled: () => G.mode === "foot", label: () => "🛥️ Rejoindre le méga-yacht Étoile Royale", action: () => bus.emit("toast", { text: this.board() }) });
+    G.interact.add({ id: "yacht-suite", pos: () => this.toWorld(this.helm.clone().add(V3(60, 1, 40))), radius: 8, enabled: () => G.mode === "foot" && this.onDeck, label: () => "🛏 Entrer dans la suite royale", action: () => G.yachtCabin?.enter() });
     G.interact.add({ id: "yacht-helm", pos: () => this.toWorld(this.helm).add(V3(0, 1, 0)), radius: 8, enabled: () => G.mode === "foot" && this.onDeck, label: () => "🧭 Prendre la barre du méga-yacht", action: () => this.takeHelm() });
     G.world.markers.push({ id: "megayacht", name: "Méga-yacht Étoile Royale", pos: this.root.position, icon: "🛥", visible: () => true });
     // HUD de pilotage
@@ -222,6 +223,7 @@ export class Yacht {
       if (a === "sonic") this.setSupersonic(!this.supersonic);
       else if (a === "cloak") this.setStealth(!this.stealth);
       else if (a === "deck") this.toDeck();
+      else if (a === "cabin") G.yachtCabin?.enter();
       else if (a === "land") void this.disembark();
       else if (a === "view") this.camMode = (this.camMode + 1) % 3;
       else if (a === "voyage") this.voyagePanel();
@@ -229,6 +231,25 @@ export class Yacht {
       else if (a === "close") this.renderHud();
     };
     G.palace.updaters.push((dt, t) => this.update(dt, t));
+  }
+
+  /** Point local du yacht → monde (utilisé par la vue de la baie vitrée de la suite). */
+  localToWorld(local: THREE.Vector3) {
+    return this.toWorld(local);
+  }
+
+  /** Quitte la barre pour aller dans la suite (le yacht s'arrête). */
+  leaveHelmForCabin() {
+    this.v = 0;
+    this.voyage = null;
+    this.leaveHelm();
+  }
+
+  /** Retour de la suite : on ressort sur le pont, devant le poste de pilotage. */
+  toDeckFromCabin() {
+    this.onDeck = true;
+    bus.emit("fade");
+    G.player.teleport(this.toWorld(this.helm.clone().add(V3(0, 0.4, 30))), this.yaw);
   }
 
   private toWorld(local: THREE.Vector3) {
@@ -387,7 +408,7 @@ export class Yacht {
     const kmh = Math.abs(this.v) * 3.6;
     const mach = Math.abs(this.v) / 343;
     this.hud.innerHTML = `<div class="yh-row"><b>🛥️ Étoile Royale</b><span>${Math.round(kmh)} km/h${mach >= 1 ? ` · Mach ${mach.toFixed(1)}` : ""}</span>${this.voyage ? `<span>➜ ${this.voyage.name} · ${(this.root.position.distanceTo(this.voyage.target) / 1000).toFixed(1)} km</span>` : this.arrivedAt ? `<span>⚓ Au large de ${this.arrivedAt}</span>` : ""}</div>
-      <div class="yh-btns"><button data-y="voyage">🌍 Voyage</button><button data-y="sonic" class="${this.supersonic ? "on" : ""}">⚡ Supersonique</button><button data-y="cloak" class="${this.stealth ? "on" : ""}">👁 Furtif</button><button data-y="view">🎥 Vue</button><button data-y="deck">🚶 Pont</button><button data-y="land">🛥️ Débarquer</button></div>`;
+      <div class="yh-btns"><button data-y="voyage">🌍 Voyage</button><button data-y="sonic" class="${this.supersonic ? "on" : ""}">⚡ Supersonique</button><button data-y="cloak" class="${this.stealth ? "on" : ""}">👁 Furtif</button><button data-y="view">🎥 Vue</button><button data-y="deck">🚶 Pont</button><button data-y="cabin">🛏 Cabine</button><button data-y="land">🛥️ Débarquer</button></div>`;
   }
 
   // ---------------------------------------------------------------- mise à jour

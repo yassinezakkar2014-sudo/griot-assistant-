@@ -52,6 +52,7 @@ function list(): Act[] {
       { icon: "⚡", label: "Supersonique", key: "KeyB" },
       { icon: "👁", label: "Furtif", key: "KeyK" },
       { icon: "🎥", label: "Changer de vue", key: "KeyV" },
+      { icon: "🛏", label: "Suite royale (cabine)", fn: () => G.yachtCabin.enter() },
       { icon: "🚶", label: "Aller sur le pont", key: "KeyE" },
       { icon: "🛥", label: "Débarquer", fn: () => void G.yacht.disembark() },
       ...common

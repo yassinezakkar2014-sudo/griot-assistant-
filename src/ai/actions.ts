@@ -303,6 +303,19 @@ export async function runAction(action: string, target?: string | null): Promise
     case "cabin": {
       const c = G.cabin;
       const n = normalize(String(target ?? ""));
+      // sur le méga-yacht (ou si on parle du yacht) : la suite royale du yacht
+      if ((G.mode as string) === "boat" || G.yacht.onDeck || G.yachtCabin.inside || /yacht|bateau/.test(n)) {
+        if (n === "exit" || /sors|quitte/.test(n)) {
+          if (!G.yachtCabin.inside) return "Vous n'êtes pas dans la suite du yacht.";
+          G.yachtCabin.exit();
+          return "Vous voici sur le pont de l'Étoile Royale.";
+        }
+        if (!G.yachtCabin.inside) {
+          if ((G.mode as string) !== "boat" && !G.yacht.onDeck) G.yacht.board();
+          setTimeout(() => G.yachtCabin.enter(), (G.mode as string) === "boat" || G.yacht.onDeck ? 0 : 1200);
+        }
+        return "Bienvenue dans la suite royale du yacht : salon, bar, chambre et salle de bain, avec vue sur la mer.";
+      }
       if (n === "exit") {
         if (!c.inside) return "Vous n'êtes pas dans la cabine.";
         c.exit();

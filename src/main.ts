@@ -42,6 +42,7 @@ import { Autopilot } from "./game/autopilot";
 import { Weather, Fireworks } from "./game/weather";
 import { Traffic, Treasure, ThemePark, Races, Tour, LEISURE_PLACES } from "./game/leisure";
 import { Yacht } from "./game/megayacht";
+import { YachtCabin } from "./game/yachtcabin";
 import { buildLandmarks } from "./world/landmarks";
 import { Realism } from "./engine/realism";
 import { EmoteWheel } from "./ui/emotes";
@@ -229,6 +230,8 @@ async function boot() {
   G.park.build();
   G.yacht = new Yacht();
   G.yacht.build();
+  G.yachtCabin = new YachtCabin();
+  G.yachtCabin.build();
   G.races = new Races();
   G.races.build();
   G.tour = new Tour();
