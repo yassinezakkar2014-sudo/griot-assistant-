@@ -24,7 +24,11 @@ const PALETTES: Record<CountryDef["style"], Pal> = {
   crystal: { wall: [0xb8c8f0, 0xd0b8f0, 0xa8e0f0], roof: 0xffffff, accent: 0x8a5cff, glow: 0x9fd8ff },
   redhills: { wall: [0xb5653e, 0xa4552f, 0xc4774c], roof: 0x8a3a22, accent: 0xf1c40f, glow: 0xffa04a },
   savanna: { wall: [0xb8865a, 0xa8764a, 0xc8966a], roof: 0xc8a050, accent: 0x1f6b4a, glow: 0xffb050 },
-  royal: { wall: [0xf6f2ec, 0xf4d8e0, 0xe8f0f6], roof: 0xd86a9a, accent: 0xd8b25a, glow: 0xffc8e0 }
+  royal: { wall: [0xf6f2ec, 0xf4d8e0, 0xe8f0f6], roof: 0xd86a9a, accent: 0xd8b25a, glow: 0xffc8e0 },
+  paris: { wall: [0xe8dcc4, 0xddd0b4, 0xf0e6d2], roof: 0x4a5566, accent: 0x1f3f8f, glow: 0xffd28a },
+  seoul: { wall: [0x2a3446, 0x3a4a62, 0x9aa8bc], roof: 0x1a2230, accent: 0xd0283a, glow: 0x5fd0ff },
+  alps: { wall: [0x7a5232, 0x8a6240, 0xf2eee6], roof: 0x5a3a24, accent: 0xd0202a, glow: 0xffd28a },
+  santorin: { wall: [0xffffff, 0xfafafa, 0xf4f6f8], roof: 0x1f5fd0, accent: 0x1f5fd0, glow: 0x7fd8ff }
 };
 
 export interface CountryInfo {
@@ -315,13 +319,18 @@ function buildCountry(c: CountryDef): CountryInfo {
     if (Math.hypot(x - plaza.x, z - plaza.z) < 40) continue;
     if (Math.hypot(x - (cx + 120), z - (cz + 120)) < 55) continue; // aire d'atterrissage
     if (inAirport(x, z)) continue;
-    const big = c.style === "crystal" ? rnd() < 0.35 : rnd() < 0.06;
+    if (c.keep?.some(([dx, dz, rr]) => Math.hypot(x - (cx + dx), z - (cz + dz)) < rr + 12)) continue;
+    const big = c.style === "crystal" || c.style === "seoul" ? rnd() < 0.35 : rnd() < 0.06;
     const w = big ? 14 + rnd() * 10 : 7 + rnd() * 8,
       d = big ? 14 + rnd() * 10 : 7 + rnd() * 8;
     if (houses.some((h) => Math.abs(h.x - x) < (h.w + w) / 2 + 4 && Math.abs(h.z - z) < (h.d + d) / 2 + 4)) continue;
     const y = ground(x, z);
     if (y < 0.5) continue;
-    const h = c.style === "crystal" ? (big ? 50 + rnd() * 110 : 14 + rnd() * 26) : big ? 16 + rnd() * 14 : 4.5 + rnd() * 5;
+    const h =
+      c.style === "crystal" ? (big ? 50 + rnd() * 110 : 14 + rnd() * 26)
+      : c.style === "seoul" ? (big ? 70 + rnd() * 180 : 18 + rnd() * 30)
+      : c.style === "paris" ? 17 + rnd() * 6
+      : big ? 16 + rnd() * 14 : 4.5 + rnd() * 5;
     houses.push({ x, z, w, d, h, y, c: Math.floor(rnd() * 3) });
   }
   const m4 = new THREE.Matrix4();
@@ -343,9 +352,10 @@ function buildCountry(c: CountryDef): CountryInfo {
   // toits selon le style
   let roofGeo: THREE.BufferGeometry | null = null;
   let roofKind: "cone" | "dome" | "eave" | "spike" | null = null;
-  if (c.style === "snow" || c.style === "forest") (roofGeo = new THREE.ConeGeometry(0.75, 1, 4).rotateY(Math.PI / 4)), (roofKind = "cone");
+  if (c.style === "paris") (roofGeo = new THREE.CylinderGeometry(0.42, 0.62, 1, 4).rotateY(Math.PI / 4)), (roofKind = "cone");
+  else if (c.style === "snow" || c.style === "forest" || c.style === "alps") (roofGeo = new THREE.ConeGeometry(0.75, 1, 4).rotateY(Math.PI / 4)), (roofKind = "cone");
   else if (c.style === "savanna") (roofGeo = new THREE.ConeGeometry(0.7, 1, 16)), (roofKind = "cone");
-  else if (c.style === "ocean" || c.style === "desert" || c.style === "royal") (roofGeo = new THREE.SphereGeometry(0.5, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2)), (roofKind = "dome");
+  else if (c.style === "ocean" || c.style === "desert" || c.style === "royal" || c.style === "santorin") (roofGeo = new THREE.SphereGeometry(0.5, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2)), (roofKind = "dome");
   else if (c.style === "jade") (roofGeo = new THREE.BoxGeometry(1, 1, 1)), (roofKind = "eave");
   else if (c.style === "crystal") (roofGeo = new THREE.ConeGeometry(0.6, 1, 6)), (roofKind = "spike");
   if (roofGeo) {

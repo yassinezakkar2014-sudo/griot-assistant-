@@ -40,7 +40,10 @@ import { buildHighway, buildRoyalTowers } from "./world/expansion";
 import { CarSystem } from "./game/car";
 import { Autopilot } from "./game/autopilot";
 import { Weather, Fireworks } from "./game/weather";
-import { Traffic, Treasure, ThemePark, Yacht, Races, Tour, LEISURE_PLACES } from "./game/leisure";
+import { Traffic, Treasure, ThemePark, Races, Tour, LEISURE_PLACES } from "./game/leisure";
+import { Yacht } from "./game/megayacht";
+import { buildLandmarks } from "./world/landmarks";
+import { EmoteWheel } from "./ui/emotes";
 import { ImperialGarage, buildPortals } from "./game/garage";
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -138,6 +141,7 @@ async function boot() {
   progress(0.965, "Les pays du grand monde");
   await new Promise((r) => setTimeout(r, 0));
   const countryList = buildCountries();
+  buildLandmarks();
   buildMSPalace();
   G.imperial = new ImperialPalace();
   G.imperial.build();
@@ -220,6 +224,8 @@ async function boot() {
   G.races.build();
   G.tour = new Tour();
   G.tour.build();
+  G.emotes = new EmoteWheel();
+  G.emotes.build();
   PLACES.push({ id: "park", name: "l'Île des Attractions", pos: () => LEISURE_PLACES.park(), outdoor: true });
   PLACES.push({ id: "marina", name: "la marina royale", pos: () => LEISURE_PLACES.marina(), outdoor: true });
   G.armor = new ArmorSystem();

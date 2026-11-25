@@ -457,146 +457,6 @@ export class ThemePark {
   }
 }
 
-// ====================================================================== YACHT ROYAL
-export class Yacht {
-  root = new THREE.Group();
-  active = false;
-  private yaw = Math.PI / 2; // nez vers l'ouest
-  private v = 0;
-  private camPos = V3();
-  readonly marina = V3(-1050, SEA, 500);
-  private docks: THREE.Vector3[] = [];
-
-  build() {
-    const white = new THREE.MeshStandardMaterial({ color: 0xf8f9fb, metalness: 0.2, roughness: 0.25 });
-    const navy = new THREE.MeshStandardMaterial({ color: 0x0b1a3c, metalness: 0.4, roughness: 0.3 });
-    const glass = new THREE.MeshStandardMaterial({ color: 0x0a1424, metalness: 0.8, roughness: 0.05 });
-    // coque : profil effilé extrudé
-    const sh = new THREE.Shape();
-    sh.moveTo(0, -16);
-    sh.quadraticCurveTo(4.2, -8, 4.2, 4);
-    sh.lineTo(3.8, 16);
-    sh.lineTo(-3.8, 16);
-    sh.lineTo(-4.2, 4);
-    sh.quadraticCurveTo(-4.2, -8, 0, -16);
-    const hull = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 3.2, bevelEnabled: true, bevelSize: 0.4, bevelThickness: 0.4, bevelSegments: 3 }), white);
-    hull.rotation.x = Math.PI / 2;
-    hull.position.y = 2.6;
-    const stripe = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.6, bevelEnabled: false }), navy);
-    stripe.rotation.x = Math.PI / 2;
-    stripe.position.y = 0.2;
-    stripe.scale.set(1.03, 1.01, 1);
-    const deck = new THREE.Mesh(new THREE.BoxGeometry(7, 0.3, 26), mat.wood);
-    deck.position.set(0, 2.7, 1.5);
-    const cabin = new THREE.Mesh(new THREE.BoxGeometry(6, 2.6, 12), white);
-    cabin.position.set(0, 4.1, 3);
-    const win = new THREE.Mesh(new THREE.BoxGeometry(6.1, 1, 11), glass);
-    win.position.set(0, 4.3, 3);
-    const top = new THREE.Mesh(new THREE.BoxGeometry(5, 2, 7), white);
-    top.position.set(0, 6.4, 4);
-    const topWin = new THREE.Mesh(new THREE.BoxGeometry(5.1, 0.8, 6.5), glass);
-    topWin.position.set(0, 6.6, 4);
-    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 5, 8), mat.gold);
-    mast.position.set(0, 9.5, 5);
-    const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1), new THREE.MeshStandardMaterial({ color: 0xd8b25a, side: THREE.DoubleSide, emissive: 0x332200 }));
-    flag.position.set(0.8, 11.4, 5);
-    const name = label("♛ ROYAL", 6, 1.2, "#d8b25a", "#f8f9fb");
-    name.position.set(4.25, 1.8, -4);
-    name.rotation.y = Math.PI / 2;
-    this.root.add(hull, stripe, deck, cabin, win, top, topWin, mast, flag, name);
-    this.root.traverse((o) => ((o as THREE.Mesh).isMesh ? ((o as THREE.Mesh).castShadow = true) : null));
-    G.scene.add(this.root);
-    // marina : ponton + quai
-    const yG = 1;
-    const pier = new THREE.Mesh(new THREE.BoxGeometry(180, 1, 8), mat.wood);
-    pier.position.set(-930, yG - 0.4, 520);
-    G.scene.add(pier);
-    G.physics.addBox({ x: -1020, y: -6, z: 516 }, { x: -840, y: yG, z: 524 }, "marina");
-    const sign = label("⛵ MARINA ROYALE", 16, 2.6);
-    sign.position.set(-850, 6, 520);
-    sign.rotation.y = Math.PI / 2;
-    G.scene.add(sign);
-    for (const dx of [0, 40, 80, 120]) {
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 4, 8), mat.gold);
-      post.position.set(-1010 + dx, 1.5, 524.5);
-      G.scene.add(post);
-    }
-    this.root.position.copy(this.marina);
-    this.root.rotation.y = this.yaw;
-    this.docks = [V3(-1000, 1.2, 520), G.park ? G.park.pier.clone() : V3()];
-    G.interact.add({ id: "yacht-board", pos: V3(-1005, 1.4, 520), radius: 6, enabled: () => G.mode === "foot", label: () => "⛵ Piloter le yacht royal", action: () => this.board() });
-    G.world.markers.push({ id: "marina", name: "Marina royale (yacht)", pos: V3(-930, 0, 520), icon: "⛵", visible: () => true });
-    G.palace.updaters.push((dt, t) => this.update(dt, t));
-  }
-
-  board() {
-    if (G.mode !== "foot") return "Descendez d'abord du véhicule.";
-    // le yacht vient se mettre à quai s'il est loin
-    const near = this.docks.reduce((a, b) => (a.distanceTo(G.player.position) < b.distanceTo(G.player.position) ? a : b));
-    if (this.root.position.distanceTo(near) > 90) {
-      const dock = near === this.docks[0] ? this.marina.clone() : near.clone().add(V3(40, 0, 0)).setY(SEA);
-      this.root.position.copy(dock);
-    }
-    this.active = true;
-    this.v = 0;
-    G.mode = "boat" as any;
-    this.camPos.copy(G.camera.position);
-    G.audio.unlock();
-    G.audio.setEngine(0.05);
-    bus.emit("mode");
-    bus.emit("toast", { text: "⛵ Yacht royal — W/S gaz · A/D barre · F descendre (près d'un quai). L'Île des Attractions est au nord-ouest !" });
-    return "Le yacht royal est à vous, Majesté. Cap sur l'Île des Attractions au nord-ouest !";
-  }
-
-  exit() {
-    const p = this.root.position;
-    const dock = this.docks.find((d) => d.distanceTo(V3(p.x, d.y, p.z)) < 110);
-    if (!dock) return bus.emit("toast", { text: "Approchez d'un quai pour descendre (marina royale ou ponton de l'Île des Attractions).", kind: "warn" });
-    this.active = false;
-    this.v = 0;
-    G.audio.setEngine(null);
-    G.mode = "foot";
-    G.player.teleport(dock.clone(), G.player.yaw);
-    bus.emit("mode");
-  }
-
-  private update(dt: number, t: number) {
-    const r = this.root;
-    const bob = Math.sin(t * 1.3) * 0.15;
-    if (!this.active) {
-      r.position.y = SEA + bob;
-      r.rotation.z = Math.sin(t * 0.9) * 0.02;
-      return;
-    }
-    const inp = G.input;
-    if (inp.hit("KeyF")) return this.exit();
-    const thr = inp.axis(["KeyS", "ArrowDown"], ["KeyW", "ArrowUp"]) - inp.touchMove.y;
-    const steer = inp.axis(["KeyD", "ArrowRight"], ["KeyA", "ArrowLeft"]) - inp.touchMove.x;
-    this.v += thr * (thr > 0 ? 7 : 10) * dt;
-    this.v -= this.v * 0.25 * dt;
-    this.v = clamp(this.v, -5, inp.down("ShiftLeft", "ShiftRight", "TouchRun") ? 34 : 24);
-    this.yaw += steer * dt * 0.5 * clamp(Math.abs(this.v) / 8, 0.2, 1) * Math.sign(this.v || 1);
-    const fwd = V3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
-    const next = r.position.clone().addScaledVector(fwd, this.v * dt);
-    const bow = next.clone().addScaledVector(fwd, 16 * Math.sign(this.v || 1));
-    if (G.physics.terrain(bow.x, bow.z) > SEA - 1.2) {
-      this.v *= -0.3;
-      bus.emit("shake", 0.3);
-    } else r.position.copy(next);
-    r.position.y = SEA + bob + Math.abs(this.v) * 0.01;
-    r.rotation.set(-Math.abs(this.v) * 0.004, this.yaw, -steer * this.v * 0.004, "YXZ");
-    G.player.position.copy(r.position).setY(r.position.y + 3);
-    G.audio.setEngine(0.05 + Math.min(1, Math.abs(this.v) / 30) * 0.7);
-    // caméra de poursuite
-    const look = inp.consumeMouse();
-    void look;
-    const want = r.position.clone().addScaledVector(fwd, -34).add(V3(0, 12, 0));
-    this.camPos.lerp(want, 1 - Math.exp(-dt * 3));
-    G.camera.position.copy(this.camPos);
-    G.camera.lookAt(r.position.clone().add(V3(0, 4, 0)).addScaledVector(fwd, 10));
-  }
-}
-
 // ====================================================================== COURSES CONTRE LA MONTRE
 interface Course {
   id: string;
@@ -621,11 +481,15 @@ export class Races {
       const a = (k / 14) * Math.PI * 2;
       sky.push(V3(900 + Math.cos(a) * 1300, 160 + Math.sin(a * 3) * 90 + 60, Math.sin(a) * 1300));
     }
-    const sea: THREE.Vector3[] = [V3(-1080, SEA + 4, 520), V3(-1300, SEA + 4, 700), V3(-1250, SEA + 4, 1000), V3(-1150, SEA + 4, 1300), V3(-1300, SEA + 4, 1800), V3(-1800, SEA + 4, 1850), V3(-1950, SEA + 4, 1400), V3(-1800, SEA + 4, 950), V3(-1500, SEA + 4, 1000), V3(-1180, SEA + 4, 1400)];
+    const sea: THREE.Vector3[] = [];
+    for (let k = 0; k < 10; k++) {
+      const a = (k / 10) * Math.PI * 2;
+      sea.push(V3(-7500 + Math.cos(a) * 3600, SEA + 140, 3400 + Math.sin(a) * 3600));
+    }
     this.courses = [
       { id: "route", name: "Course de la Route impériale", pts: road, radius: 14, modes: ["car", "foot"] },
       { id: "ciel", name: "Anneaux du ciel (Royal Talon)", pts: sky, radius: 30, modes: ["ship"] },
-      { id: "mer", name: "Régate royale (yacht)", pts: sea, radius: 30, modes: ["boat"] }
+      { id: "mer", name: "Régate royale (méga-yacht)", pts: sea, radius: 380, modes: ["boat"] }
     ];
     G.scene.add(this.group);
     this.hud = document.createElement("div");
@@ -644,7 +508,7 @@ export class Races {
     if (!c) return `Courses : ${this.courses.map((x) => x.name).join(", ")}.`;
     this.stop();
     if (id === "ciel" && G.mode !== "ship") return "Montez d'abord dans le Royal Talon, puis dites « course aérienne ».";
-    if (id === "mer" && G.mode !== "boat") return "Montez d'abord sur le yacht royal (marina royale), puis dites « régate ».";
+    if (id === "mer" && G.mode !== "boat") return "Prenez d'abord la barre du méga-yacht (dites « yacht »), puis « régate ».";
     if (id === "route" && G.mode === "foot") G.player.teleport(V3(0, groundY(0, 360) + 0.3, 360), Math.PI);
     if (id === "route" && G.mode === "car" && G.cars.active) {
       const car = G.cars.active;

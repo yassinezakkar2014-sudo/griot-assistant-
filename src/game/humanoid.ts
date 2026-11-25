@@ -297,6 +297,119 @@ export class Humanoid {
     this.hips.position.y = 0.95 + Math.abs(Math.cos(this.phase)) * amp * 0.05;
   }
 
+  /** EMOTES : salut, danse, applaudir, révérence, victoire, salut militaire, muscles, rire. t = temps écoulé. */
+  emote(id: string, t: number) {
+    const A = this.armL,
+      R = this.armR;
+    const s = Math.sin(t * 6);
+    this.legL.upper.rotation.x = this.legR.upper.rotation.x = 0;
+    this.legL.lower.rotation.x = this.legR.lower.rotation.x = 0;
+    this.torso.rotation.set(0, 0, 0);
+    this.head.rotation.set(0, 0, 0);
+    this.hips.position.y = 0.95;
+    A.upper.rotation.set(0, 0, 0.08);
+    R.upper.rotation.set(0, 0, -0.08);
+    A.lower.rotation.x = R.lower.rotation.x = 0.2;
+    switch (id) {
+      case "wave":
+        R.upper.rotation.set(0, 0, -2.6);
+        R.lower.rotation.x = 0;
+        R.lower.rotation.z = Math.sin(t * 9) * 0.5;
+        this.head.rotation.z = 0.08;
+        break;
+      case "dance": {
+        const b = Math.sin(t * 7);
+        this.hips.position.y = 0.92 + Math.abs(b) * 0.06;
+        this.torso.rotation.y = b * 0.35;
+        this.torso.rotation.z = Math.sin(t * 3.5) * 0.12;
+        A.upper.rotation.set(-1.2 + b * 0.6, 0, 0.6);
+        R.upper.rotation.set(-1.2 - b * 0.6, 0, -0.6);
+        A.lower.rotation.x = R.lower.rotation.x = 1.2;
+        this.legL.upper.rotation.x = Math.max(0, b) * 0.6;
+        this.legR.upper.rotation.x = Math.max(0, -b) * 0.6;
+        this.legL.lower.rotation.x = -Math.max(0, b) * 0.8;
+        this.legR.lower.rotation.x = -Math.max(0, -b) * 0.8;
+        this.head.rotation.z = Math.sin(t * 7) * 0.1;
+        break;
+      }
+      case "clap": {
+        const c = Math.abs(Math.sin(t * 8));
+        A.upper.rotation.set(-1.25, 0, -0.3 + c * 0.35);
+        R.upper.rotation.set(-1.25, 0, 0.3 - c * 0.35);
+        A.lower.rotation.x = R.lower.rotation.x = 0.35;
+        break;
+      }
+      case "bow":
+        this.torso.rotation.x = 0.7 * Math.min(1, t * 2);
+        this.head.rotation.x = 0.2;
+        R.upper.rotation.set(-0.6, 0, -0.2);
+        R.lower.rotation.x = 1.4;
+        A.upper.rotation.set(0.5, 0, 0.1);
+        break;
+      case "victory":
+        A.upper.rotation.set(0, 0, 2.7 + s * 0.1);
+        R.upper.rotation.set(0, 0, -2.7 - s * 0.1);
+        A.lower.rotation.x = R.lower.rotation.x = 0;
+        this.hips.position.y = 0.95 + Math.max(0, Math.sin(t * 5)) * 0.12;
+        break;
+      case "salute":
+        R.upper.rotation.set(-1.4, 0, -1.1);
+        R.lower.rotation.x = 2.1;
+        this.head.rotation.x = -0.05;
+        break;
+      case "flex":
+        A.upper.rotation.set(0, 0, 1.55);
+        R.upper.rotation.set(0, 0, -1.55);
+        A.lower.rotation.x = R.lower.rotation.x = 0;
+        A.lower.rotation.z = 1.6 + s * 0.15;
+        R.lower.rotation.z = -1.6 - s * 0.15;
+        this.torso.rotation.y = Math.sin(t * 2) * 0.25;
+        break;
+      case "laugh":
+        this.torso.rotation.x = -0.15 + Math.abs(Math.sin(t * 10)) * 0.2;
+        this.head.rotation.x = -0.25;
+        A.upper.rotation.set(-0.6, 0, 0.2);
+        R.upper.rotation.set(-0.6, 0, -0.2);
+        A.lower.rotation.x = R.lower.rotation.x = 1.6;
+        break;
+    }
+  }
+
+  /** Remet les membres à zéro après une emote. */
+  clearEmote() {
+    this.torso.rotation.set(0, 0, 0);
+    this.head.rotation.set(0, 0, 0);
+    for (const l of [this.armL, this.armR]) l.lower.rotation.z = 0;
+  }
+
+  /** Bulle emoji au-dessus de la tête. */
+  bubble(emoji: string) {
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = 128;
+    const c = cv.getContext("2d")!;
+    c.font = "96px serif";
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    c.fillText(emoji, 64, 70);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false }));
+    sp.scale.setScalar(0.6);
+    sp.position.y = 2.15;
+    this.root.add(sp);
+    const t0 = performance.now();
+    const tick = () => {
+      const k = (performance.now() - t0) / 2500;
+      sp.position.y = 2.15 + k * 0.5;
+      sp.material.opacity = 1 - k;
+      if (k < 1) requestAnimationFrame(tick);
+      else {
+        this.root.remove(sp);
+        sp.material.map?.dispose();
+        sp.material.dispose();
+      }
+    };
+    requestAnimationFrame(tick);
+  }
+
   /** Pose d'exposition (mannequin). */
   pose() {
     this.armL.upper.rotation.z = 0.25;

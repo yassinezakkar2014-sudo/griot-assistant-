@@ -1,6 +1,7 @@
 // MULTIJOUEUR — chaque joueur voit les autres (à pied, en armure ou en Royal Talon) et peut leur écrire.
 // Transport : salle temps réel de Claude quand la page est ouverte dans claude.ai,
 // sinon relais public MQTT sur WebSocket sécurisé (site web, iPad compris).
+import { EMOTES } from "../ui/emotes";
 import * as THREE from "three";
 import { G, bus } from "../core";
 import { Humanoid, DEFAULT_LOOK, type Look } from "../game/humanoid";
@@ -38,6 +39,8 @@ export interface NetState {
   sp?: string;
   /** décoration du palais (envoyée régulièrement ; la plus récente gagne) */
   dk?: { v: number; t: string; i: [any, number, number, number, number][] };
+  /** emote en cours : [id, horodatage] */
+  em?: [string, number];
 }
 
 /** Portes synchronisées entre joueurs (barrières, portails, grandes portes). */
@@ -64,6 +67,7 @@ class Remote {
   car: string | null = null;
   interactAdded = false;
   private prev = new THREE.Vector3();
+  private lastEmote = 0;
   private lightMat = new THREE.MeshStandardMaterial({ color: 0x050810, emissive: 0x3fc8ff, emissiveIntensity: 2 });
   private glowMat = new THREE.MeshStandardMaterial({ color: 0, emissive: 0x2a9dff, emissiveIntensity: 3 });
 
@@ -209,6 +213,17 @@ class Remote {
     this.body.root.rotation.y += d * Math.min(1, dt * 10);
     const speed = this.prev.distanceTo(this.body.root.position) / Math.max(dt, 1e-3);
     this.body.animate(dt, Math.min(speed, 9), false, st.m === "sit");
+    if (st.em && speed < 0.6) {
+      const et = (Date.now() - st.em[1]) / 1000;
+      if (et >= 0 && et < (st.em[0] === "dance" ? 30 : 5)) {
+        if (this.lastEmote !== st.em[1]) {
+          this.lastEmote = st.em[1];
+          const e = EMOTES.find((x) => x.id === st.em![0]);
+          if (e) this.body.bubble(e.emoji);
+        }
+        this.body.emote(st.em[0], et);
+      }
+    }
     if (st.s) {
       this.shipGroup.position.lerp(this.shipTarget, 1 - Math.exp(-dt * 8));
       if (this.shipGroup.position.distanceTo(this.shipTarget) > 200) this.shipGroup.position.copy(this.shipTarget);
@@ -490,7 +505,8 @@ export class Multiplayer {
       ...(G.deco.version && performance.now() - this.decoSent > 3000 ? ((this.decoSent = performance.now()), { dk: G.deco.compact() }) : {}),
       s: shipOut ? [r2(sh.root.position.x), r2(sh.root.position.y), r2(sh.root.position.z), r2(sh.root.quaternion.x), r2(sh.root.quaternion.y), r2(sh.root.quaternion.z), r2(sh.root.quaternion.w), sh.engines ? r2(sh.throttle) : 0, sh.stealth ? 1 : 0, sh.opts.small ? 1 : 0] : 0,
       z: G.world.zoneName(G.mode === "ship" ? sh.root.position : pl.position),
-      ...(this.lastSay ? { say: this.lastSay } : {})
+      ...(this.lastSay ? { say: this.lastSay } : {}),
+      ...(G.player.emoteState ? { em: [G.player.emoteState.id, Date.now() - Math.round(performance.now() - G.player.emoteState.t0)] as [string, number] } : {})
     };
   }
 

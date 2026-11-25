@@ -557,3 +557,16 @@ body[data-mode="ship"] .keys-help { font-size: 11px; }
 .admin-badge { position: fixed; left: 50%; top: 8px; transform: translateX(-50%); z-index: 70; padding: 4px 12px; border-radius: 999px; background: rgba(10,16,30,.8); border: 1px solid rgba(255,214,122,.5); color: #ffd27a; font: 600 12px Manrope, system-ui, sans-serif; cursor: pointer; }
 .race-hud { position: fixed; left: 50%; top: 64px; transform: translateX(-50%); z-index: 60; display: flex; gap: 14px; align-items: center; padding: 8px 16px; border-radius: 14px; background: rgba(6,14,28,.82); border: 1px solid rgba(255,210,59,.5); color: #fff2c8; font: 600 14px Manrope, system-ui, sans-serif; }
 .race-hud span { font-variant-numeric: tabular-nums; }
+/* emotes */
+.emote-wheel { position: fixed; left: 50%; top: 50%; width: 320px; height: 320px; transform: translate(-50%,-50%); z-index: 75; border-radius: 50%; background: radial-gradient(circle, rgba(8,14,28,.55) 0 30%, rgba(8,14,28,.85) 31%); border: 1px solid rgba(255,214,122,.45); }
+.emote-wheel button { position: absolute; left: 50%; top: 50%; width: 82px; height: 70px; margin: -35px 0 0 -41px; transform: rotate(var(--a)) translateY(-118px) rotate(calc(-1 * var(--a))); border: 0; border-radius: 16px; background: rgba(255,255,255,.08); color: #f4ecd8; cursor: pointer; display: grid; place-items: center; font: 600 11px Manrope, system-ui, sans-serif; }
+.emote-wheel button span { font-size: 28px; line-height: 1; }
+.emote-wheel button:hover { background: rgba(255,214,122,.25); }
+.emote-wheel .em-close { transform: none; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; font-size: 18px; }
+/* méga-yacht */
+.yacht-hud { position: fixed; left: 50%; bottom: max(18px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 60; padding: 10px 14px; border-radius: 16px; background: rgba(6,14,28,.85); border: 1px solid rgba(255,214,122,.45); color: #f4ecd8; font: 600 13px Manrope, system-ui, sans-serif; display: grid; gap: 8px; width: min(94vw, 640px); }
+.yacht-hud .yh-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+.yacht-hud .yh-btns, .yacht-hud .yh-grid { display: flex; gap: 6px; flex-wrap: wrap; }
+.yacht-hud button { padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.07); color: inherit; cursor: pointer; font: inherit; }
+.yacht-hud button.on { background: linear-gradient(90deg,#d8b25a,#ffdf8a); color: #1a1406; }
+.yacht-hud .yh-title { color: #ffd27a; }

@@ -1,7 +1,7 @@
 // Les pays du grand monde (noms et styles originaux). Données pures : utilisées par le terrain
 // (continents, couleurs du sol) et par le constructeur des pays (palais, villes).
 
-export type CountryStyle = "desert" | "snow" | "jade" | "ocean" | "volcano" | "forest" | "pyramid" | "crystal" | "redhills" | "savanna" | "royal";
+export type CountryStyle = "desert" | "snow" | "jade" | "ocean" | "volcano" | "forest" | "pyramid" | "crystal" | "redhills" | "savanna" | "royal" | "paris" | "seoul" | "alps" | "santorin";
 
 export interface CountryDef {
   id: string;
@@ -20,6 +20,8 @@ export interface CountryDef {
   desc: string;
   /** rayon laissé libre au centre (grand palais sur mesure) */
   clear?: number;
+  /** zones sans maisons (monuments) : [dx, dz, rayon] */
+  keep?: [number, number, number][];
 }
 
 /** Côté de la carte du grand monde (m). Le cœur du royaume (8 km) est au centre. */
@@ -47,6 +49,11 @@ export const COUNTRIES: CountryDef[] = [
   { id: "lumina", name: "Lumina", x: 10000, z: 25500, r: 3000, style: "crystal", base: 6, hills: 70, ground: [0.66, 0.64, 0.8], desc: "capitale de lumière et de cristal" },
   { id: "rubis", name: "Rubis", x: -20500, z: -21000, r: 3100, style: "redhills", base: 8, hills: 180, ground: [0.6, 0.22, 0.14], desc: "canyons rouges et citadelles" },
   { id: "princesses", name: "Cité des Princesses", x: 7000, z: -15500, r: 2400, style: "royal", base: 8, hills: 70, ground: [0.34, 0.6, 0.3], desc: "la grande cité royale et le Palais des Princesses", clear: 240 },
+  // ---- villes et pays inspirés du monde réel
+  { id: "paris", name: "Paris", x: -6000, z: -20000, r: 2600, style: "paris", base: 8, hills: 25, ground: [0.42, 0.56, 0.3], desc: "ville lumière : tour de fer, arc de triomphe, pyramide de verre, quais de la Seine", keep: [[-320, 260, 120], [300, -300, 50], [-300, -330, 60]] },
+  { id: "seoul", name: "Séoul", x: 18000, z: 6000, r: 2600, style: "seoul", base: 8, hills: 70, ground: [0.32, 0.5, 0.3], desc: "gratte-ciel lumineux, tour sur la colline, porte du palais, fleuve et ponts", keep: [[380, 300, 110], [-320, -300, 70]] },
+  { id: "suisse", name: "Suisse", x: -17000, z: 9000, r: 2800, style: "alps", base: 10, hills: 90, ground: [0.3, 0.55, 0.28], desc: "Alpes enneigées, chalets, lac bleu, grand sommet pyramidal et téléphérique", keep: [[-360, 320, 140]] },
+  { id: "santorin", name: "Santorin", x: -3000, z: 19000, r: 2200, style: "santorin", base: 70, hills: 30, ground: [0.72, 0.62, 0.46], desc: "île grecque : maisons blanches, dômes bleus, moulins, falaises et coucher de soleil", keep: [[300, 260, 60], [-280, 300, 50]] },
   { id: "zambara", name: "Zambara", x: 13000, z: -25500, r: 3000, style: "savanna", base: 6, hills: 55, ground: [0.66, 0.54, 0.26], desc: "grandes plaines et villages royaux" }
 ];
 

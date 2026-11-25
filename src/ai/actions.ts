@@ -438,14 +438,27 @@ export async function runAction(action: string, target?: string | null): Promise
       const n = String(target ?? "start");
       return n === "hint" ? G.treasure.hint() : n === "reset" ? G.treasure.reset() : G.treasure.start();
     }
-    case "yacht":
-      if (G.mode === "boat") return "Vous êtes déjà à la barre du yacht.";
-      if (G.mode !== "foot") return "Descendez d'abord du véhicule.";
-      if (G.player.position.distanceTo(new THREE.Vector3(-1000, 1, 520)) > 150 && G.player.position.distanceTo(G.park.pier) > 150) {
-        bus.emit("fade");
-        G.player.teleport(new THREE.Vector3(-1000, 1.3, 520), Math.PI / 2);
+    case "yacht": {
+      const n = String(target ?? "");
+      if (n.startsWith("voyage:")) return G.yacht.voyageTo(n.slice(7));
+      if (n === "stealth" || n === "sonic") {
+        if (!G.yacht.active) return "Prenez d'abord la barre du méga-yacht (dites « yacht »).";
+        if (n === "stealth") G.yacht.setStealth(!G.yacht.stealth);
+        else G.yacht.setSupersonic(!G.yacht.supersonic);
+        return n === "stealth" ? (G.yacht.stealth ? "L'Étoile Royale devient invisible." : "L'Étoile Royale est de nouveau visible.") : G.yacht.supersonic ? "Supersonique enclenché !" : "Retour en vitesse de croisière.";
       }
       return G.yacht.board();
+    }
+    case "emote": {
+      const id = String(target ?? "dance");
+      if (G.mode !== "foot") return "Les emotes se font à pied.";
+      if (id === "menu") {
+        bus.emit("ui:emotes");
+        return "Choisissez une emote.";
+      }
+      G.player.emote(id);
+      return ({ wave: "Coucou !", dance: "Que la fête commence !", clap: "Bravo !", bow: "Votre Majesté salue.", victory: "Victoire !", salute: "Garde à vous !", flex: "Quelle force !", laugh: "Ha ha ha !" } as Record<string, string>)[id] ?? "Emote !";
+    }
     case "race": {
       const n = String(target ?? "route");
       if (n === "stop") {
