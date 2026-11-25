@@ -45,6 +45,8 @@ import { Yacht } from "./game/megayacht";
 import { buildLandmarks } from "./world/landmarks";
 import { Realism } from "./engine/realism";
 import { EmoteWheel } from "./ui/emotes";
+import { ActionMenu } from "./ui/actions";
+import { Gamepads } from "./engine/gamepad";
 import { ImperialGarage, buildPortals } from "./game/garage";
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -62,7 +64,10 @@ const progress = (p: number, label: string) => {
 G.mobile = matchMedia("(pointer: coarse)").matches || (navigator.maxTouchPoints > 1 && /Macintosh|iPad|iPhone|Android/.test(navigator.userAgent));
 if (G.mobile) document.documentElement.classList.add("touch");
 // v2 : graphismes plus réalistes aussi sur iPad (ombres, bloom, meilleure résolution)
-const settings = { v: 2, bloom: true, shadows: true, pixelRatio: G.mobile ? 0.8 : 1, ao: false };
+// téléphone (petit écran) : réglages allégés pour rester fluide ; iPad : qualité élevée
+const phone = G.mobile && Math.min(screen.width, screen.height) < 600;
+if (phone) document.documentElement.classList.add("phone");
+const settings = { v: 2, bloom: !phone, shadows: !phone, pixelRatio: phone ? 0.7 : G.mobile ? 0.8 : 1, ao: false };
 try {
   const saved = JSON.parse(localStorage.getItem("griot-gfx") || "{}");
   if (saved.v === 2) Object.assign(settings, saved);
@@ -230,6 +235,9 @@ async function boot() {
   G.tour.build();
   G.emotes = new EmoteWheel();
   G.emotes.build();
+  G.actions = new ActionMenu();
+  G.actions.build();
+  G.gamepad = new Gamepads();
   new Realism().build(renderer);
   PLACES.push({ id: "park", name: "l'Île des Attractions", pos: () => LEISURE_PLACES.park(), outdoor: true });
   PLACES.push({ id: "marina", name: "la marina royale", pos: () => LEISURE_PLACES.marina(), outdoor: true });
@@ -381,6 +389,7 @@ async function boot() {
     const dt = Math.min(raw, 0.05);
     G.time += dt;
     const t = G.time;
+    G.gamepad?.poll(dt);
     G.env.update(dt);
     G.palace.update(dt, t);
     G.physics.update();

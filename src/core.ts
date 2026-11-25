@@ -19,6 +19,8 @@ import type { Weather, Fireworks } from "./game/weather";
 import type { Traffic, Treasure, ThemePark, Races, Tour } from "./game/leisure";
 import type { Yacht } from "./game/megayacht";
 import type { EmoteWheel } from "./ui/emotes";
+import type { ActionMenu } from "./ui/actions";
+import type { Gamepads } from "./engine/gamepad";
 import type { ImperialGarage } from "./game/garage";
 import type { AntiAir } from "./world/antiair";
 import type { Passenger } from "./net/passenger";
@@ -60,6 +62,8 @@ export interface GameContext {
   park: ThemePark;
   yacht: Yacht;
   emotes: EmoteWheel;
+  actions: ActionMenu;
+  gamepad: Gamepads;
   races: Races;
   tour: Tour;
   garage: ImperialGarage;
