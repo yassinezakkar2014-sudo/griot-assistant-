@@ -2,6 +2,7 @@
 import * as THREE from "three";
 import { G, bus, clamp, damp } from "../core";
 import { Humanoid, DEFAULT_LOOK, type Look } from "./humanoid";
+import { EMOTES } from "../ui/emotes";
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -27,6 +28,15 @@ export class Player {
   height = 1.8;
   sitting: { pos: THREE.Vector3; yaw: number } | null = null;
   speedMul = 1;
+  /** emote en cours (id, début) — annulée dès qu'on bouge */
+  emoteState: { id: string; t0: number } | null = null;
+  emote(id: string) {
+    const e = EMOTES.find((x) => x.id === id);
+    if (!e || G.mode !== "foot") return false;
+    this.emoteState = { id, t0: performance.now() };
+    this.body.bubble(e.emoji);
+    return true;
+  }
   /** SUPER VITESSE (touche U / ⚡) : course éclair à plus de 400 km/h */
   superSpeed = false;
   private fx: HTMLElement | null = null;
@@ -228,6 +238,13 @@ export class Player {
       r.rotation.y += d * Math.min(1, dt * 12);
     }
     this.body.animate(dt, this.moveSpeed, !this.onGround);
+    if (this.emoteState) {
+      const et = (performance.now() - this.emoteState.t0) / 1000;
+      if (this.moveSpeed > 0.6 || !this.onGround || et > (this.emoteState.id === "dance" ? 30 : 5)) {
+        this.emoteState = null;
+        this.body.clearEmote();
+      } else this.body.emote(this.emoteState.id, et);
+    }
     this.updateCamera(dt);
 
     // détection d'étage pour la mission de visite

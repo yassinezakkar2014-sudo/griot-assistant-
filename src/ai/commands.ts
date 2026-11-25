@@ -41,7 +41,23 @@ function clause(raw: string): Intent | null {
   }
   if (/\b(chasse au tresor|tresor|joyaux?|indice)\b/.test(t)) return { action: "treasure", target: /\b(indice|ou est|aide.moi)\b/.test(t) ? "hint" : /\b(recommence|rejouer|reset)\b/.test(t) ? "reset" : "start" };
   if (/\b(grande roue|montagnes? russes?|carrousel|manege|parc d attractions?|ile des attractions|fete foraine)\b/.test(t)) return { action: "teleport", target: "park" };
-  if (/\b(yacht|bateau|marina|regate)\b/.test(t)) return { action: /\bregate\b/.test(t) ? "race" : "yacht", target: /\bregate\b/.test(t) ? "mer" : null };
+  if (/\b(yacht|bateau|marina|regate|navire|croisiere)\b/.test(t) || (/\bvoyage\b/.test(t) && /\b(vers|a|en|au|aux)\b/.test(t))) {
+    if (/\bregate\b/.test(t)) return { action: "race", target: "mer" };
+    if (/\b(furtif|invisible)\b/.test(t)) return { action: "yacht", target: "stealth" };
+    if (/\b(supersonique|supersonic|mach)\b/.test(t)) return { action: "yacht", target: "sonic" };
+    if (/\b(vers|voyage|cap sur|direction|emmene|va)\b/.test(t) && !/\b(le|du|au) (yacht|bateau)$/.test(t)) return { action: "yacht", target: "voyage:" + t };
+    return { action: "yacht" };
+  }
+  // --- emotes ---
+  if (/\b(emotes?|emoticones?)\b/.test(t)) return { action: "emote", target: "menu" };
+  if (/^(danse|dance|fais (une )?danse|fais la fete)\b|\bdanse\b.*\b(avatar|personnage)\b/.test(t)) return { action: "emote", target: "dance" };
+  if (/^(fais coucou|coucou|salue|dis bonjour de la main|fais signe)\b/.test(t)) return { action: "emote", target: "wave" };
+  if (/^(applaudis|applaudir|bravo)\b/.test(t)) return { action: "emote", target: "clap" };
+  if (/^(fais (une )?reverence|reverence|incline.toi)\b/.test(t)) return { action: "emote", target: "bow" };
+  if (/^(victoire|fais la victoire|leve les bras)\b/.test(t)) return { action: "emote", target: "victory" };
+  if (/^(salut militaire|garde a vous|salut royal)\b/.test(t)) return { action: "emote", target: "salute" };
+  if (/^(muscles|montre tes muscles|fais les muscles)\b/.test(t)) return { action: "emote", target: "flex" };
+  if (/^(rigole|ris|eclate.toi de rire|fais rire)\b/.test(t)) return { action: "emote", target: "laugh" };
   if (/\b(course|contre la montre|chrono)\b/.test(t) && !/\b(courses? au|faire les courses|eclair)\b/.test(t)) return { action: "race", target: /\b(aerienne|ciel|anneaux|vaisseau)\b/.test(t) ? "ciel" : /\b(mer|bateau|yacht)\b/.test(t) ? "mer" : /\b(arrete|stop|abandonne)\b/.test(t) ? "stop" : "route" };
   if (/\b(visite guidee|fais.moi visiter|visite du royaume|guide.moi|fais.moi la visite|stop visite|arrete la visite)\b/.test(t)) return { action: "tour", target: /\b(stop|arrete)\b/.test(t) ? "stop" : "start" };
 

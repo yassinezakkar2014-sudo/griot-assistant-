@@ -144,7 +144,7 @@ export function worldHeight(x: number, z: number) {
     const land = 1 - smooth(c.r * 0.72, c.r, edge);
     if (land <= 0) continue;
     let lh = c.base + 2 + fbm(x * 0.0025 + 11, z * 0.0025 - 4) * c.hills;
-    if (c.style === "snow") lh += ridged(x * 0.0013 + 4, z * 0.0013) * 520 * smooth(c.r * 0.3, c.r * 0.62, dc);
+    if (c.style === "snow" || c.style === "alps") lh += ridged(x * 0.0013 + 4, z * 0.0013) * 520 * smooth(c.r * 0.3, c.r * 0.62, dc);
     if (c.style === "volcano") {
       const dv = Math.hypot(x - (c.x + c.r * 0.42), z - (c.z + c.r * 0.18));
       lh += Math.max(0, 640 * (1 - dv / 950)) - Math.max(0, 160 * (1 - dv / 140));
@@ -266,7 +266,11 @@ export class Terrain {
       normalMap: this.normalTex,
       normalScale: new THREE.Vector2(0.35, 0.35),
       transparent: true,
-      opacity: 0.92
+      opacity: 0.92,
+      // l'eau est repoussée en profondeur : jamais d'eau qui « perce » la terre sur les appareils peu précis
+      polygonOffset: true,
+      polygonOffsetFactor: 4,
+      polygonOffsetUnits: 16
     });
     this.water = new THREE.Mesh(new THREE.PlaneGeometry(EARTH * 1.5, EARTH * 1.5), this.waterMat);
     this.water.rotation.x = -Math.PI / 2;

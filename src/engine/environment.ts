@@ -168,6 +168,15 @@ export class Environment {
     // en altitude, le brouillard s'éclaircit : on voit le sol au lieu d'un voile bleu
     const alt = Math.max(0, this.camera.position.y - Math.max(0, G.physics?.terrain(this.camera.position.x, this.camera.position.z) ?? 0) - 120);
     this.fog.density = 0.00028 / (1 + alt / 300);
+    // précision de profondeur : plan proche adapté à l'altitude (sinon l'eau traverse la terre au loin)
+    if (!this.space) {
+      const flying = (G.mode as string) === "ship" || (G.mode as string) === "boat";
+      const near = flying ? Math.min(4, Math.max(0.1, alt / 60)) : 0.1;
+      if (Math.abs(this.camera.near - near) > near * 0.15) {
+        this.camera.near = near;
+        this.camera.updateProjectionMatrix();
+      }
+    }
     if (this.space) {
       this.scene.fog = null;
       this.sky.visible = false;
