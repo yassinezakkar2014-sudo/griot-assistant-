@@ -409,7 +409,7 @@ export class Yacht {
     if (this.onDeck && G.mode === "foot") this.collideDeck();
     if (!this.active) return;
     const inp = G.input;
-    if (inp.hit("KeyF")) return this.toDeck();
+    if (inp.hit("KeyF", "KeyE")) return this.toDeck();
     if (inp.hit("KeyB")) this.setSupersonic(!this.supersonic);
     if (inp.hit("KeyK")) this.setStealth(!this.stealth);
     if (inp.hit("KeyV")) this.camMode = (this.camMode + 1) % 3;

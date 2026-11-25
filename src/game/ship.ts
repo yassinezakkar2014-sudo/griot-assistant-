@@ -715,7 +715,7 @@ export class Ship {
     if (inp.hit("KeyK")) this.setStealth(!this.stealth);
     if (inp.hit("KeyB")) this.setSupersonic(!this.supersonic);
     if (inp.hit("KeyV")) this.cycleView();
-    if (inp.hit("KeyF")) return this.exit();
+    if (inp.hit("KeyF", "KeyE")) return this.exit();
     if (inp.hit("KeyH")) this.land();
     if (inp.hit("KeyI") && !this.opts.small && G.cabin) return void G.cabin.enter();
     if (inp.hit("KeyO") && !this.opts.small) {
@@ -727,7 +727,7 @@ export class Ship {
     const thrIn = inp.axis(["KeyS"], ["KeyW"]) + (inp.down("TouchThrottleUp") ? 1 : 0) - (inp.down("TouchThrottleDown") ? 1 : 0);
     // PC : la souris fait tourner le vaisseau (gauche/droite) et le cabre (haut/bas)
     const yawIn = clamp(inp.axis(["KeyD"], ["KeyA"]) - inp.touchMove.x - look.x * 14, -1.6, 1.6);
-    const rollIn = inp.axis(["KeyE"], ["KeyQ"]);
+    const rollIn = 0; // inclinaison automatique (touches simplifiées)
     const pitchIn = inp.axis(["ArrowDown"], ["ArrowUp"]) - look.y * 18 + -inp.touchMove.y * 0.8;
     const liftIn = inp.axis(["KeyC", "ControlLeft", "TouchDown"], ["Space", "TouchUp"]);
     const manual = Math.abs(thrIn) + Math.abs(yawIn) + Math.abs(pitchIn) + Math.abs(liftIn) + Math.abs(rollIn) > 0.05;

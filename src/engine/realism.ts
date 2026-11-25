@@ -111,7 +111,7 @@ export class Realism {
         #endif`
       );
     };
-    const n = G.mobile ? 2600 : 5000;
+    const n = document.documentElement.classList.contains("phone") ? 1400 : G.mobile ? 2600 : 5000;
     this.grass = new THREE.InstancedMesh(geo, m, n);
     this.grass.count = 0;
     this.grass.frustumCulled = false;

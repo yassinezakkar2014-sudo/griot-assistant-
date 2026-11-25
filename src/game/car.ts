@@ -453,7 +453,7 @@ export class CarSystem {
     const car = this.active;
     if (!car || (G.mode as string) !== "car") return;
     const inp = G.input;
-    if (inp.hit("KeyF")) {
+    if (inp.hit("KeyF", "KeyE")) {
       if (G.autopilot?.dest) {
         G.autopilot.stop();
         car.speed = 0;

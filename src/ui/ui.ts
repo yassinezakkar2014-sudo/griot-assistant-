@@ -96,6 +96,7 @@ export class UI {
     bus.on("ui:call", () => this.call());
     bus.on("ui:train", (from: string) => this.trainPanel(from));
     bus.on("ui:flight", (from: string) => this.flightPanel(from));
+    bus.on("gamepad", () => (this.keysMode = ""));
     if ((window as any).claude) document.documentElement.classList.add("in-claude");
     document.querySelectorAll<HTMLElement>("[data-say]").forEach((b) => (b.onclick = () => this.griot.send(b.dataset.say!)));
     $("vActivate").onclick = () => this.griot.send("active AISAM");
@@ -106,6 +107,10 @@ export class UI {
       bus.emit("layout");
     };
     $("vFull").onclick = () => setFull(true);
+    // téléphone : le jeu passe automatiquement en plein écran quand AISAM s'active
+    bus.on("aisam:state", (st: string) => {
+      if (G.mobile && Math.min(innerWidth, innerHeight) < 600 && /ACTIF/.test(String(st)) && !document.body.classList.contains("full")) setFull(true);
+    });
     $("exitFull").onclick = () => setFull(false);
     // la fenêtre de jeu suit l'emplacement réservé dans l'interface
     const slot = $("viewSlot");
@@ -1417,6 +1422,7 @@ export class UI {
         G.audio.unlock();
         if (code === "Escape") return this.menu();
         if (code === "KeyM") return this.map();
+        if (code === "Tab") return G.actions.toggle();
         G.input.touchButtons.add(code);
         G.input.tap(code);
       });
@@ -1474,22 +1480,41 @@ export class UI {
   /** Menu des touches (PC) sous la mini-carte, selon ce que l'on fait. */
   private keysMode = "";
   private updateKeysHelp() {
-    if (G.mobile) return;
-    const mode = G.mode === "foot" ? (G.mecha?.active ? "titan" : G.armor.worn ? "armor" : "foot") : G.mode;
+    const pad = !!G.gamepad?.connected;
+    if (G.mobile && !pad) return;
+    const mode = (G.mode === "foot" ? (G.mecha?.active ? "titan" : G.armor.worn ? "armor" : "foot") : G.mode) + (pad ? "-pad" : "");
     if (mode === this.keysMode) return;
     this.keysMode = mode;
     const K = (k: string, t: string) => `<div><kbd>${k}</kbd><span>${t}</span></div>`;
-    const common = K("M", "Carte") + K("Entrée", "Parler à GRIOT") + K("T", "Micro") + K("P", "Menu") + K("J", "Missions");
-    const lists: Record<string, string> = {
-      foot: K("ZQSD / WASD", "Marcher") + K("Souris", "Regarder") + K("Maj", "Courir") + K("Espace ×2", "Double saut") + K("U", "⚡ Super vitesse") + K("B", "😀 Emotes") + K("E", "Interagir") + K("V", "Vue 1re / 3e pers.") + common,
-      armor: K("ZQSD", "Marcher") + K("Espace ×2", "Double saut") + K("1", "Onde de choc") + K("2", "Bouclier") + K("3", "Surcharge") + K("4", "Vision") + K("5 / G", "Rayon") + K("X", "Masque") + K("E", "Interagir") + common,
-      titan: K("ZQSD", "Marcher (Titan)") + K("Espace", "Réacteurs") + K("5 / G", "Canon") + K("1", "Frappe au sol") + common,
-      ship: K("Souris", "Tourner / cabrer") + K("W / S", "Poussée") + K("A / D", "Tourner") + K("Q / E", "Inclinaison") + K("Espace / C", "Monter / descendre") + K("Maj", "Post-combustion") + K("R", "Moteurs") + K("H", "Atterrir") + K("B", "Supersonique") + K("K", "Furtif") + K("I", "Cabine") + K("O", "Espace") + K("V", "Vue") + K("F", "Sortir"),
-      boat: K("W / S", "Gaz") + K("A / D", "Barre") + K("B", "⚡ Supersonique") + K("K", "👁 Furtif") + K("V", "Vue") + K("F", "Pont") + common,
-      ride: K("F", "Descendre") + common,
-      car: K("W / S", "Accélérer / freiner") + K("A / D", "Tourner") + K("Y", "🤖 Pilote auto") + K("V", "Vue") + K("F", "Sortir") + common
-    };
-    $("keysHelp").innerHTML = `<div class="kh-title">⌨ Touches</div>${lists[mode] ?? common}`;
+    let html: string;
+    if (pad) {
+      const m = G.mode as string;
+      const veh = m === "car" || m === "boat" || m === "ship";
+      html =
+        `<div class="kh-title">🎮 Manette</div>` +
+        K("Stick G", veh ? "Diriger" : "Bouger") +
+        K("Stick D", "Regarder") +
+        (veh ? K("RT / LT", m === "ship" ? "Poussée / descendre" : "Accélérer / freiner") : K("A", "Sauter")) +
+        K("B", veh ? "Sortir" : "Interagir") +
+        K("RB", veh ? "Boost" : "Courir") +
+        K("Y", "Toutes les actions") +
+        K("Start", "Menu");
+    } else {
+      const m = G.mode as string;
+      const move =
+        m === "ship" ? K("Souris", "Diriger") + K("W / S", "Poussée") + K("Espace / C", "Monter / descendre")
+        : m === "car" || m === "boat" ? K("W / S", "Avancer / freiner") + K("A / D", "Tourner")
+        : m === "ride" ? ""
+        : K("ZQSD", "Bouger") + K("Souris", "Regarder") + K("Espace", "Sauter");
+      html =
+        `<div class="kh-title">⌨ Touches</div>` +
+        move +
+        (m === "ride" ? "" : K("Maj", m === "foot" ? "Courir" : "Boost")) +
+        K("E", m === "foot" ? "Interagir" : m === "boat" ? "Aller sur le pont" : "Sortir") +
+        K("Tab", "Toutes les actions") +
+        K("Entrée", "Parler à GRIOT");
+    }
+    $("keysHelp").innerHTML = html;
   }
 
   private drawMinimap(p: THREE.Vector3, yaw: number) {
