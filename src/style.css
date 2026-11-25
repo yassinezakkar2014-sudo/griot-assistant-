@@ -570,3 +570,4 @@ body[data-mode="ship"] .keys-help { font-size: 11px; }
 .yacht-hud button { padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.07); color: inherit; cursor: pointer; font: inherit; }
 .yacht-hud button.on { background: linear-gradient(90deg,#d8b25a,#ffdf8a); color: #1a1406; }
 .yacht-hud .yh-title { color: #ffd27a; }
+.build-tag { position: fixed; right: 8px; bottom: 4px; z-index: 40; font: 500 10px Manrope, system-ui, sans-serif; color: rgba(200,220,255,.45); pointer-events: none; }

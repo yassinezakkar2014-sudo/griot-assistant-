@@ -43,6 +43,7 @@ import { Weather, Fireworks } from "./game/weather";
 import { Traffic, Treasure, ThemePark, Races, Tour, LEISURE_PLACES } from "./game/leisure";
 import { Yacht } from "./game/megayacht";
 import { buildLandmarks } from "./world/landmarks";
+import { Realism } from "./engine/realism";
 import { EmoteWheel } from "./ui/emotes";
 import { ImperialGarage, buildPortals } from "./game/garage";
 
@@ -60,10 +61,13 @@ const progress = (p: number, label: string) => {
 // iPad (y compris iPadOS qui se présente comme un Mac), téléphones, tablettes
 G.mobile = matchMedia("(pointer: coarse)").matches || (navigator.maxTouchPoints > 1 && /Macintosh|iPad|iPhone|Android/.test(navigator.userAgent));
 if (G.mobile) document.documentElement.classList.add("touch");
-const settings = { bloom: !G.mobile, shadows: !G.mobile, pixelRatio: G.mobile ? 0.6 : 1, ao: false };
+// v2 : graphismes plus réalistes aussi sur iPad (ombres, bloom, meilleure résolution)
+const settings = { v: 2, bloom: true, shadows: true, pixelRatio: G.mobile ? 0.8 : 1, ao: false };
 try {
-  Object.assign(settings, JSON.parse(localStorage.getItem("griot-gfx") || "{}"));
+  const saved = JSON.parse(localStorage.getItem("griot-gfx") || "{}");
+  if (saved.v === 2) Object.assign(settings, saved);
 } catch {}
+console.info("GRIOT version", __BUILD__);
 (window as any).__griotSettings = settings;
 
 // app installable (écran d'accueil) : fonctionne hors ligne après la première visite
@@ -226,6 +230,7 @@ async function boot() {
   G.tour.build();
   G.emotes = new EmoteWheel();
   G.emotes.build();
+  new Realism().build(renderer);
   PLACES.push({ id: "park", name: "l'Île des Attractions", pos: () => LEISURE_PLACES.park(), outdoor: true });
   PLACES.push({ id: "marina", name: "la marina royale", pos: () => LEISURE_PLACES.marina(), outdoor: true });
   G.armor = new ArmorSystem();
@@ -252,7 +257,7 @@ async function boot() {
   const applySettings = () => {
     G.env.bloomEnabled = settings.bloom;
     G.env.ao.enabled = settings.ao;
-    const res = settings.ao ? 4096 : 2048;
+    const res = settings.ao ? 4096 : G.mobile ? 1024 : 2048;
     if (G.env.sun.shadow.mapSize.x !== res) {
       G.env.sun.shadow.mapSize.set(res, res);
       G.env.sun.shadow.map?.dispose();
