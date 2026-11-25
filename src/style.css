@@ -555,3 +555,5 @@ body[data-mode="ship"] .keys-help { font-size: 11px; }
 .fid-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; background: rgba(255,255,255,.06); margin-bottom: 6px; }
 .fid-toggle { display: flex; align-items: center; gap: 6px; }
 .admin-badge { position: fixed; left: 50%; top: 8px; transform: translateX(-50%); z-index: 70; padding: 4px 12px; border-radius: 999px; background: rgba(10,16,30,.8); border: 1px solid rgba(255,214,122,.5); color: #ffd27a; font: 600 12px Manrope, system-ui, sans-serif; cursor: pointer; }
+.race-hud { position: fixed; left: 50%; top: 64px; transform: translateX(-50%); z-index: 60; display: flex; gap: 14px; align-items: center; padding: 8px 16px; border-radius: 14px; background: rgba(6,14,28,.82); border: 1px solid rgba(255,210,59,.5); color: #fff2c8; font: 600 14px Manrope, system-ui, sans-serif; }
+.race-hud span { font-variant-numeric: tabular-nums; }
