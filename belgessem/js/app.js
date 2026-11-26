@@ -4,6 +4,10 @@
   const CART_KEY = "belgessem-cart";
   const SHIPPING_FREE_FROM = 80;
   const SHIPPING_PRICE = 5.9;
+  // Adresse qui reçoit les commandes par e-mail (via FormSubmit.co, gratuit, sans compte).
+  // Laisser vide pour le mode démonstration (aucun e-mail envoyé).
+  // Après la 1re commande, FormSubmit envoie un e-mail d'activation à cette adresse : cliquer sur « Activate ».
+  const ORDER_EMAIL = "zakkaretmaamounbenhammoudayass@gmail.com";
 
   const $ = (sel, root = document) => root.querySelector(sel);
   const euro = (n) => n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
@@ -292,13 +296,52 @@
         writeCart(cart);
         render();
       });
-      root.addEventListener("submit", (e) => {
+      root.addEventListener("submit", async (e) => {
         if (e.target.id !== "checkout") return;
         e.preventDefault();
-        const name = new FormData(e.target).get("name");
+        const form = e.target;
+        const f = Object.fromEntries(new FormData(form));
+        const cart = readCart().filter((l) => byId(l.id));
         const ref = "BG-" + Math.random().toString(36).slice(2, 8).toUpperCase();
+        const subtotal = cart.reduce((s, l) => s + byId(l.id).price * l.qty, 0);
+        const shipping = subtotal >= SHIPPING_FREE_FROM ? 0 : SHIPPING_PRICE;
+        const lines = cart.map((l) => `${l.qty} x ${byId(l.id).name} (${l.option}) : ${euro(byId(l.id).price * l.qty)}`).join("\n");
+        let sent = false;
+        if (ORDER_EMAIL) {
+          const btn = form.querySelector("button");
+          btn.disabled = true;
+          btn.textContent = "Envoi de la commande…";
+          try {
+            const res = await fetch(`https://formsubmit.co/ajax/${ORDER_EMAIL}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Accept: "application/json" },
+              body: JSON.stringify({
+                _subject: `Nouvelle commande Belgessem ${ref}`,
+                _template: "table",
+                _captcha: "false",
+                _autoresponse: `Bonjour ${f.name}, merci pour votre commande ${ref} chez Belgessem !\n\n${lines}\nLivraison : ${shipping ? euro(shipping) : "offerte"}\nTotal : ${euro(subtotal + shipping)}\n\nLivraison à : ${f.address}, ${f.zip} ${f.city}\n\n(Boutique fictive : aucun paiement n'est encaissé.)`,
+                Commande: ref,
+                Nom: f.name,
+                email: f.email,
+                Adresse: `${f.address}, ${f.zip} ${f.city}`,
+                Articles: lines,
+                Livraison: shipping ? euro(shipping) : "Offerte",
+                Total: euro(subtotal + shipping),
+              }),
+            });
+            const data = await res.json().catch(() => ({}));
+            sent = res.ok && String(data.success) === "true";
+            if (!sent) throw new Error(data.message || `HTTP ${res.status}`);
+          } catch (err) {
+            console.error("Envoi de la commande impossible :", err);
+            btn.disabled = false;
+            btn.textContent = "Valider la commande";
+            toast("La commande n'a pas pu être envoyée. Vérifiez votre connexion et réessayez.");
+            return;
+          }
+        }
         writeCart([]);
-        root.innerHTML = `<div class="empty"><h2>Merci ${esc(name)} !</h2><p>Votre commande <strong>${ref}</strong> est enregistrée. Vous recevrez un e-mail de confirmation.</p><a class="btn" href="index.html">Retour à l'accueil</a></div>`;
+        root.innerHTML = `<div class="empty"><h2>Merci ${esc(f.name)} !</h2><p>Votre commande <strong>${ref}</strong> est enregistrée.</p><p class="muted">${sent ? `Un e-mail de confirmation a été envoyé à ${esc(f.email)}.` : "Mode démonstration : aucun e-mail n'a été envoyé."}</p><a class="btn" href="index.html">Retour à l'accueil</a></div>`;
       });
       render();
     },
