@@ -7,7 +7,7 @@
   // Adresse qui reçoit les commandes par e-mail (via FormSubmit.co, gratuit, sans compte).
   // Laisser vide pour le mode démonstration (aucun e-mail envoyé).
   // Après la 1re commande, FormSubmit envoie un e-mail d'activation à cette adresse : cliquer sur « Activate ».
-  const ORDER_EMAIL = "";
+  const ORDER_EMAIL = "zakkaretmaamounbenhammoudayass@gmail.com";
 
   const $ = (sel, root = document) => root.querySelector(sel);
   const euro = (n) => n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
